@@ -5899,6 +5899,8 @@ function AddAgencyForm({ isDark, onSaveForLater, onDiscard, initialDraft, c, btn
   // we flip draftAttempted so inline hints render, and pop a toast.
   const [draftAttempted, setDraftAttempted] = useState(false);
   const [missingDraftToast, setMissingDraftToast] = useState(false);
+  // Shown when user clicks Submit but the form is incomplete — offers Save as Draft.
+  const [submitIncompleteOpen, setSubmitIncompleteOpen] = useState(false);
 
   const validators: Record<string, (v: string) => string | null> = {
     email: v => !v ? null : /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ? null : "Enter a valid email",
@@ -5988,6 +5990,9 @@ function AddAgencyForm({ isDark, onSaveForLater, onDiscard, initialDraft, c, btn
     setSubmitted(true);
     if (Object.keys(newErrors).length === 0) {
       // form submission would happen here
+    } else {
+      // Friendly prompt — invite the user to save as a draft instead.
+      setSubmitIncompleteOpen(true);
     }
   };
 
@@ -6603,6 +6608,55 @@ function AddAgencyForm({ isDark, onSaveForLater, onDiscard, initialDraft, c, btn
           </button>
         </div>
       )}
+      {submitIncompleteOpen && (() => {
+        // The same minimum-fields check the Save-for-Later button uses.
+        const canSaveDraft =
+          agencyName.trim().length > 0 &&
+          agencyCode.trim().length > 0 &&
+          contact.trim().length > 0 &&
+          email.trim().length > 0 &&
+          phone.trim().length > 0;
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-6"
+            onClick={() => setSubmitIncompleteOpen(false)}
+            style={{ background: "rgba(0,0,0,0.45)" }}>
+            <div className="w-[460px] rounded-2xl p-6 shadow-2xl" onClick={e => e.stopPropagation()}
+              style={{ background: c.cardBg, border: `1px solid ${c.border}`, fontFamily: FONT }}>
+              <div className="flex items-start gap-4 mb-5">
+                <div className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0"
+                  style={{ background: "rgba(166,20,195,0.10)" }}>
+                  <AlertCircle className="w-6 h-6" style={{ color: "#A614C3" }} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-[16px] font-bold mb-1" style={{ color: c.text }}>Form not yet complete</h3>
+                  <p className="text-[13px]" style={{ color: c.muted, lineHeight: "18px" }}>
+                    Some required fields are still empty.
+                    {canSaveDraft
+                      ? " You can save this as a draft and finish later."
+                      : <> To save as a draft, fill in <strong style={{ color: c.text }}>Agency Name</strong>, <strong style={{ color: c.text }}>Code</strong>, <strong style={{ color: c.text }}>Contact</strong>, <strong style={{ color: c.text }}>Email</strong>, and <strong style={{ color: c.text }}>Phone</strong>.</>}
+                  </p>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <button onClick={() => setSubmitIncompleteOpen(false)}
+                  className="px-4 py-2 rounded-lg text-[12px] font-medium transition-colors"
+                  style={{ ...font, border: `1px solid ${c.border}`, color: c.text, background: "transparent", cursor: "pointer" }}
+                  onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+                  onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                  Continue Editing
+                </button>
+                {canSaveDraft && (
+                  <button onClick={() => { setSubmitIncompleteOpen(false); onSaveForLater(collectDraft()); }}
+                    className="px-4 py-2 rounded-lg text-[12px] font-semibold text-white transition-all"
+                    style={{ ...font, background: btnGrad, border: "none", cursor: "pointer" }}>
+                    Save as Draft
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
       {discardConfirmOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-6"
           onClick={() => setDiscardConfirmOpen(false)}
