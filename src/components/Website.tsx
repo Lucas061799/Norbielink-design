@@ -212,7 +212,7 @@ function LoginView({ c, font, inputStyle, labelStyle, primaryBtnStyle, btnGrad, 
   onResetLinkClicked: () => void;
   onResetEmailSent: (email: string, mode: "password" | "userId" | "both") => void;
 }) {
-  const [identifier, setIdentifier] = useState("lisa.armitage");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(false);
   const [showPw, setShowPw] = useState(false);
@@ -240,9 +240,9 @@ function LoginView({ c, font, inputStyle, labelStyle, primaryBtnStyle, btnGrad, 
       </p>
 
       <div className="mb-5">
-        <label style={labelStyle}>Email or User ID</label>
+        <label style={labelStyle}>User ID</label>
         <input type="text" value={identifier} onChange={e => setIdentifier(e.target.value)}
-          placeholder="you@company.com or your User ID"
+          placeholder="Enter your email or User ID"
           style={inputStyle} />
       </div>
 
@@ -534,8 +534,7 @@ function ResetModal({ c, font, inputStyle, labelStyle, btnGrad, onClose, onSimul
         </div>
 
         {/* Footer — secondary action on the left, primary on the right */}
-        <div className="flex items-center justify-between gap-2 px-6 py-3"
-          style={{ borderTop: `1px solid ${c.border}` }}>
+        <div className="flex items-center justify-between gap-2 px-6 pb-5 pt-2">
           {step === "choose" && (
             <>
               <button onClick={onClose}

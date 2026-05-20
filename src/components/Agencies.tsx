@@ -5895,6 +5895,10 @@ function AddAgencyForm({ isDark, onSaveForLater, onDiscard, initialDraft, c, btn
   const REASON_OPTIONS = ["Closed", "Sold", "Credit Hold", "Missing Info", "Terminated"];
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitted, setSubmitted] = useState(false);
+  // Save for Later: when the user clicks the button with missing required fields,
+  // we flip draftAttempted so inline hints render, and pop a toast.
+  const [draftAttempted, setDraftAttempted] = useState(false);
+  const [missingDraftToast, setMissingDraftToast] = useState(false);
 
   const validators: Record<string, (v: string) => string | null> = {
     email: v => !v ? null : /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ? null : "Enter a valid email",
@@ -5987,8 +5991,21 @@ function AddAgencyForm({ isDark, onSaveForLater, onDiscard, initialDraft, c, btn
     }
   };
 
-  const ErrMsg = ({ k }: { k: string }) =>
-    errors[k] ? <p className="text-[11px] mt-1" style={{ color: "#EF4444", fontFamily: FONT }}>{errors[k]}</p> : null;
+  const ErrMsg = ({ k, value }: { k: string; value?: string }) => {
+    // If a DraftHint will render in place of this error (draft-required field is empty after
+    // a Save-for-Later attempt), suppress this message to avoid the redundant duplicate.
+    if (value !== undefined && draftAttempted && value.trim().length === 0) return null;
+    return errors[k] ? <p className="text-[11px] mt-1" style={{ color: "#EF4444", fontFamily: FONT }}>{errors[k]}</p> : null;
+  };
+
+  // Inline hint shown below required fields when the user clicks "Save for Later" without filling them.
+  // Hidden once the user starts typing in that field.
+  const DraftHint = ({ value }: { value: string }) =>
+    draftAttempted && value.trim().length === 0
+      ? <p className="text-[11px] mt-1 flex items-center gap-1" style={{ color: "#A614C3", fontFamily: FONT }}>
+          <AlertCircle className="w-3 h-3 flex-shrink-0" />Required to save as draft
+        </p>
+      : null;
 
   const formatPhone = (raw: string) => {
     const digits = raw.replace(/\D/g, "").slice(0, 10);
@@ -6163,7 +6180,26 @@ function AddAgencyForm({ isDark, onSaveForLater, onDiscard, initialDraft, c, btn
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-[18px] font-bold" style={{ ...font, color: c.text }}>Add New Agency Information</h2>
-            <button onClick={() => onSaveForLater(collectDraft())} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-colors"
+            <button
+              onClick={() => {
+                // Save for Later requires the top-two rows filled. Missing fields trigger inline hints + a toast.
+                const missing =
+                  agencyName.trim().length === 0 ||
+                  agencyCode.trim().length === 0 ||
+                  contact.trim().length === 0 ||
+                  email.trim().length === 0 ||
+                  phone.trim().length === 0;
+                if (missing) {
+                  setDraftAttempted(true);
+                  setMissingDraftToast(true);
+                  setTimeout(() => setMissingDraftToast(false), 4000);
+                  return;
+                }
+                setDraftAttempted(false);
+                onSaveForLater(collectDraft());
+              }}
+              title="Save this draft for later"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-colors"
               style={{ ...font, border: `1px solid ${isDark ? "rgba(255,255,255,0.10)" : "#E5E7EB"}`, color: c.text }}
               onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
               onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
@@ -6178,7 +6214,8 @@ function AddAgencyForm({ isDark, onSaveForLater, onDiscard, initialDraft, c, btn
               <input value={agencyName}
                 onChange={e => { setAgencyName(e.target.value); runValidate("agencyName", e.target.value); }}
                 placeholder="Agency name" style={{ ...inputStyle, ...errorStyleFor("agencyName") }} />
-              <ErrMsg k="agencyName" />
+              <ErrMsg k="agencyName" value={agencyName} />
+              <DraftHint value={agencyName} />
             </div>
             <div>
               <label style={labelStyle}>Agency Code:</label>
@@ -6195,7 +6232,8 @@ function AddAgencyForm({ isDark, onSaveForLater, onDiscard, initialDraft, c, btn
                   <span style={isDark ? { color: "#FFFFFF" } : { backgroundImage: "linear-gradient(88.54deg, #5C2ED4 0.1%, #A614C3 63.88%)", backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Create Code</span>
                 </button>
               </div>
-              <ErrMsg k="agencyCode" />
+              <ErrMsg k="agencyCode" value={agencyCode} />
+              <DraftHint value={agencyCode} />
             </div>
             <div>
               <label style={labelStyle}>Agency Type:</label>
@@ -6223,6 +6261,36 @@ function AddAgencyForm({ isDark, onSaveForLater, onDiscard, initialDraft, c, btn
                   );
                 })}
               </div>
+            </div>
+          </div>
+
+          {/* Agency Contact + Email + Phone — placed early so the most-important contact info sits near the top */}
+          <div className="grid grid-cols-3 gap-6 mb-6">
+            <div>
+              <label style={labelStyle}>Agency Contact:</label>
+              <input value={contact}
+                onChange={e => { setContact(e.target.value); runValidate("contact", e.target.value); }}
+                placeholder="Contact name" style={{ ...inputStyle, ...errorStyleFor("contact") }} />
+              <ErrMsg k="contact" value={contact} />
+              <DraftHint value={contact} />
+            </div>
+            <div>
+              <label style={labelStyle}>Email Address:</label>
+              <input value={email}
+                onChange={e => { setEmail(e.target.value); runValidate("email", e.target.value); }}
+                onBlur={e => runValidate("email", e.target.value)}
+                placeholder="Email" style={{ ...inputStyle, ...errorStyleFor("email") }} type="email" />
+              <ErrMsg k="email" value={email} />
+              <DraftHint value={email} />
+            </div>
+            <div>
+              <label style={labelStyle}>Phone Number:</label>
+              <input value={phone}
+                onChange={e => { const v = formatPhone(e.target.value); setPhone(v); runValidate("phone", v); }}
+                onBlur={e => runValidate("phone", e.target.value)}
+                placeholder="(000) 000-0000" style={{ ...inputStyle, ...errorStyleFor("phone") }} inputMode="tel" />
+              <ErrMsg k="phone" value={phone} />
+              <DraftHint value={phone} />
             </div>
           </div>
 
@@ -6314,26 +6382,7 @@ function AddAgencyForm({ isDark, onSaveForLater, onDiscard, initialDraft, c, btn
             <div />
           </div>
 
-          {/* Agency Contact + Email */}
-          <div className="grid grid-cols-3 gap-6 mb-6">
-            <div>
-              <label style={labelStyle}>Agency Contact:</label>
-              <input value={contact}
-                onChange={e => { setContact(e.target.value); runValidate("contact", e.target.value); }}
-                placeholder="Contact name" style={{ ...inputStyle, ...errorStyleFor("contact") }} />
-              <ErrMsg k="contact" />
-            </div>
-            <div>
-              <label style={labelStyle}>Email Address:</label>
-              <input value={email}
-                onChange={e => { setEmail(e.target.value); runValidate("email", e.target.value); }}
-                onBlur={e => runValidate("email", e.target.value)}
-                placeholder="Email" style={{ ...inputStyle, ...errorStyleFor("email") }} type="email" />
-              <ErrMsg k="email" />
-            </div>
-          </div>
-
-          {/* Business Type | Tax ID | Website */}
+          {/* Business Type | Tax ID */}
           <div className="grid grid-cols-3 gap-6 mb-6">
             <div>
               <label style={labelStyle}>Type of Business:</label>
@@ -6372,34 +6421,6 @@ function AddAgencyForm({ isDark, onSaveForLater, onDiscard, initialDraft, c, btn
                 placeholder="Tax ID" style={{ ...inputStyle, ...errorStyleFor("taxId") }} inputMode="numeric" />
               <ErrMsg k="taxId" />
             </div>
-            <div>
-              <label style={labelStyle}>Website Url:</label>
-              <input value={website}
-                onChange={e => { setWebsite(e.target.value); runValidate("website", e.target.value); }}
-                onBlur={e => runValidate("website", e.target.value)}
-                placeholder="https://" style={{ ...inputStyle, ...errorStyleFor("website") }} />
-              <ErrMsg k="website" />
-            </div>
-          </div>
-
-          {/* Phone | Toll Free */}
-          <div className="grid grid-cols-3 gap-6 mb-6">
-            <div>
-              <label style={labelStyle}>Phone Number:</label>
-              <input value={phone}
-                onChange={e => { const v = formatPhone(e.target.value); setPhone(v); runValidate("phone", v); }}
-                onBlur={e => runValidate("phone", e.target.value)}
-                placeholder="(000) 000-0000" style={{ ...inputStyle, ...errorStyleFor("phone") }} inputMode="tel" />
-              <ErrMsg k="phone" />
-            </div>
-            <div>
-              <label style={labelStyle}>Toll Free Number:</label>
-              <input value={tollFree}
-                onChange={e => { const v = formatPhone(e.target.value); setTollFree(v); runValidate("tollFree", v); }}
-                onBlur={e => runValidate("tollFree", e.target.value)}
-                placeholder="(000) 000-0000" style={{ ...inputStyle, ...errorStyleFor("tollFree") }} inputMode="tel" />
-              <ErrMsg k="tollFree" />
-            </div>
             <div />
           </div>
 
@@ -6431,6 +6452,27 @@ function AddAgencyForm({ isDark, onSaveForLater, onDiscard, initialDraft, c, btn
             <div>
               <label style={labelStyle}>Expiration Date:</label>
               <DatePicker value={eoExp} onChange={setEoExp} inputStyle={inputStyle} c={c as any} btnGrad={btnGrad} font={font} />
+            </div>
+            <div />
+          </div>
+
+          {/* Toll Free Number + Website Url */}
+          <div className="grid grid-cols-3 gap-6 mb-6">
+            <div>
+              <label style={labelStyle}>Toll Free Number:</label>
+              <input value={tollFree}
+                onChange={e => { const v = formatPhone(e.target.value); setTollFree(v); runValidate("tollFree", v); }}
+                onBlur={e => runValidate("tollFree", e.target.value)}
+                placeholder="(000) 000-0000" style={{ ...inputStyle, ...errorStyleFor("tollFree") }} inputMode="tel" />
+              <ErrMsg k="tollFree" />
+            </div>
+            <div>
+              <label style={labelStyle}>Website Url:</label>
+              <input value={website}
+                onChange={e => { setWebsite(e.target.value); runValidate("website", e.target.value); }}
+                onBlur={e => runValidate("website", e.target.value)}
+                placeholder="https://" style={{ ...inputStyle, ...errorStyleFor("website") }} />
+              <ErrMsg k="website" />
             </div>
             <div />
           </div>
@@ -6540,6 +6582,27 @@ function AddAgencyForm({ isDark, onSaveForLater, onDiscard, initialDraft, c, btn
         </div>
         </form>
       </div>
+      {missingDraftToast && (
+        <div className="fixed top-[68px] right-6 z-50 flex items-start gap-3"
+          style={{ background: c.cardBg, border: `1px solid ${c.border}`, borderRadius: 12, padding: "12px 14px", boxShadow: "0 4px 16px rgba(0,0,0,0.10)", minWidth: 320, maxWidth: 400, fontFamily: FONT }}>
+          <span className="flex items-center justify-center flex-shrink-0"
+            style={{ width: 28, height: 28, borderRadius: 8, background: "rgba(166,20,195,0.08)", marginTop: 1 }}>
+            <AlertCircle className="w-4 h-4" style={{ color: "#A614C3" }} />
+          </span>
+          <div className="flex-1 min-w-0">
+            <div className="text-[13px] font-semibold" style={{ color: c.text }}>Can&apos;t save draft yet</div>
+            <div className="text-[12px] mt-0.5" style={{ color: c.muted, lineHeight: "16px" }}>
+              Fill in Agency Name, Code, Contact, Email, and Phone first.
+            </div>
+          </div>
+          <button onClick={() => setMissingDraftToast(false)}
+            className="flex-shrink-0 transition-colors"
+            style={{ background: "transparent", border: "none", color: c.muted, cursor: "pointer", padding: 2 }}
+            aria-label="Dismiss">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
       {discardConfirmOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-6"
           onClick={() => setDiscardConfirmOpen(false)}
