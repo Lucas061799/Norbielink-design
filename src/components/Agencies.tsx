@@ -8,7 +8,7 @@ import {
   FileText as QuoteIcon, Shield,
   StickyNote, LayoutGrid, Trash2, Archive, Pin, List, Table2, FolderOpen, FileCheck,
   CheckSquare, Maximize2, Minimize2, Lock, Unlock, Copy, CopyPlus,
-  MoreVertical, UserCircle, UserX, UserMinus, Download, Upload, UserCog, Pencil, Globe, Eye, Headphones, Crown, Mail, Phone, Bell, Bookmark, FilePen, AlertCircle, Filter, Paperclip,
+  MoreVertical, UserCircle, UserX, UserMinus, Download, Upload, UserCog, Pencil, Globe, Eye, Headphones, Crown, Mail, Phone, Bell, Bookmark, FilePen, AlertCircle, Filter, Paperclip, Check,
 } from "lucide-react";
 import { AddressAutocomplete } from "./AddressAutocomplete";
 
@@ -6609,35 +6609,51 @@ function AddAgencyForm({ isDark, onSaveForLater, onDiscard, initialDraft, c, btn
         </div>
       )}
       {submitIncompleteOpen && (() => {
-        // The same minimum-fields check the Save-for-Later button uses.
-        const canSaveDraft =
-          agencyName.trim().length > 0 &&
-          agencyCode.trim().length > 0 &&
-          contact.trim().length > 0 &&
-          email.trim().length > 0 &&
-          phone.trim().length > 0;
+        // Per-field status — shows the user exactly which draft-required fields are filled vs missing.
+        const fields: { label: string; value: string }[] = [
+          { label: "Agency Name", value: agencyName },
+          { label: "Agency Code", value: agencyCode },
+          { label: "Agency Contact", value: contact },
+          { label: "Email Address", value: email },
+          { label: "Phone Number", value: phone },
+        ];
+        const canSaveDraft = fields.every(f => f.value.trim().length > 0);
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-6"
             onClick={() => setSubmitIncompleteOpen(false)}
             style={{ background: "rgba(0,0,0,0.45)" }}>
-            <div className="w-[460px] rounded-2xl p-6 shadow-2xl" onClick={e => e.stopPropagation()}
+            <div className="w-[440px] rounded-2xl shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}
               style={{ background: c.cardBg, border: `1px solid ${c.border}`, fontFamily: FONT }}>
-              <div className="flex items-start gap-4 mb-5">
-                <div className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0"
-                  style={{ background: "rgba(166,20,195,0.10)" }}>
-                  <AlertCircle className="w-6 h-6" style={{ color: "#A614C3" }} />
+              {/* Header */}
+              <div className="flex items-start justify-between px-6 pt-5 pb-3"
+                style={{ borderBottom: `1px solid ${c.border}` }}>
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className="flex items-center justify-center flex-shrink-0"
+                    style={{ width: 32, height: 32, borderRadius: 10, background: "rgba(166,20,195,0.08)" }}>
+                    <AlertCircle className="w-[18px] h-[18px]" style={{ color: "#A614C3" }} strokeWidth={1.75} />
+                  </span>
+                  <h3 className="text-[16px] font-bold" style={{ color: c.text }}>Form not yet complete</h3>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-[16px] font-bold mb-1" style={{ color: c.text }}>Form not yet complete</h3>
-                  <p className="text-[13px]" style={{ color: c.muted, lineHeight: "18px" }}>
-                    Some required fields are still empty.
-                    {canSaveDraft
-                      ? " You can save this as a draft and finish later."
-                      : <> To save as a draft, fill in <strong style={{ color: c.text }}>Agency Name</strong>, <strong style={{ color: c.text }}>Code</strong>, <strong style={{ color: c.text }}>Contact</strong>, <strong style={{ color: c.text }}>Email</strong>, and <strong style={{ color: c.text }}>Phone</strong>.</>}
-                  </p>
-                </div>
+                <button onClick={() => setSubmitIncompleteOpen(false)}
+                  className="flex-shrink-0 transition-colors"
+                  style={{ background: "transparent", border: "none", color: c.muted, cursor: "pointer", padding: 2, marginLeft: 12 }}
+                  aria-label="Close">
+                  <X className="w-4 h-4" />
+                </button>
               </div>
-              <div className="flex justify-end gap-2">
+
+              {/* Body */}
+              <div className="px-6 pt-4 pb-5">
+                <p className="text-[13px]" style={{ color: c.muted, lineHeight: "18px" }}>
+                  Some required fields are still empty.
+                  {canSaveDraft
+                    ? " You can save this as a draft and finish later."
+                    : <> To save as a draft, fill in <span style={{ color: c.text, fontWeight: 600 }}>Agency Name</span>, <span style={{ color: c.text, fontWeight: 600 }}>Code</span>, <span style={{ color: c.text, fontWeight: 600 }}>Contact</span>, <span style={{ color: c.text, fontWeight: 600 }}>Email</span>, and <span style={{ color: c.text, fontWeight: 600 }}>Phone</span>.</>}
+                </p>
+              </div>
+
+              {/* Footer */}
+              <div className="flex items-center justify-end gap-2 px-6 pb-5 pt-2">
                 <button onClick={() => setSubmitIncompleteOpen(false)}
                   className="px-4 py-2 rounded-lg text-[12px] font-medium transition-colors"
                   style={{ ...font, border: `1px solid ${c.border}`, color: c.text, background: "transparent", cursor: "pointer" }}
