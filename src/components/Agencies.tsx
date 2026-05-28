@@ -759,6 +759,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
     { id: "d5", category: "license",   name: `${agency.state || "NY"}-License.pdf`, date: "Jan 10, 2025", size: "0.6 MB" },
     { id: "d6", category: "agreement", name: "Appointment Letter.pdf",      date: agency.apptDate || "Mar 24, 2026", size: "0.5 MB" },
     { id: "d7", category: "agreement", name: "Producer Agreement.pdf",      date: agency.apptDate || "Mar 24, 2026", size: "1.1 MB" },
+    { id: "d8", category: "eo",        name: "EO-Certificate.pdf",          date: `Expires ${agency.eoExp || "Mar 1, 2027"}`, size: "0.4 MB" },
   ]);
   // Documents toolbar state
   const [docView,        setDocView]        = useState<"all"|"byType"|"table">("byType");
@@ -2948,7 +2949,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                                 {docFilterCats.size === 0 && <svg width="10" height="8" viewBox="0 0 9 7" fill="none" className="flex-shrink-0"><path d="M1 3.5L3.5 6L8 1" stroke="#A614C3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
                               </button>
                               <div style={{ height: 1, background: c.border }} />
-                              {(["bor","w9","license","agreement","other","eo"] as AgencyDocCategory[]).map(t => {
+                              {(["bor","w9","license","agreement","eo","other"] as AgencyDocCategory[]).map(t => {
                                 const checked = docFilterCats.has(t);
                                 return (
                                   <button key={t} onClick={() => toggleDocFilterCat(t)}
@@ -3010,7 +3011,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                           All Categories
                           {docFilterCats.size === 0 && <svg width="10" height="8" viewBox="0 0 9 7" fill="none"><path d="M1 3.5L3.5 6L8 1" stroke="#A614C3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
                         </button>
-                        {(["bor","w9","license","agreement","other","eo"] as AgencyDocCategory[]).map(t => {
+                        {(["bor","w9","license","agreement","eo","other"] as AgencyDocCategory[]).map(t => {
                           const checked = docFilterCats.has(t);
                           return (
                             <button key={t} onClick={() => toggleDocFilterCat(t)}
@@ -3135,7 +3136,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                                 {docUploadModalCatOpen && (
                                   <div className="absolute left-0 right-0 top-full mt-1 z-30 rounded-lg overflow-hidden"
                                     style={{ background: c.cardBg, border: `1px solid ${c.border}`, boxShadow: "0 8px 24px rgba(0,0,0,0.12)" }}>
-                                    {(["bor","w9","license","agreement","other"] as AgencyDocCategory[]).map(cat => {
+                                    {(["bor","w9","license","agreement","eo","other"] as AgencyDocCategory[]).map(cat => {
                                       const active = docUploadModalCat === cat;
                                       return (
                                         <button key={cat} type="button"
@@ -3242,14 +3243,23 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
 
                 {/* By Type view — grouped by category so each type is visually separated. */}
                 {!showDocArchived && !showDocTrashed && docView === "byType" && (() => {
-                  const ORDER: AgencyDocCategory[] = ["bor","w9","license","agreement","other"];
-                  const groups = ORDER
-                    .map(cat => ({ cat, docs: visibleDocs.filter(d => d.category === cat) }))
-                    .filter(g => g.docs.length > 0);
-                  // E&O is a special read-only doc that lives outside agencyDocs — show it when no filter or filter includes "eo".
-                  const eoVisible = docFilterCats.size === 0 || docFilterCats.has("eo");
-                  // Empty state only when both regular groups AND the E&O section are hidden.
-                  const showEmpty = groups.length === 0 && !eoVisible;
+                  // Render order: regular categories → E&O Certificate → Other (catch-all at the end).
+                  const ORDER: AgencyDocCategory[] = ["bor","w9","license","agreement","eo","other"];
+                  const renderGroup = (cat: AgencyDocCategory) => {
+                    const docs = visibleDocs.filter(d => d.category === cat);
+                    if (docs.length === 0) return null;
+                    return (
+                      <div key={cat} className="rounded-xl overflow-hidden mb-3" style={{ background: c.cardBg, border: `1px solid ${c.border}` }}>
+                        <div className="flex items-center gap-2 px-5 py-2.5" style={{ borderBottom: `1px solid ${c.border}`, background: c.hoverBg }}>
+                          <FolderOpen className="w-3.5 h-3.5" style={{ color: "#A855F7" }} />
+                          <span className="text-[12px] font-semibold" style={{ ...font, color: c.text }}>{CAT_LABEL[cat]}</span>
+                          <span className="text-[11px]" style={{ ...font, color: c.muted }}>({docs.length})</span>
+                        </div>
+                        {docs.map(d => <FlatRow key={d.id} d={d} />)}
+                      </div>
+                    );
+                  };
+                  const showEmpty = visibleDocs.length === 0;
                   return (
                   <>
                     {showEmpty && (
@@ -3257,56 +3267,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                         No documents in this category yet.
                       </div>
                     )}
-                    {groups.map(g => (
-                      <div key={g.cat} className="rounded-xl overflow-hidden mb-3" style={{ background: c.cardBg, border: `1px solid ${c.border}` }}>
-                        <div className="flex items-center gap-2 px-5 py-2.5" style={{ borderBottom: `1px solid ${c.border}`, background: c.hoverBg }}>
-                          <FolderOpen className="w-3.5 h-3.5" style={{ color: "#A855F7" }} />
-                          <span className="text-[12px] font-semibold" style={{ ...font, color: c.text }}>{CAT_LABEL[g.cat]}</span>
-                          <span className="text-[11px]" style={{ ...font, color: c.muted }}>({g.docs.length})</span>
-                        </div>
-                        {g.docs.map(d => <FlatRow key={d.id} d={d} />)}
-                      </div>
-                    ))}
-                    {/* E&O (read-only) — shown when no filter is active or when "eo" is in the filter set */}
-                    {eoVisible && (
-                      <div className="rounded-xl mb-4" style={{ border: `1px solid ${c.border}`, background: c.cardBg }}>
-                        <div className="flex items-center justify-between px-5 py-3" style={{ borderBottom: `1px solid ${c.border}` }}>
-                          <div className="flex items-center gap-2">
-                            <FileCheck className="w-4 h-4" style={{ color: "#A855F7" }} />
-                            <span className="text-[13px] font-bold" style={{ ...font, color: c.text }}>E&amp;O Certificate</span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3 px-5 py-2.5">
-                          <FileText className="w-4 h-4 flex-shrink-0" style={{ color: c.muted }} />
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="text-[13px] truncate" style={{ ...font, color: c.text }}>EO-Certificate.pdf</span>
-                              <span className="flex-shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded"
-                                style={{ ...font, color: isDark ? "#C87BE0" : "#A614C3", background: isDark ? "rgba(168,85,247,0.22)" : "rgba(168,85,247,0.10)" }}>
-                                E&amp;O Certificate
-                              </span>
-                            </div>
-                            <div className="text-[11px]" style={{ ...font, color: c.muted }}>Expires {eoExpiry}</div>
-                          </div>
-                          <button title="View" onClick={() => setPreviewDoc({ id: "eo", category: "eo", name: "EO-Certificate.pdf", date: `Expires ${eoExpiry}` })} className="p-1.5 rounded transition-colors"
-                            style={{ color: previewDoc?.id === "eo" ? "#A855F7" : c.muted, background: previewDoc?.id === "eo" ? "rgba(168,85,247,0.10)" : "transparent" }}
-                            onMouseEnter={e => { if (previewDoc?.id !== "eo") { e.currentTarget.style.background = c.hoverBg; e.currentTarget.style.color = c.text; } }}
-                            onMouseLeave={e => { if (previewDoc?.id !== "eo") { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = c.muted; } }}>
-                            <Eye className="w-3.5 h-3.5" />
-                          </button>
-                          <button title="Download" className="p-1.5 rounded transition-colors"
-                            style={{ color: c.muted }}
-                            onMouseEnter={e => { e.currentTarget.style.background = c.hoverBg; e.currentTarget.style.color = c.text; }}
-                            onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = c.muted; }}>
-                            <Download className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                        <div className="px-5 py-2.5 text-[11px] flex items-start gap-1.5" style={{ ...font, color: c.muted, borderTop: `1px solid ${c.border}` }}>
-                          <AlertCircle className="w-3 h-3 flex-shrink-0 mt-0.5" />
-                          <span>E&amp;O must remain active per agreement clause — contact compliance to update.</span>
-                        </div>
-                      </div>
-                    )}
+                    {ORDER.map(renderGroup)}
                   </>
                   );
                 })()}
