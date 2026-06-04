@@ -720,9 +720,13 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
   const [importFileName, setImportFileName] = useState<string | null>(null);
   const [importUserCount, setImportUserCount] = useState<number>(0);
   // Parsed users from the uploaded file. Each row maps directly to the template columns
-  // (Name / Admin / Job Title / Email / Phone / Ext). Stays empty until a file is parsed.
-  type ParsedUser = { name: string; admin: string; jobTitle: string; email: string; phone: string; ext: string };
+  // (First Name / Last Name / Admin / Job Title / Email / Phone / Ext). First Name and Last Name
+  // are collected separately so downstream systems can address users by either field cleanly.
+  // Stays empty until a file is parsed.
+  type ParsedUser = { firstName: string; lastName: string; admin: string; jobTitle: string; email: string; phone: string; ext: string };
+  type ImportIssue = { rowIndex: number; severity: "error" | "warning"; field: "name" | "email" | "admin" | "jobTitle" | "principal"; message: string };
   const [parsedUsers, setParsedUsers] = useState<ParsedUser[]>([]);
+  const [importIssues, setImportIssues] = useState<ImportIssue[]>([]);
   const [importError, setImportError] = useState<string | null>(null);
   const [importBusy, setImportBusy] = useState(false);
   const importFileInputRef = useRef<HTMLInputElement | null>(null);
@@ -732,8 +736,61 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
     setImportFileName(null);
     setImportUserCount(0);
     setParsedUsers([]);
+    setImportIssues([]);
     setImportError(null);
     setImportBusy(false);
+  };
+
+  /**
+   * Validate the parsed rows against the template rules:
+   *   - First Name AND Last Name both missing → error (we need at least one to address the user)
+   *   - Email missing or malformed → error
+   *   - Duplicate email within the same file → error
+   *   - Admin level not in ADMIN_LEVELS → error
+   *   - Job Title not in JOB_TITLES → error
+   *   - Multiple Principals (this file + the existing agency Principal) → warning, since the
+   *     back-end can only accept the first one, but the upload itself isn't invalid syntactically
+   * Returns issues with the original spreadsheet row number (1-indexed, +1 for the header).
+   */
+  const validateParsedUsers = (users: ParsedUser[]): ImportIssue[] => {
+    const issues: ImportIssue[] = [];
+    const seenEmails = new Map<string, number>(); // lowercased email → first sheet row
+    let principalRowIdx = -1;
+    users.forEach((u, idx) => {
+      const sheetRow = idx + 2; // header is row 1
+      const noFirst = !u.firstName.trim();
+      const noLast  = !u.lastName.trim();
+      if (noFirst && noLast) {
+        issues.push({ rowIndex: idx, severity: "error", field: "name", message: `Row ${sheetRow}: missing first and last name.` });
+      }
+      const email = u.email.trim();
+      if (!email) {
+        issues.push({ rowIndex: idx, severity: "error", field: "email", message: `Row ${sheetRow}: missing email.` });
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        issues.push({ rowIndex: idx, severity: "error", field: "email", message: `Row ${sheetRow}: "${email}" doesn't look like a valid email.` });
+      } else {
+        const key = email.toLowerCase();
+        if (seenEmails.has(key)) {
+          issues.push({ rowIndex: idx, severity: "error", field: "email", message: `Row ${sheetRow}: duplicate email — also on row ${seenEmails.get(key)! + 2}.` });
+        } else {
+          seenEmails.set(key, idx);
+        }
+      }
+      if (u.admin.trim() && !ADMIN_LEVELS.includes(u.admin.trim())) {
+        issues.push({ rowIndex: idx, severity: "error", field: "admin", message: `Row ${sheetRow}: "${u.admin}" isn't a valid Admin level.` });
+      }
+      if (u.jobTitle.trim() && !JOB_TITLES.includes(u.jobTitle.trim())) {
+        issues.push({ rowIndex: idx, severity: "error", field: "jobTitle", message: `Row ${sheetRow}: "${u.jobTitle}" isn't a valid Job Title.` });
+      }
+      if (u.jobTitle.trim() === "Principal") {
+        if (principalRowIdx === -1) {
+          principalRowIdx = idx;
+        } else {
+          issues.push({ rowIndex: idx, severity: "warning", field: "principal", message: `Row ${sheetRow}: another Principal already on row ${principalRowIdx + 2}. Only one Principal is allowed per agency.` });
+        }
+      }
+    });
+    return issues;
   };
 
   /**
@@ -770,12 +827,13 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
         for (let i = 1; i < lines.length; i++) {
           const v = splitCsvLine(lines[i]);
           rows.push({
-            name:     v[0] ?? "",
-            admin:    v[1] ?? "",
-            jobTitle: v[2] ?? "",
-            email:    v[3] ?? "",
-            phone:    v[4] ?? "",
-            ext:      v[5] ?? "",
+            firstName: v[0] ?? "",
+            lastName:  v[1] ?? "",
+            admin:     v[2] ?? "",
+            jobTitle:  v[3] ?? "",
+            email:     v[4] ?? "",
+            phone:     v[5] ?? "",
+            ext:       v[6] ?? "",
           });
         }
       } else if (name.endsWith(".xlsx") || name.endsWith(".xls")) {
@@ -803,12 +861,13 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
             return "";
           };
           rows.push({
-            name:     cellText(1),
-            admin:    cellText(2),
-            jobTitle: cellText(3),
-            email:    cellText(4),
-            phone:    cellText(5),
-            ext:      cellText(6),
+            firstName: cellText(1),
+            lastName:  cellText(2),
+            admin:     cellText(3),
+            jobTitle:  cellText(4),
+            email:     cellText(5),
+            phone:     cellText(6),
+            ext:       cellText(7),
           });
         });
       } else {
@@ -816,7 +875,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
         return null;
       }
       // Drop rows missing both name and email (likely blank rows in the spreadsheet).
-      return rows.filter(r => r.name || r.email);
+      return rows.filter(r => r.firstName || r.lastName || r.email);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Could not read the file.";
       setImportError(`Couldn't parse the file: ${msg}`);
@@ -836,6 +895,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
       return;
     }
     setParsedUsers(users);
+    setImportIssues(validateParsedUsers(users));
     setImportFileName(file.name);
     setImportUserCount(users.length);
     setImportPhase("ready");
@@ -991,48 +1051,50 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet("Users");
     ws.columns = [
-      { header: "Name",      key: "name",     width: 22 },
-      { header: "Admin",     key: "admin",    width: 14 },
-      { header: "Job Title", key: "jobTitle", width: 18 },
-      { header: "Email",     key: "email",    width: 28 },
-      { header: "Phone",     key: "phone",    width: 16 },
-      { header: "Ext",       key: "ext",      width: 8  },
+      { header: "First Name", key: "firstName", width: 16 },
+      { header: "Last Name",  key: "lastName",  width: 16 },
+      { header: "Admin",      key: "admin",     width: 22 },
+      { header: "Job Title",  key: "jobTitle",  width: 18 },
+      { header: "Email",      key: "email",     width: 28 },
+      { header: "Phone",      key: "phone",     width: 16 },
+      { header: "Ext",        key: "ext",       width: 8  },
     ];
     // Bold header row
     ws.getRow(1).font = { bold: true };
     // One example row so the format is obvious at a glance
-    ws.addRow({ name: "John Doe", admin: "Read-Only Admin", jobTitle: "Producer", email: "john@example.com", phone: "555-1234", ext: "123" });
+    ws.addRow({ firstName: "John", lastName: "Doe", admin: "Read-Only Admin", jobTitle: "Producer", email: "john@example.com", phone: "555-1234", ext: "123" });
 
-    // Apply data-validation dropdowns to Admin (col B) and Job Title (col C),
+    // Apply data-validation dropdowns to Admin (col C) and Job Title (col D),
     // rows 2..201. exceljs's per-cell assignment is the documented + most reliably
     // serialised path. A FRESH validation object is assigned per cell — sharing the
     // same object across cells can let exceljs drop entries when it dedupes.
     const adminFormula    = `"${ADMIN_LEVELS.join(",")}"`;     // → "Read-Only Admin,Agency Support Admin,Super Admin"
     const jobTitleFormula = `"${JOB_TITLES.join(",")}"`;       // → "Principal,Producer,CSR,Accounting,Account Manager"
     for (let r = 2; r <= 201; r++) {
-      ws.getCell(`B${r}`).dataValidation = {
+      ws.getCell(`C${r}`).dataValidation = {
         type: "list",
         allowBlank: true,
         formulae: [adminFormula],
       };
-      ws.getCell(`C${r}`).dataValidation = {
+      ws.getCell(`D${r}`).dataValidation = {
         type: "list",
         allowBlank: true,
         formulae: [jobTitleFormula],
       };
     }
 
-    // Cell comment on the Job Title header so the rule is discoverable on hover.
-    ws.getCell("C1").note = "Only one Principal is allowed per agency.";
+    // Cell comment on the Job Title header (now column D) so the rule is discoverable on hover.
+    ws.getCell("D1").note = "Only one Principal is allowed per agency.";
 
     // Conditional formatting — highlight any "Principal" cell in red when the column
     // already contains more than one. Draws attention to the duplicate before upload.
+    // Job Title is now column D (after splitting Name → First Name + Last Name).
     ws.addConditionalFormatting({
-      ref: "C2:C201",
+      ref: "D2:D201",
       rules: [
         {
           type: "expression",
-          formulae: [`AND(C2="Principal", COUNTIF($C$2:$C$201,"Principal")>1)`],
+          formulae: [`AND(D2="Principal", COUNTIF($D$2:$D$201,"Principal")>1)`],
           priority: 1,
           style: {
             fill:   { type: "pattern", pattern: "solid", bgColor: { argb: "FFFEE2E2" } },
@@ -6050,7 +6112,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                 </p>
                 <div className="flex items-baseline gap-2 text-[12px]" style={{ fontFamily:FONT }}>
                   <span className="flex-shrink-0 w-[68px]" style={{ color:c.muted }}>Columns</span>
-                  <span className="font-mono" style={{ color:"#73C9B7" }}>Name, Admin, Job Title, Email, Phone, Ext</span>
+                  <span className="font-mono" style={{ color:"#73C9B7" }}>First Name, Last Name, Admin, Job Title, Email, Phone, Ext</span>
                 </div>
                 <div className="flex items-baseline gap-2 text-[12px]" style={{ fontFamily:FONT }}>
                   <span className="flex-shrink-0 w-[68px]" style={{ color:c.muted }}>Admin</span>
@@ -6134,15 +6196,36 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                 // container below caps the visible area so a 500-row file doesn't
                 // blow out the modal height — the rest scrolls inside the card.
                 const totalUsers = parsedUsers.length;
+                const errorCount = importIssues.filter(i => i.severity === "error").length;
+                const hasIssues  = importIssues.length > 0;
+                // Map row-index → the issues affecting that row so we can decorate rows in the preview.
+                const issuesByRow = new Map<number, ImportIssue[]>();
+                importIssues.forEach(iss => {
+                  const list = issuesByRow.get(iss.rowIndex) ?? [];
+                  list.push(iss);
+                  issuesByRow.set(iss.rowIndex, list);
+                });
                 return (
                 <div>
-                  {/* Question first — the main intent of this screen */}
+                  {/* Question first — copy adapts to the validation outcome */}
                   <p className="text-[18px] font-bold text-center mb-1.5" style={{ fontFamily:FONT, color:c.text }}>
-                    Are you sure you want to send?
+                    {hasIssues ? "We spotted some issues" : "Are you sure you want to send?"}
                   </p>
-                  <p className="text-[13px] text-center mx-auto mb-5 max-w-[460px]" style={{ fontFamily:FONT, color:c.muted, lineHeight:"19px" }}>
-                    We&apos;ll email each of these users a secure registration link so they can activate their account. This can&apos;t be undone.
+                  <p className="text-[13px] text-center mx-auto mb-5 max-w-[480px]" style={{ fontFamily:FONT, color:c.muted, lineHeight:"19px", textWrap: "balance" }}>
+                    {hasIssues ? (
+                      errorCount > 0 ? (
+                        <>Rows with <span style={{ color: "#B91C1C", fontWeight: 600 }}>errors</span> below won&apos;t be sent — we&apos;ll only invite the valid users. Cancel if you&apos;d rather fix the file first.</>
+                      ) : (
+                        <>Rows with <span style={{ color: "#B45309", fontWeight: 600 }}>warnings</span> below look unusual but will still be sent. Cancel if you&apos;d rather review the file first.</>
+                      )
+                    ) : (
+                      <>We&apos;ll email each of these users a secure registration link so they can activate their account. This can&apos;t be undone.</>
+                    )}
                   </p>
+
+                  {/* No standalone issues panel — problem rows are decorated in the preview
+                      below (red/amber background, alert icon, colored field text), which is
+                      already the actionable signal and scales naturally to any file size. */}
 
                   {/* Preview — file caption header + scrollable user list (capped height for large files) */}
                   <div className="rounded-xl overflow-hidden mb-5" style={{ border:`1px solid ${c.border}` }}>
@@ -6155,39 +6238,67 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                     </div>
                     {/* Scroll body — caps at ~240px so a 500-row file still fits the modal */}
                     <div style={{ maxHeight: 240, overflowY: "auto" }}>
-                      {parsedUsers.map((u, i) => (
-                        <div key={`${u.email}-${i}`}
-                          className="flex items-center justify-between gap-4 px-4 py-2.5 text-[12px]"
-                          style={{ borderBottom: i < parsedUsers.length - 1 ? `1px solid ${c.border}` : "none", fontFamily:FONT, background:c.cardBg }}>
-                          <div className="min-w-0 flex-1">
-                            <div className="font-semibold truncate" style={{ color:c.text }}>{u.name}</div>
-                            <div className="text-[11px] truncate" style={{ color:c.muted }}>{u.email}</div>
+                      {parsedUsers.map((u, i) => {
+                        // Compose the display name from First Name + Last Name; trim handles
+                        // rows where only one half is present.
+                        const fullName = `${u.firstName} ${u.lastName}`.trim() || u.email || "(no name)";
+                        const rowIssues = issuesByRow.get(i) ?? [];
+                        const rowHasError = rowIssues.some(iss => iss.severity === "error");
+                        const rowHasWarn  = rowIssues.some(iss => iss.severity === "warning");
+                        const fieldsWithIssue = new Set(rowIssues.map(iss => iss.field));
+                        // Soft red tint for errors, soft amber for warnings-only.
+                        const rowBg = rowHasError ? (isDark ? "rgba(239,68,68,0.06)" : "#FEF7F7") : rowHasWarn ? (isDark ? "rgba(245,158,11,0.06)" : "#FFFBF0") : c.cardBg;
+                        return (
+                          <div key={`${u.email}-${i}`}
+                            className="flex items-center justify-between gap-4 px-4 py-2.5 text-[12px]"
+                            style={{ borderBottom: i < parsedUsers.length - 1 ? `1px solid ${c.border}` : "none", fontFamily:FONT, background: rowBg }}>
+                            <div className="min-w-0 flex-1 flex items-start gap-2">
+                              {(rowHasError || rowHasWarn) && (
+                                <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: rowHasError ? "#B91C1C" : "#B45309" }} />
+                              )}
+                              <div className="min-w-0 flex-1">
+                                <div className="font-semibold truncate" style={{ color: fieldsWithIssue.has("name") ? "#B91C1C" : c.text }}>{fullName}</div>
+                                <div className="text-[11px] truncate" style={{ color: fieldsWithIssue.has("email") ? "#B91C1C" : c.muted }}>{u.email || "(no email)"}</div>
+                              </div>
+                            </div>
+                            <div className="text-right flex-shrink-0">
+                              <div className="text-[11px]" style={{ color: fieldsWithIssue.has("jobTitle") || fieldsWithIssue.has("principal") ? "#B91C1C" : c.text }}>{u.jobTitle || "—"}</div>
+                              <div className="text-[11px] font-mono" style={{ color: fieldsWithIssue.has("admin") ? "#B91C1C" : "#A614C3" }}>{u.admin || "—"}</div>
+                            </div>
                           </div>
-                          <div className="text-right flex-shrink-0">
-                            <div className="text-[11px]" style={{ color:c.text }}>{u.jobTitle}</div>
-                            <div className="text-[11px] font-mono" style={{ color:"#A614C3" }}>{u.admin}</div>
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
 
-                  {/* Actions — Cancel on the left, primary confirm pushed to the right */}
+                  {/* Actions — Cancel on the left, primary confirm pushed to the right. Confirm CTA
+                      adapts when there are issues: amber-tinted "Send Anyway" so the user knows
+                      they're acknowledging that some rows will be skipped. */}
                   <div className="flex items-center justify-between gap-2">
-                    <button onClick={() => { setImportPhase("empty"); setImportFileName(null); setImportUserCount(0); }}
+                    <button onClick={() => { setImportPhase("empty"); setImportFileName(null); setImportUserCount(0); setParsedUsers([]); setImportIssues([]); }}
                       className="px-5 py-2.5 rounded-lg text-[13px] font-semibold transition-colors"
                       style={{ fontFamily:FONT, color:c.text, border:`1px solid ${c.border}`, background:isDark?"rgba(255,255,255,0.04)":"#fff" }}
                       onMouseEnter={e=>(e.currentTarget.style.background=c.hoverBg)}
                       onMouseLeave={e=>(e.currentTarget.style.background=isDark?"rgba(255,255,255,0.04)":"#fff")}>
                       Cancel
                     </button>
-                    <button onClick={() => setImportPhase("sent")}
-                      className="flex items-center gap-1.5 px-6 py-2.5 rounded-lg text-[13px] font-semibold text-white transition-all"
-                      style={{ fontFamily:FONT, background:btnGrad, boxShadow:"0 2px 10px rgba(166,20,195,0.25)" }}
-                      onMouseEnter={e=>(e.currentTarget.style.filter="brightness(1.08)")}
-                      onMouseLeave={e=>(e.currentTarget.style.filter="none")}>
-                      <Send className="w-3.5 h-3.5"/>Yes, Send Invites
-                    </button>
+                    {hasIssues ? (
+                      <button onClick={() => setImportPhase("sent")}
+                        className="flex items-center gap-1.5 px-6 py-2.5 rounded-lg text-[13px] font-semibold text-white transition-all"
+                        style={{ fontFamily:FONT, background: errorCount > 0 ? "#DC2626" : "#D97706", boxShadow: errorCount > 0 ? "0 2px 10px rgba(220,38,38,0.25)" : "0 2px 10px rgba(217,119,6,0.25)" }}
+                        onMouseEnter={e=>(e.currentTarget.style.filter="brightness(1.08)")}
+                        onMouseLeave={e=>(e.currentTarget.style.filter="none")}>
+                        <AlertCircle className="w-3.5 h-3.5"/>Send Anyway
+                      </button>
+                    ) : (
+                      <button onClick={() => setImportPhase("sent")}
+                        className="flex items-center gap-1.5 px-6 py-2.5 rounded-lg text-[13px] font-semibold text-white transition-all"
+                        style={{ fontFamily:FONT, background:btnGrad, boxShadow:"0 2px 10px rgba(166,20,195,0.25)" }}
+                        onMouseEnter={e=>(e.currentTarget.style.filter="brightness(1.08)")}
+                        onMouseLeave={e=>(e.currentTarget.style.filter="none")}>
+                        <Send className="w-3.5 h-3.5"/>Yes, Send Invites
+                      </button>
+                    )}
                   </div>
                 </div>
                 );

@@ -107,8 +107,8 @@ export default function Sidenav({ isDark = false, onToggleDark, activeItem = "Ma
   const [profileDrag, setProfileDrag] = useState(false);
   const [profilePreview, setProfilePreview] = useState<string | null>(null);
   // User Name = editable handle (what user picks). User ID = system-assigned identifier with numbers (read-only).
-  const [userName, setUserName] = useState("johnsmith");
-  const [savedUserName, setSavedUserName] = useState("johnsmith");
+  const [userName, setUserName] = useState("John Smith");
+  const [savedUserName, setSavedUserName] = useState("John Smith");
   const userId = "johnsmith01"; // system-assigned, shown as @userId, never edited by the user
   // Inline validation (e.g. min-length) for the User Name field. Duplicates are allowed.
   const [userNameError, setUserNameError] = useState<string | null>(null);
@@ -125,12 +125,16 @@ export default function Sidenav({ isDark = false, onToggleDark, activeItem = "Ma
   const [imageOffsetY, setImageOffsetY] = useState(0);
   const dragRef = useRef<{ startX: number; startY: number; baseX: number; baseY: number } | null>(null);
   const resetCrop = () => { setImageZoom(1); setImageOffsetX(0); setImageOffsetY(0); };
-  // Display name + initials come from the user record (firstName + lastName), NOT the User ID.
-  // Hard-coded for the demo; in production this comes from the user record.
-  const firstName = "John";
-  const lastName  = "Smith";
-  const displayName = `${firstName} ${lastName}`;
-  const initials  = (firstName[0] + lastName[0]).toUpperCase();
+  // Display name is the saved User Name (e.g. "John Smith"). Initials are derived from
+  // the first two word starts so the avatar chip and the sidebar button stay in sync
+  // when the user edits their name.
+  const displayName = savedUserName;
+  const initials = (() => {
+    const parts = savedUserName.trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return "";
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return ((parts[0][0] ?? "") + (parts[1][0] ?? "")).toUpperCase();
+  })();
 
   // Close the My Account menu on outside click.
   useEffect(() => {
@@ -464,12 +468,14 @@ export default function Sidenav({ isDark = false, onToggleDark, activeItem = "Ma
                     <label className="text-[12px] font-semibold block mb-1.5" style={{ color: text }}>User Name</label>
                     <input value={userName}
                       onChange={e => {
-                        const v = e.target.value.replace(/[^a-zA-Z0-9]/g, "");
+                        // Allow letters, digits, and spaces — the User Name now reads as a
+                        // display name (e.g. "John Smith"), not a strict lowercase handle.
+                        const v = e.target.value.replace(/[^a-zA-Z0-9 ]/g, "");
                         setUserName(v);
                         // Clear the "taken" error as soon as the user changes the value.
                         if (userNameError) setUserNameError(null);
                       }}
-                      placeholder="yourusername"
+                      placeholder="Your name"
                       className="w-full px-3 py-2 rounded-lg text-[13px] outline-none transition-colors"
                       style={{
                         background: cardBg,
