@@ -504,7 +504,10 @@ export default function Policies({ isDark }: { isDark: boolean }) {
   const renewalsCount     = mockPolicies.filter(p => p.status === "Upcoming Renewals").length;
   const actionReqCount    = mockPolicies.filter(p => p.status === "Pending/Action Req.").length;
   const statusSummary: { key: string; label: string; sub: string; count: number }[] = [
-    { key: "All Statuses",        label: "Total Policies",     sub: "All policies in book", count: mockPolicies.length },
+    // "Total Policies" (All Statuses) intentionally removed — Active / Upcoming Renewals /
+    // Action Required are the actionable signals; a total of every policy doesn't drive any
+    // decision. The Start-a-Quote CTA tile (rendered before this map) now completes a clean
+    // 4-tile row alongside the 3 status breakdowns.
     { key: "Sold/Issued",         label: "Active",             sub: "Currently in force",   count: activeCount         },
     { key: "Upcoming Renewals",   label: "Upcoming Renewals",  sub: "Next 30 days",         count: renewalsCount       },
     { key: "Pending/Action Req.", label: "Action Required",    sub: "Needs your attention", count: actionReqCount      },
@@ -520,7 +523,7 @@ export default function Policies({ isDark }: { isDark: boolean }) {
 
       {/* Toolbar — date scope + search, then a divider, then Refresh / View / Export,
           then Help + Primary CTA pushed to the far right. */}
-      <div className="flex items-center gap-3 pb-4 mb-3 flex-shrink-0 flex-wrap" onClick={e => e.stopPropagation()}>
+      <div className="flex items-center gap-3 pb-4 mb-3 flex-shrink-0 flex-wrap" style={{ order: 3 }} onClick={e => e.stopPropagation()}>
         <div className="flex items-center gap-2 flex-wrap min-w-0">
           {/* Date scope */}
           <div className="relative flex-shrink-0">
@@ -646,7 +649,10 @@ export default function Policies({ isDark }: { isDark: boolean }) {
               Help
             </button>
             {helpOpen && (
-              <div className="absolute left-0 z-30 w-[260px] rounded-xl shadow-xl py-2"
+              // Anchored to the RIGHT edge of the Help button so the 260px panel opens
+              // leftward — keeps it tucked under the toolbar instead of spilling over the
+              // table columns to the right.
+              <div className="absolute right-0 z-30 w-[260px] rounded-xl shadow-xl py-2"
                 style={{ background: c.cardBg, border: `1px solid ${c.border}`, top: "calc(100% + 6px)" }}>
                 <p className="px-3 pb-2 text-[12px]" style={{ fontFamily: FONT, color: c.muted }}>Can&apos;t find what you&apos;re looking for?</p>
                 <div className="px-2 space-y-1.5">
@@ -684,8 +690,10 @@ export default function Policies({ isDark }: { isDark: boolean }) {
 
         </div>
 
-        {/* Vertical divider — separates filter / view controls (left) from data actions (right) */}
-        <div className="flex items-center gap-2 flex-wrap flex-shrink-0" style={{ borderLeft: `1px solid ${c.border}`, paddingLeft: 12, marginLeft: 4 }}>
+        {/* Data-action cluster (Refresh / Export) — pushed to the far right of the toolbar with
+            `ml-auto` so filter controls stay clustered on the left and table-action controls
+            anchor on the right. The space from `ml-auto` is visual separation enough; no divider line. */}
+        <div className="flex items-center gap-2 flex-wrap flex-shrink-0 ml-auto">
 
         {/* Refresh */}
         <button
@@ -716,24 +724,44 @@ export default function Policies({ isDark }: { isDark: boolean }) {
 
         </div>
 
-        {/* Primary CTA — pushed to the far right with ml-auto */}
-        <button
-          className="flex items-center gap-1.5 text-[12.5px] font-semibold text-white flex-shrink-0 ml-auto"
-          style={{ fontFamily: FONT, background: btnGrad, padding: "7px 14px", borderRadius: 8, transition: "filter 0.15s", boxShadow: "0 2px 10px rgba(166,20,195,0.20)" }}
-          onMouseEnter={e => (e.currentTarget.style.filter = "brightness(1.08)")}
-          onMouseLeave={e => (e.currentTarget.style.filter = "none")}
-        >
-          <Plus className="w-3.5 h-3.5" />
-          Start a Quote
-        </button>
+        {/* Start a Quote lives as a 5th tile inside the KPI grid below (no toolbar CTA).
+            The brand gradient + white text in the otherwise-neutral KPI row makes it the page's
+            visual primary action without needing its own dedicated row. */}
       </div>
 
-      {/* KPI strip — clickable status cards (matches Overview's KpiCard pattern) */}
+      {/* KPI strip — clickable status cards (matches Overview's KpiCard pattern).
+          Visual order: KPI = 2, toolbar = 3, table = 4. */}
       <div
         className="grid gap-3 mb-5 flex-shrink-0"
-        style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}
+        style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", order: 2 }}
         onClick={e => e.stopPropagation()}
       >
+        {/* Start a Quote — primary-action tile. Same shape and dimensions as the KPI cards so
+            it sits naturally in the grid, but uses the brand gradient + white text + a chunkier
+            plus icon (in place of a number) so it visually reads as "action" rather than "stat".
+            Placed FIRST in the row so the eye lands on the primary action before the stat cards.
+            Hover = brightness-only, matching the standard brand-gradient button treatment. */}
+        <button
+          className="rounded-2xl px-5 py-4 text-left cursor-pointer flex flex-col justify-between"
+          style={{
+            background: btnGrad,
+            color: "#fff",
+            border: "none",
+            transition: "filter 0.15s",
+          }}
+          onMouseEnter={e => { e.currentTarget.style.filter = "brightness(1.08)"; }}
+          onMouseLeave={e => { e.currentTarget.style.filter = "none"; }}
+        >
+          <div className="flex items-start justify-between gap-3 mb-0.5">
+            <div className="text-[15px] font-semibold">Start a Quote</div>
+            <div className="flex-shrink-0">
+              <Plus className="w-6 h-6" strokeWidth={2.5} />
+            </div>
+          </div>
+          <div className="text-[11px]" style={{ opacity: 0.9 }}>
+            New submission
+          </div>
+        </button>
         {statusSummary.map((s) => {
           // "Total Policies" (All Statuses) is the unfiltered state — clicking it clears the
           // status filter entirely; never apply it as a literal status (no row would match).
@@ -759,7 +787,7 @@ export default function Policies({ isDark }: { isDark: boolean }) {
             >
               {/* Top: title + big count on the right */}
               <div className="flex items-start justify-between gap-3 mb-0.5">
-                <div className="text-[13px] font-semibold truncate" style={{ color: c.text }}>
+                <div className="text-[15px] font-semibold truncate" style={{ color: c.text }}>
                   {s.label}
                 </div>
                 <div
@@ -1198,7 +1226,7 @@ export default function Policies({ isDark }: { isDark: boolean }) {
       `}</style>
 
       {/* Table */}
-      <div className="rounded-2xl flex flex-col flex-1 min-h-0 overflow-hidden" style={{ background: c.cardBg, border: `1px solid ${c.border}`, marginBottom: 16 }}>
+      <div className="rounded-2xl flex flex-col flex-1 min-h-0 overflow-hidden" style={{ background: c.cardBg, border: `1px solid ${c.border}`, marginBottom: 16, order: 4 }}>
         {/* Header + body share ONE scroll context so column widths align even when the body scrolls */}
         <div className="flex-1 min-h-0 overflow-y-auto">
         <div className="grid px-5 py-3 gap-4 sticky top-0 z-10" style={{ gridTemplateColumns: gridTemplate, borderBottom: `1px solid ${c.border}`, background: c.mutedBg, borderTopLeftRadius: 16, borderTopRightRadius: 16 }}>

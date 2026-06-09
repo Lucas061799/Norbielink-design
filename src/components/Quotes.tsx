@@ -482,7 +482,11 @@ export default function Quotes({ isDark }: { isDark: boolean }) {
   const soldCount          = mockQuotes.filter(q => q.status === "Sold/Issued").length;
   const actionReqCount     = mockQuotes.filter(q => q.status === "Pending/Action Req.").length;
   const statusSummary: { key: string; label: string; sub: string; count: number }[] = [
-    { key: "All Statuses",        label: "Total Quotes",     sub: "All submissions",      count: mockQuotes.length },
+    // "Total Quotes" (All Statuses) intentionally removed — the breakdown cards (Pending /
+    // Sold-Issued / Action Required) are the actionable signals; a total count of every
+    // submission doesn't drive any decision and pushed the row to 5 KPIs + 1 CTA, which felt
+    // crowded. The Start-a-Quote CTA tile (rendered after this map) now completes a clean
+    // 4-tile row alongside the 3 status breakdowns.
     { key: "Pending",             label: "Pending",          sub: "Awaiting carrier",     count: pendingCount      },
     { key: "Sold/Issued",         label: "Sold / Issued",    sub: "Bound this period",    count: soldCount         },
     { key: "Pending/Action Req.", label: "Action Required",  sub: "Needs your attention", count: actionReqCount    },
@@ -490,16 +494,23 @@ export default function Quotes({ isDark }: { isDark: boolean }) {
 
   return (
     <div className="flex flex-col flex-1 min-h-0" style={{ fontFamily: FONT }} onClick={closeAllDropdowns}>
-      {/* Section title — sits directly below the topbar */}
+      {/* Section title — sits directly below the topbar. Title-only by design; the page's
+          primary action (Start a Quote) lives at the right end of the toolbar where the
+          filter / table-action controls are clustered, fenced off by a vertical divider so
+          it reads as a distinct primary action rather than just another button. */}
       <div className="flex flex-col justify-center flex-shrink-0 mb-12"
         style={{ height: 71, borderBottom: `0.87px solid ${isDark ? "rgba(255,255,255,0.08)" : "#E5E7EB"}`, marginLeft: -48, marginRight: -48, paddingLeft: 28, paddingRight: 28 }}>
         <h1 className="text-[22px] font-normal" style={{ fontFamily: FONT, color: c.text }}>Quotes</h1>
       </div>
 
+      {/* Start a Quote — promoted to a 5th tile inside the KPI grid below (no dedicated row).
+          The brand gradient + white text inside an otherwise neutral row of count cards makes
+          it visually pop without floating in an empty band. */}
+
       {/* Toolbar — date scope + search, then a divider, then Refresh / View / Export.
-          Primary CTA and Help live in the title strip above so this row stays focused on
-          filtering and table-level actions, kept close to the table. */}
-      <div className="flex items-center gap-3 pb-4 mb-3 flex-shrink-0 flex-wrap" onClick={e => e.stopPropagation()}>
+          Stays as a standalone row above the table (NOT visually fused with the card).
+          Visual order (CSS `order`): CTA row = 1, KPI = 2, toolbar = 3, table = 4. */}
+      <div className="flex items-center gap-3 pb-4 mb-3 flex-shrink-0 flex-wrap" style={{ order: 3 }} onClick={e => e.stopPropagation()}>
         <div className="flex items-center gap-2 flex-wrap min-w-0">
           {/* Date scope */}
           <div className="relative flex-shrink-0">
@@ -625,7 +636,10 @@ export default function Quotes({ isDark }: { isDark: boolean }) {
               Help
             </button>
             {helpOpen && (
-              <div className="absolute left-0 z-30 w-[260px] rounded-xl shadow-xl py-2"
+              // Anchored to the RIGHT edge of the Help button so the 260px panel opens
+              // leftward — keeps it tucked under the toolbar instead of spilling over the
+              // table columns to the right.
+              <div className="absolute right-0 z-30 w-[260px] rounded-xl shadow-xl py-2"
                 style={{ background: c.cardBg, border: `1px solid ${c.border}`, top: "calc(100% + 6px)" }}>
                 <p className="px-3 pb-2 text-[12px]" style={{ fontFamily: FONT, color: c.muted }}>Can&apos;t find what you&apos;re looking for?</p>
                 <div className="px-2 space-y-1.5">
@@ -663,8 +677,11 @@ export default function Quotes({ isDark }: { isDark: boolean }) {
 
         </div>
 
-        {/* Vertical divider — separates filter / view controls (left) from data actions (right) */}
-        <div className="flex items-center gap-2 flex-wrap flex-shrink-0" style={{ borderLeft: `1px solid ${c.border}`, paddingLeft: 12, marginLeft: 4 }}>
+        {/* Data-action cluster (Refresh / Export) — pushed to the far right of the toolbar with
+            `ml-auto` so filter controls stay clustered on the left and table-action controls
+            anchor on the right. The space between left and right clusters from `ml-auto` is
+            visual separation enough; no divider line. */}
+        <div className="flex items-center gap-2 flex-wrap flex-shrink-0 ml-auto">
 
         {/* Refresh — labeled, matches Overview */}
         <button
@@ -695,24 +712,46 @@ export default function Quotes({ isDark }: { isDark: boolean }) {
 
         </div>
 
-        {/* Primary CTA — pushed to the far right with ml-auto */}
-        <button
-          className="flex items-center gap-1.5 text-[12.5px] font-semibold text-white flex-shrink-0 ml-auto"
-          style={{ fontFamily: FONT, background: btnGrad, padding: "7px 14px", borderRadius: 8, transition: "filter 0.15s", boxShadow: "0 2px 10px rgba(166,20,195,0.20)" }}
-          onMouseEnter={e => (e.currentTarget.style.filter = "brightness(1.08)")}
-          onMouseLeave={e => (e.currentTarget.style.filter = "none")}
-        >
-          <Plus className="w-3.5 h-3.5" />
-          Start a Quote
-        </button>
+        {/* Start a Quote lives in its own row above the KPI strip (see the "Primary CTA row"
+            block above the KPI block). This toolbar stays focused on filter / table-action
+            controls and is visually fused with the table card below (matching background, no
+            seam between toolbar and table). */}
       </div>
 
-      {/* KPI strip — clickable status cards (matches Overview's KpiCard pattern) */}
+      {/* KPI strip — clickable status cards (matches Overview's KpiCard pattern).
+          Visual order: CTA row = 1, KPI = 2, toolbar = 3, table = 4. */}
       <div
         className="grid gap-3 mb-5 flex-shrink-0"
-        style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}
+        style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", order: 2 }}
         onClick={e => e.stopPropagation()}
       >
+        {/* Start a Quote — primary-action tile. Same shape and dimensions as the KPI cards so
+            it sits naturally in the grid, but uses the brand gradient + white text + a chunkier
+            plus icon (in place of a number) so it visually reads as "action" rather than "stat".
+            Placed FIRST in the row so the eye lands on the primary action before the stat cards.
+            Hover = brightness-only, matching the standard brand-gradient button treatment used
+            elsewhere in the app (no lift / shadow growth — kept simple and consistent). */}
+        <button
+          className="rounded-2xl px-5 py-4 text-left cursor-pointer flex flex-col justify-between"
+          style={{
+            background: btnGrad,
+            color: "#fff",
+            border: "none",
+            transition: "filter 0.15s",
+          }}
+          onMouseEnter={e => { e.currentTarget.style.filter = "brightness(1.08)"; }}
+          onMouseLeave={e => { e.currentTarget.style.filter = "none"; }}
+        >
+          <div className="flex items-start justify-between gap-3 mb-0.5">
+            <div className="text-[15px] font-semibold">Start a Quote</div>
+            <div className="flex-shrink-0">
+              <Plus className="w-6 h-6" strokeWidth={2.5} />
+            </div>
+          </div>
+          <div className="text-[11px]" style={{ opacity: 0.9 }}>
+            New submission
+          </div>
+        </button>
         {statusSummary.map((s) => {
           // "Total Quotes" (All Statuses) is the unfiltered state — clicking it clears the
           // status filter entirely; never apply it as a literal status (no row would match).
@@ -738,7 +777,7 @@ export default function Quotes({ isDark }: { isDark: boolean }) {
             >
               {/* Top: title + big count on the right */}
               <div className="flex items-start justify-between gap-3 mb-0.5">
-                <div className="text-[13px] font-semibold truncate" style={{ color: c.text }}>
+                <div className="text-[15px] font-semibold truncate" style={{ color: c.text }}>
                   {s.label}
                 </div>
                 <div
@@ -1170,8 +1209,9 @@ export default function Quotes({ isDark }: { isDark: boolean }) {
         }
       `}</style>
 
-      {/* Table — grid layout matching Clients quotes */}
-      <div className="rounded-2xl flex flex-col flex-1 min-h-0 overflow-hidden" style={{ background: c.cardBg, border: `1px solid ${c.border}`, marginBottom: 16 }}>
+      {/* Table — grid layout matching Clients quotes.
+          Visual order: CTA row = 1, KPI = 2, toolbar = 3, table = 4. */}
+      <div className="rounded-2xl flex flex-col flex-1 min-h-0 overflow-hidden" style={{ background: c.cardBg, border: `1px solid ${c.border}`, marginBottom: 16, order: 4 }}>
         {/* Header + body share ONE scroll context so column widths align even when the body scrolls */}
         <div className="flex-1 min-h-0 overflow-y-auto">
         <div className="grid px-5 py-3 gap-4 sticky top-0 z-10" style={{ gridTemplateColumns: gridTemplate, borderBottom: `1px solid ${c.border}`, background: c.mutedBg, borderTopLeftRadius: 16, borderTopRightRadius: 16 }}>

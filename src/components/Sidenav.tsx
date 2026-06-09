@@ -106,11 +106,15 @@ export default function Sidenav({ isDark = false, onToggleDark, activeItem = "Ma
   const [profileStep, setProfileStep] = useState<"overview" | "photo">("overview");
   const [profileDrag, setProfileDrag] = useState(false);
   const [profilePreview, setProfilePreview] = useState<string | null>(null);
-  // User Name = editable handle (what user picks). User ID = system-assigned identifier with numbers (read-only).
-  const [userName, setUserName] = useState("John Smith");
-  const [savedUserName, setSavedUserName] = useState("John Smith");
+  // User Name = First Name + Last Name (what the user picks). User ID = system-assigned identifier with numbers (read-only).
+  // Stored as two separate fields so first / last can be addressed independently downstream
+  // (e.g. "Hi John" greetings, sortable by last name, etc.).
+  const [firstName, setFirstName] = useState("John");
+  const [lastName,  setLastName]  = useState("Smith");
+  const [savedFirstName, setSavedFirstName] = useState("John");
+  const [savedLastName,  setSavedLastName]  = useState("Smith");
   const userId = "johnsmith01"; // system-assigned, shown as @userId, never edited by the user
-  // Inline validation (e.g. min-length) for the User Name field. Duplicates are allowed.
+  // Inline validation (required-field) for the User Name fields. Duplicates are allowed.
   const [userNameError, setUserNameError] = useState<string | null>(null);
   // Top-right success toast that appears after a successful profile save.
   const [profileToast, setProfileToast] = useState<{ title: string; description: string } | null>(null);
@@ -125,16 +129,10 @@ export default function Sidenav({ isDark = false, onToggleDark, activeItem = "Ma
   const [imageOffsetY, setImageOffsetY] = useState(0);
   const dragRef = useRef<{ startX: number; startY: number; baseX: number; baseY: number } | null>(null);
   const resetCrop = () => { setImageZoom(1); setImageOffsetX(0); setImageOffsetY(0); };
-  // Display name is the saved User Name (e.g. "John Smith"). Initials are derived from
-  // the first two word starts so the avatar chip and the sidebar button stay in sync
-  // when the user edits their name.
-  const displayName = savedUserName;
-  const initials = (() => {
-    const parts = savedUserName.trim().split(/\s+/).filter(Boolean);
-    if (parts.length === 0) return "";
-    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-    return ((parts[0][0] ?? "") + (parts[1][0] ?? "")).toUpperCase();
-  })();
+  // Display name is the saved First + Last. Initials are the first character of each
+  // so the avatar chip and the sidebar button stay in sync when the user edits their name.
+  const displayName = `${savedFirstName} ${savedLastName}`.trim();
+  const initials = ((savedFirstName[0] ?? "") + (savedLastName[0] ?? "")).toUpperCase();
 
   // Close the My Account menu on outside click.
   useEffect(() => {
@@ -456,34 +454,63 @@ export default function Sidenav({ isDark = false, onToggleDark, activeItem = "Ma
                         <Pencil className="w-3 h-3" style={{ color: "#A614C3" }} strokeWidth={2} />
                       </span>
                     </button>
-                    <div className="text-[18px] font-bold leading-tight" style={{ color: text }}>{displayName}</div>
+                    {/* User ID is the prominent identity — it's the unique handle that never
+                        changes. The display name + member status sits below as secondary info.
+                        "User ID:" label kept at lighter weight + muted color so the focus lands
+                        on the ID itself, not the label. */}
+                    <div className="text-[18px] font-bold leading-tight" style={{ color: text }}>
+                      <span style={{ fontWeight: 500, color: muted }}>User ID:</span> {userId}
+                    </div>
                     <div className="text-[12px] mt-0.5" style={{ color: muted }}>
-                      <span style={{ fontWeight: 600 }}>User ID:</span> {userId} · ProSuite Member
+                      {displayName} · ProSuite Member
                     </div>
                   </div>
 
 
-                  {/* User ID — clean labeled field, no heavy card wrapper */}
+                  {/* User Name — split into First + Last Name. "User Name" is the section
+                      header; each input gets its own small caption so the user can still tell
+                      which is which after the placeholder disappears. No input sanitizer —
+                      users may have names with accented characters, periods (e.g. "John A."),
+                      or other punctuation we shouldn't pre-filter. Validation only checks
+                      that both fields are non-empty on save. */}
                   <div className="px-6 pt-2 pb-2">
                     <label className="text-[12px] font-semibold block mb-1.5" style={{ color: text }}>User Name</label>
-                    <input value={userName}
-                      onChange={e => {
-                        // Allow letters, digits, and spaces — the User Name now reads as a
-                        // display name (e.g. "John Smith"), not a strict lowercase handle.
-                        const v = e.target.value.replace(/[^a-zA-Z0-9 ]/g, "");
-                        setUserName(v);
-                        // Clear the "taken" error as soon as the user changes the value.
-                        if (userNameError) setUserNameError(null);
-                      }}
-                      placeholder="Your name"
-                      className="w-full px-3 py-2 rounded-lg text-[13px] outline-none transition-colors"
-                      style={{
-                        background: cardBg,
-                        border: `1px solid ${userNameError ? "#EF4444" : border}`,
-                        color: text,
-                      }}
-                      onFocus={e => { if (!userNameError) e.currentTarget.style.borderColor = "#A614C3"; }}
-                      onBlur={e => { e.currentTarget.style.borderColor = userNameError ? "#EF4444" : border; }} />
+                    <div className="flex gap-2">
+                      <div className="flex-1 min-w-0">
+                        <label className="text-[11px] block mb-1" style={{ color: muted }}>First Name</label>
+                        <input value={firstName}
+                          onChange={e => {
+                            setFirstName(e.target.value);
+                            if (userNameError) setUserNameError(null);
+                          }}
+                          placeholder="First Name"
+                          className="w-full px-3 py-2 rounded-lg text-[13px] outline-none transition-colors"
+                          style={{
+                            background: cardBg,
+                            border: `1px solid ${userNameError ? "#EF4444" : border}`,
+                            color: text,
+                          }}
+                          onFocus={e => { if (!userNameError) e.currentTarget.style.borderColor = "#A614C3"; }}
+                          onBlur={e => { e.currentTarget.style.borderColor = userNameError ? "#EF4444" : border; }} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <label className="text-[11px] block mb-1" style={{ color: muted }}>Last Name</label>
+                        <input value={lastName}
+                          onChange={e => {
+                            setLastName(e.target.value);
+                            if (userNameError) setUserNameError(null);
+                          }}
+                          placeholder="Last Name"
+                          className="w-full px-3 py-2 rounded-lg text-[13px] outline-none transition-colors"
+                          style={{
+                            background: cardBg,
+                            border: `1px solid ${userNameError ? "#EF4444" : border}`,
+                            color: text,
+                          }}
+                          onFocus={e => { if (!userNameError) e.currentTarget.style.borderColor = "#A614C3"; }}
+                          onBlur={e => { e.currentTarget.style.borderColor = userNameError ? "#EF4444" : border; }} />
+                      </div>
+                    </div>
                     {userNameError && (
                       <div className="text-[11px] mt-1.5 flex items-center gap-1.5" style={{ color: "#EF4444", lineHeight: "16px" }}>
                         <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" strokeWidth={2} />
@@ -712,14 +739,20 @@ export default function Sidenav({ isDark = false, onToggleDark, activeItem = "Ma
                 <button onClick={() => {
                     if (profileStep === "photo") { setProfileStep("overview"); return; }
                     // Overview step Save. User Name allows duplicates — no uniqueness check.
-                    if (userName === savedUserName) { close(); return; } // no change
-                    if (userName.length < 8) {
-                      setUserNameError("User name must be at least 8 characters.");
+                    // Trim both fields once so " John " === "John" doesn't look like a change.
+                    const fn = firstName.trim();
+                    const ln = lastName.trim();
+                    if (fn === savedFirstName && ln === savedLastName) { close(); return; } // no change
+                    if (!fn || !ln) {
+                      setUserNameError("First name and last name are both required.");
                       return;
                     }
-                    setSavedUserName(userName);
+                    setSavedFirstName(fn);
+                    setSavedLastName(ln);
+                    setFirstName(fn);
+                    setLastName(ln);
                     setUserNameError(null);
-                    setProfileToast({ title: "Profile saved", description: `Your user name has been updated to "${userName}".` });
+                    setProfileToast({ title: "Profile saved", description: `Your user name has been updated to "${fn} ${ln}".` });
                     close();
                   }}
                   className="px-5 py-2 rounded-lg text-[12px] font-semibold text-white transition-all"

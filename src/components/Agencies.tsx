@@ -711,24 +711,48 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
 
   /* ── users tab state ── */
   const [importUsersOpen, setImportUsersOpen] = useState(false);
-  // The Bulk Upload modal has ONE step but the dropzone has three inline phases:
-  //   "empty"  — paperclip prompt, click/drag to upload
-  //   "ready"  — file uploaded, awaiting Send Invites confirmation
-  //   "sent"   — green-check success message showing the invite emails went out
-  type ImportPhase = "empty" | "ready" | "sent";
+  // The Bulk Upload modal phases:
+  //   "empty"    — paperclip prompt, click/drag to upload
+  //   "mapping"  — file uploaded but at least one column didn't auto-match; user maps unmatched columns manually
+  //   "ready"    — file mapped + validated; editable table for fixing issues inline before send
+  //   "sent"     — green-check success message with skipped-row download link if any
+  // Send-confirmation is an OVERLAY within "ready" (sendConfirmOpen state below) rather than its own
+  // phase, so the modal width doesn't jitter and the editable table stays visible underneath.
+  type ImportPhase = "empty" | "mapping" | "ready" | "sent";
   const [importPhase, setImportPhase] = useState<ImportPhase>("empty");
+  const [sendConfirmOpen, setSendConfirmOpen] = useState(false);
   const [importFileName, setImportFileName] = useState<string | null>(null);
   const [importUserCount, setImportUserCount] = useState<number>(0);
-  // Parsed users from the uploaded file. Each row maps directly to the template columns
-  // (First Name / Last Name / Admin / Job Title / Email / Phone / Ext). First Name and Last Name
-  // are collected separately so downstream systems can address users by either field cleanly.
-  // Stays empty until a file is parsed.
-  type ParsedUser = { firstName: string; lastName: string; admin: string; jobTitle: string; email: string; phone: string; ext: string };
-  type ImportIssue = { rowIndex: number; severity: "error" | "warning"; field: "name" | "email" | "admin" | "jobTitle" | "principal"; message: string };
+  // Parsed users from the uploaded file. Address is optional (the Add New User modal asks for it,
+  // but bulk-invite admins typically only have name/email/role, so we don't force it). Everything
+  // else is required and gets validated.
+  type ParsedUser = {
+    firstName: string; lastName: string;
+    admin: string; jobTitle: string;
+    email: string; phone: string; ext: string;
+    address: string;
+  };
+  // Issue field names map to the ParsedUser keys so the editable table can paint the right cell red.
+  type ImportIssue = { rowIndex: number; severity: "error" | "warning"; field: "firstName" | "lastName" | "email" | "admin" | "jobTitle" | "phone" | "principal"; message: string };
+  // Canonical fields we accept in the bulk-upload schema. "ignore" is a sentinel for the mapping
+  // step that lets the user explicitly drop unrecognized columns.
+  type CanonicalField = "firstName" | "lastName" | "admin" | "jobTitle" | "email" | "phone" | "ext" | "address" | "ignore";
+  // Result of parsing the file before we apply column mapping. We hold on to the raw header strings
+  // and the raw row values so the mapping step can show the user what was found.
+  type RawParsedFile = { headers: string[]; rows: string[][]; fileName: string };
   const [parsedUsers, setParsedUsers] = useState<ParsedUser[]>([]);
   const [importIssues, setImportIssues] = useState<ImportIssue[]>([]);
   const [importError, setImportError] = useState<string | null>(null);
   const [importBusy, setImportBusy] = useState(false);
+  // Column-mapping flow state. `rawParsed` is the file as read (headers + raw rows) before mapping is applied.
+  // `headerMapping` is the user's chosen mapping (header index → canonical field). When every header auto-matches,
+  // we skip the mapping phase and go straight to "ready".
+  const [rawParsed,     setRawParsed]     = useState<RawParsedFile | null>(null);
+  const [headerMapping, setHeaderMapping] = useState<CanonicalField[]>([]);
+  // Sent-phase summary so we can show "X sent · Y skipped" and offer a skipped-rows download.
+  const [sentSummary, setSentSummary] = useState<{ sent: number; skipped: ParsedUser[] } | null>(null);
+  // Pending draft prompt — set on modal open if localStorage has saved progress for this agency.
+  const [draftPrompt, setDraftPrompt] = useState<{ fileName: string; count: number } | null>(null);
   const importFileInputRef = useRef<HTMLInputElement | null>(null);
   const closeImportModal = () => {
     setImportUsersOpen(false);
@@ -739,34 +763,118 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
     setImportIssues([]);
     setImportError(null);
     setImportBusy(false);
+    setRawParsed(null);
+    setHeaderMapping([]);
+    setSentSummary(null);
+    setDraftPrompt(null);
+    setSendConfirmOpen(false);
   };
 
   /**
-   * Validate the parsed rows against the template rules:
-   *   - First Name AND Last Name both missing → error (we need at least one to address the user)
-   *   - Email missing or malformed → error
-   *   - Duplicate email within the same file → error
-   *   - Admin level not in ADMIN_LEVELS → error
-   *   - Job Title not in JOB_TITLES → error
-   *   - Multiple Principals (this file + the existing agency Principal) → warning, since the
-   *     back-end can only accept the first one, but the upload itself isn't invalid syntactically
+   * Normalize a header string for fuzzy matching: lowercase, strip non-alphanumeric.
+   * Used both for matching the user's file headers against our canonical fields and for
+   * matching Admin / Job Title values against the allowed sets.
+   *   "First Name" → "firstname"
+   *   "FNAME"      → "fname"
+   *   "first_name" → "firstname"
+   *   "Read-Only Admin" → "readonlyadmin"
+   */
+  const slugify = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+  /**
+   * Map of canonical field → list of normalized alias strings we'll accept as that field
+   * in an uploaded file. Keep generous to be forgiving of how admins name their columns.
+   */
+  const HEADER_ALIASES: Record<Exclude<CanonicalField, "ignore">, string[]> = {
+    firstName: ["firstname", "first", "fname", "givenname", "given"],
+    lastName:  ["lastname", "last", "lname", "surname", "familyname", "family"],
+    email:     ["email", "emailaddress", "mail", "emailid"],
+    admin:     ["admin", "adminlevel", "adminrole", "role", "access", "accesslevel", "permission", "permissions"],
+    jobTitle:  ["jobtitle", "title", "job", "position", "designation"],
+    phone:     ["phone", "phonenumber", "tel", "telephone", "mobile", "mobilephone", "cell", "cellphone", "contact"],
+    ext:       ["ext", "extension", "phoneext", "phoneextension"],
+    address:   ["address", "streetaddress", "mailingaddress", "location"],
+  };
+
+  /**
+   * Try to auto-map a single header to a canonical field. Returns null when nothing matches —
+   * the user will manually pick the mapping in the mapping phase.
+   */
+  const autoMapHeader = (header: string): CanonicalField | null => {
+    const slug = slugify(header);
+    if (!slug) return null;
+    for (const [field, aliases] of Object.entries(HEADER_ALIASES)) {
+      if (aliases.includes(slug)) return field as CanonicalField;
+    }
+    return null;
+  };
+
+  /**
+   * Case- and punctuation-insensitive match for Admin level values. "read-only admin",
+   * "READONLY ADMIN", "Read Only Admin" all return the canonical "Read-Only Admin".
+   * Returns the original (trimmed) string when no match — caller decides if that's an error.
+   */
+  const normalizeAdminValue = (raw: string): string => {
+    const trimmed = raw.trim();
+    if (!trimmed) return "";
+    const slug = slugify(trimmed);
+    const hit = ADMIN_LEVELS.find(v => slugify(v) === slug);
+    return hit ?? trimmed;
+  };
+  const normalizeJobTitleValue = (raw: string): string => {
+    const trimmed = raw.trim();
+    if (!trimmed) return "";
+    const slug = slugify(trimmed);
+    const hit = JOB_TITLES.find(v => slugify(v) === slug);
+    return hit ?? trimmed;
+  };
+
+  /**
+   * Phone helpers — strip non-digits for storage, format for display.
+   * Accept 10 digits (US) or 11 digits starting with 1. NOTE: a sibling `formatPhone`
+   * exists higher up in this component for LIVE input formatting (progressive `(123) 456…`
+   * as the user types). These are post-parse helpers for display + validation, hence the
+   * `importPhone*` / `…Display` naming to avoid the name collision.
+   */
+  const importPhoneDigits = (raw: string): string => raw.replace(/\D/g, "");
+  const isValidPhone = (raw: string): boolean => {
+    const d = importPhoneDigits(raw);
+    return d.length === 10 || (d.length === 11 && d.startsWith("1"));
+  };
+  const formatPhoneDisplay = (raw: string): string => {
+    const d = importPhoneDigits(raw);
+    if (d.length === 10) return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`;
+    if (d.length === 11 && d.startsWith("1")) return `+1 (${d.slice(1, 4)}) ${d.slice(4, 7)}-${d.slice(7)}`;
+    return raw;
+  };
+  const isValidEmail = (raw: string): boolean => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(raw.trim());
+
+  /**
+   * Validate the parsed rows against the template rules. Address is optional (no validation
+   * beyond accepting whatever the user provides). Phone is required and must be 10 (or 11 with
+   * a leading 1) digits after stripping non-digits.
+   *
+   * Admin / Job Title use slug-match — the parse layer already normalizes values to canonical
+   * casing, so what hits validate is either an exact ADMIN_LEVELS entry or unrecognizable.
+   *
    * Returns issues with the original spreadsheet row number (1-indexed, +1 for the header).
    */
   const validateParsedUsers = (users: ParsedUser[]): ImportIssue[] => {
     const issues: ImportIssue[] = [];
-    const seenEmails = new Map<string, number>(); // lowercased email → first sheet row
+    const seenEmails = new Map<string, number>();
     let principalRowIdx = -1;
     users.forEach((u, idx) => {
-      const sheetRow = idx + 2; // header is row 1
-      const noFirst = !u.firstName.trim();
-      const noLast  = !u.lastName.trim();
-      if (noFirst && noLast) {
-        issues.push({ rowIndex: idx, severity: "error", field: "name", message: `Row ${sheetRow}: missing first and last name.` });
+      const sheetRow = idx + 2;
+      if (!u.firstName.trim()) {
+        issues.push({ rowIndex: idx, severity: "error", field: "firstName", message: `Row ${sheetRow}: missing first name.` });
+      }
+      if (!u.lastName.trim()) {
+        issues.push({ rowIndex: idx, severity: "error", field: "lastName", message: `Row ${sheetRow}: missing last name.` });
       }
       const email = u.email.trim();
       if (!email) {
         issues.push({ rowIndex: idx, severity: "error", field: "email", message: `Row ${sheetRow}: missing email.` });
-      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      } else if (!isValidEmail(email)) {
         issues.push({ rowIndex: idx, severity: "error", field: "email", message: `Row ${sheetRow}: "${email}" doesn't look like a valid email.` });
       } else {
         const key = email.toLowerCase();
@@ -776,11 +884,21 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
           seenEmails.set(key, idx);
         }
       }
-      if (u.admin.trim() && !ADMIN_LEVELS.includes(u.admin.trim())) {
+      if (!u.admin.trim()) {
+        issues.push({ rowIndex: idx, severity: "error", field: "admin", message: `Row ${sheetRow}: missing Admin level.` });
+      } else if (!ADMIN_LEVELS.includes(u.admin.trim())) {
         issues.push({ rowIndex: idx, severity: "error", field: "admin", message: `Row ${sheetRow}: "${u.admin}" isn't a valid Admin level.` });
       }
-      if (u.jobTitle.trim() && !JOB_TITLES.includes(u.jobTitle.trim())) {
+      if (!u.jobTitle.trim()) {
+        issues.push({ rowIndex: idx, severity: "error", field: "jobTitle", message: `Row ${sheetRow}: missing Job Title.` });
+      } else if (!JOB_TITLES.includes(u.jobTitle.trim())) {
         issues.push({ rowIndex: idx, severity: "error", field: "jobTitle", message: `Row ${sheetRow}: "${u.jobTitle}" isn't a valid Job Title.` });
+      }
+      // Phone now required (per the schema decision). Address is optional → no validation.
+      if (!u.phone.trim()) {
+        issues.push({ rowIndex: idx, severity: "error", field: "phone", message: `Row ${sheetRow}: missing phone.` });
+      } else if (!isValidPhone(u.phone)) {
+        issues.push({ rowIndex: idx, severity: "error", field: "phone", message: `Row ${sheetRow}: "${u.phone}" doesn't look like a valid phone number.` });
       }
       if (u.jobTitle.trim() === "Principal") {
         if (principalRowIdx === -1) {
@@ -794,19 +912,21 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
   };
 
   /**
-   * Parse an uploaded Excel (.xlsx) or CSV file into ParsedUser rows.
-   * Header row is skipped. Empty rows (missing name or email) are filtered out.
+   * Read an uploaded file into raw header strings + raw row values. No column-mapping yet —
+   * this is the "what's in the file" pass. Column mapping happens in a separate step (either
+   * auto-applied when every header matches, or via the mapping phase when some don't).
    * Returns null on a parse error (we surface the error via importError).
    */
-  const parseImportFile = async (file: File): Promise<ParsedUser[] | null> => {
+  const parseImportFile = async (file: File): Promise<RawParsedFile | null> => {
     try {
       const name = file.name.toLowerCase();
-      const rows: ParsedUser[] = [];
+      let headers: string[] = [];
+      const rows: string[][] = [];
       if (name.endsWith(".csv")) {
         // Minimal CSV parser — handles commas + quoted fields with escaped quotes.
         const text = await file.text();
         const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
-        if (lines.length < 2) return [];
+        if (lines.length < 2) return { headers: [], rows: [], fileName: file.name };
         const splitCsvLine = (line: string): string[] => {
           const out: string[] = []; let cur = ""; let inQ = false;
           for (let i = 0; i < line.length; i++) {
@@ -824,18 +944,8 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
           out.push(cur);
           return out.map(v => v.trim());
         };
-        for (let i = 1; i < lines.length; i++) {
-          const v = splitCsvLine(lines[i]);
-          rows.push({
-            firstName: v[0] ?? "",
-            lastName:  v[1] ?? "",
-            admin:     v[2] ?? "",
-            jobTitle:  v[3] ?? "",
-            email:     v[4] ?? "",
-            phone:     v[5] ?? "",
-            ext:       v[6] ?? "",
-          });
-        }
+        headers = splitCsvLine(lines[0]);
+        for (let i = 1; i < lines.length; i++) rows.push(splitCsvLine(lines[i]));
       } else if (name.endsWith(".xlsx") || name.endsWith(".xls")) {
         // Lazy-load exceljs only on file-pick — keeps the initial bundle slim.
         const ExcelJS = (await import("exceljs")).default;
@@ -843,39 +953,35 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
         const buf = await file.arrayBuffer();
         await wb.xlsx.load(buf);
         const ws = wb.worksheets[0];
-        if (!ws) return [];
+        if (!ws) return { headers: [], rows: [], fileName: file.name };
+        const cellText = (cell: ReturnType<typeof ws.getCell>): string => {
+          const v = cell?.value;
+          if (v == null) return "";
+          if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") return String(v).trim();
+          if (typeof v === "object") {
+            const obj = v as { text?: string; result?: string | number; hyperlink?: string };
+            if (obj.text != null) return String(obj.text).trim();
+            if (obj.result != null) return String(obj.result).trim();
+            if (obj.hyperlink != null) return String(obj.hyperlink).trim();
+          }
+          return "";
+        };
+        // Capture headers from row 1 — width follows columns in the worksheet
+        const headerRow = ws.getRow(1);
+        const colCount = headerRow.cellCount;
+        for (let c = 1; c <= colCount; c++) headers.push(cellText(headerRow.getCell(c)));
+        // Then every other row as raw strings, indexed parallel to headers.
         ws.eachRow({ includeEmpty: false }, (row, rowNum) => {
-          if (rowNum === 1) return; // header
-          const cellText = (col: number): string => {
-            const cell = row.getCell(col);
-            const v = cell?.value;
-            if (v == null) return "";
-            if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") return String(v).trim();
-            // Hyperlink / formula / rich-text fallback
-            if (typeof v === "object") {
-              const obj = v as { text?: string; result?: string | number; hyperlink?: string };
-              if (obj.text != null) return String(obj.text).trim();
-              if (obj.result != null) return String(obj.result).trim();
-              if (obj.hyperlink != null) return String(obj.hyperlink).trim();
-            }
-            return "";
-          };
-          rows.push({
-            firstName: cellText(1),
-            lastName:  cellText(2),
-            admin:     cellText(3),
-            jobTitle:  cellText(4),
-            email:     cellText(5),
-            phone:     cellText(6),
-            ext:       cellText(7),
-          });
+          if (rowNum === 1) return;
+          const cells: string[] = [];
+          for (let c = 1; c <= colCount; c++) cells.push(cellText(row.getCell(c)));
+          rows.push(cells);
         });
       } else {
         setImportError("Unsupported file type. Please upload a .xlsx or .csv file.");
         return null;
       }
-      // Drop rows missing both name and email (likely blank rows in the spreadsheet).
-      return rows.filter(r => r.firstName || r.lastName || r.email);
+      return { headers, rows, fileName: file.name };
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Could not read the file.";
       setImportError(`Couldn't parse the file: ${msg}`);
@@ -883,22 +989,225 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
     }
   };
 
-  // Wired up to the dropzone click + the hidden <input type="file" /> change event.
+  /**
+   * Apply a header → canonical-field mapping to the raw parsed file, building ParsedUser rows.
+   * Values are normalized inline: Admin and Job Title get slug-matched to canonical casing so
+   * "read only admin" doesn't trigger an error. Empty rows (no name AND no email) are dropped.
+   */
+  const buildParsedUsers = (raw: RawParsedFile, mapping: CanonicalField[]): ParsedUser[] => {
+    // colIndex[field] = index into the raw header array that maps to that field, or -1 if unmapped.
+    const colIndex: Record<Exclude<CanonicalField, "ignore">, number> = {
+      firstName: -1, lastName: -1, admin: -1, jobTitle: -1,
+      email: -1, phone: -1, ext: -1, address: -1,
+    };
+    mapping.forEach((field, idx) => {
+      if (field !== "ignore" && colIndex[field] === -1) colIndex[field] = idx;
+    });
+    const pick = (row: string[], field: Exclude<CanonicalField, "ignore">): string => {
+      const i = colIndex[field];
+      return i >= 0 ? (row[i] ?? "") : "";
+    };
+    return raw.rows.map(row => ({
+      firstName: pick(row, "firstName").trim(),
+      lastName:  pick(row, "lastName").trim(),
+      admin:     normalizeAdminValue(pick(row, "admin")),
+      jobTitle:  normalizeJobTitleValue(pick(row, "jobTitle")),
+      email:     pick(row, "email").trim(),
+      phone:     pick(row, "phone").trim(),
+      ext:       pick(row, "ext").trim(),
+      address:   pick(row, "address").trim(),
+    })).filter(r => r.firstName || r.lastName || r.email);
+  };
+
+  /**
+   * After a file is uploaded, decide whether to enter the mapping phase (some headers
+   * unrecognized) or skip straight to "ready" (every header auto-matched). The mapping
+   * defaults to autoMapHeader's best guess; the user confirms or adjusts in the mapping phase.
+   */
   const handleImportFileChosen = async (file: File) => {
     setImportError(null);
     setImportBusy(true);
-    const users = await parseImportFile(file);
+    const raw = await parseImportFile(file);
     setImportBusy(false);
-    if (!users) return; // error already set
-    if (users.length === 0) {
-      setImportError("That file didn't contain any users with a name and email.");
+    if (!raw) return; // error already set
+    if (raw.rows.length === 0) {
+      setImportError("That file didn't contain any data rows.");
       return;
     }
+    const guesses: CanonicalField[] = raw.headers.map(h => autoMapHeader(h) ?? "ignore");
+    const hasUnmapped = raw.headers.some((h, i) => h.trim() !== "" && guesses[i] === "ignore");
+    setRawParsed(raw);
+    setHeaderMapping(guesses);
+    setImportFileName(file.name);
+    if (hasUnmapped) {
+      // Some columns need user confirmation before we can build ParsedUser rows.
+      setImportPhase("mapping");
+      setParsedUsers([]);
+      setImportIssues([]);
+      setImportUserCount(0);
+    } else {
+      // Clean auto-match — go straight to the editable preview.
+      const users = buildParsedUsers(raw, guesses);
+      setParsedUsers(users);
+      setImportIssues(validateParsedUsers(users));
+      setImportUserCount(users.length);
+      setImportPhase("ready");
+    }
+  };
+
+  /**
+   * Confirm the user's column mapping from the mapping phase and transition to "ready".
+   * Builds ParsedUser rows + runs validation with the now-finalized mapping.
+   */
+  const confirmMapping = () => {
+    if (!rawParsed) return;
+    const users = buildParsedUsers(rawParsed, headerMapping);
     setParsedUsers(users);
     setImportIssues(validateParsedUsers(users));
-    setImportFileName(file.name);
     setImportUserCount(users.length);
     setImportPhase("ready");
+  };
+
+  /**
+   * localStorage draft persistence — protects the user from accidentally closing the
+   * modal mid-upload. We save under a per-agency key so drafts for Agency A don't pollute
+   * Agency B. Draft shape is { fileName, users } only; mapping/raw state isn't needed
+   * because saved drafts are always in canonical ParsedUser form (resume picks up at "ready").
+   */
+  const draftStorageKey = `norbielink:bulk-upload-draft:${agency.id}`;
+  // On modal open: peek at localStorage. If there's a saved draft AND we're not already in a
+  // workflow (i.e. user just opened the modal fresh), surface the "Resume previous?" prompt.
+  useEffect(() => {
+    if (!importUsersOpen) return;
+    if (importPhase !== "empty") return; // already mid-flow, don't prompt
+    if (typeof window === "undefined") return;
+    try {
+      const raw = window.localStorage.getItem(draftStorageKey);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as { fileName?: string; users?: ParsedUser[] };
+      if (Array.isArray(parsed.users) && parsed.users.length > 0) {
+        setDraftPrompt({ fileName: parsed.fileName ?? "previous upload", count: parsed.users.length });
+      }
+    } catch {
+      // Corrupt draft — clear it and move on. Better than crashing the modal.
+      try { window.localStorage.removeItem(draftStorageKey); } catch { /* noop */ }
+    }
+    // We only want to check ONCE per modal open, not on every state change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [importUsersOpen]);
+
+  // On every change to parsedUsers (i.e. each inline edit) we re-persist the draft so the
+  // user can recover from an accidental close. Skips when the modal is closed OR phase is empty.
+  useEffect(() => {
+    if (!importUsersOpen) return;
+    if (importPhase !== "ready") return;
+    if (parsedUsers.length === 0) return;
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(draftStorageKey, JSON.stringify({
+        fileName: importFileName,
+        users: parsedUsers,
+        savedAt: new Date().toISOString(),
+      }));
+    } catch {
+      // Quota exceeded or storage disabled — degrade silently; the in-memory state is still authoritative.
+    }
+  }, [parsedUsers, importPhase, importUsersOpen, importFileName, draftStorageKey]);
+
+  // Resume from the saved draft: skip parsing + mapping, jump straight to "ready" with the
+  // persisted rows and freshly recomputed issues.
+  const resumeDraft = () => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = window.localStorage.getItem(draftStorageKey);
+      if (!raw) { setDraftPrompt(null); return; }
+      const parsed = JSON.parse(raw) as { fileName?: string; users?: Partial<ParsedUser>[] };
+      const rawUsers = Array.isArray(parsed.users) ? parsed.users : [];
+      if (rawUsers.length === 0) { setDraftPrompt(null); return; }
+      // Backfill defaults so older drafts (saved before `address` was added) don't render
+      // `undefined` into controlled inputs. Coerce to strings defensively.
+      const users: ParsedUser[] = rawUsers.map(u => ({
+        firstName: String(u.firstName ?? ""),
+        lastName:  String(u.lastName  ?? ""),
+        admin:     String(u.admin     ?? ""),
+        jobTitle:  String(u.jobTitle  ?? ""),
+        email:     String(u.email     ?? ""),
+        phone:     String(u.phone     ?? ""),
+        ext:       String(u.ext       ?? ""),
+        address:   String(u.address   ?? ""),
+      }));
+      setParsedUsers(users);
+      setImportIssues(validateParsedUsers(users));
+      setImportUserCount(users.length);
+      setImportFileName(parsed.fileName ?? "draft.xlsx");
+      setImportPhase("ready");
+      setDraftPrompt(null);
+    } catch {
+      setDraftPrompt(null);
+    }
+  };
+
+  // Discard the saved draft and start fresh from the empty phase.
+  const discardDraft = () => {
+    if (typeof window !== "undefined") {
+      try { window.localStorage.removeItem(draftStorageKey); } catch { /* noop */ }
+    }
+    setDraftPrompt(null);
+  };
+
+  // Clear the draft after a successful send so the next modal open isn't haunted by stale work.
+  const clearDraftStorage = () => {
+    if (typeof window === "undefined") return;
+    try { window.localStorage.removeItem(draftStorageKey); } catch { /* noop */ }
+  };
+
+  /**
+   * Update a single field on a single row in the editable table. Re-runs validation against
+   * the whole file (cheap at 500 rows) so cross-row checks like duplicate-email + multiple-
+   * Principal stay accurate after every edit. Admin / Job Title cells pass through the
+   * normalizer so a dropdown pick lands as the canonical value even if the user later
+   * pastes a slug-equivalent string.
+   */
+  const updateRow = (rowIdx: number, field: keyof ParsedUser, value: string) => {
+    setParsedUsers(prev => {
+      const next = prev.map((u, i) => {
+        if (i !== rowIdx) return u;
+        // Normalize on the way in for Admin/Job Title so the cell snaps to canonical casing.
+        if (field === "admin")    return { ...u, admin:    normalizeAdminValue(value) };
+        if (field === "jobTitle") return { ...u, jobTitle: normalizeJobTitleValue(value) };
+        return { ...u, [field]: value };
+      });
+      setImportIssues(validateParsedUsers(next));
+      return next;
+    });
+  };
+
+  /**
+   * Final send. Filters out rows with any error, transitions to the sent phase, captures
+   * a summary so the success screen can show "sent vs skipped" with a download link for the
+   * skipped rows, and clears the localStorage draft so a future modal open starts fresh.
+   */
+  const executeSend = () => {
+    // Build a row-index → has-error map so we partition the parsed users in one pass.
+    const errorRowIdx = new Set(importIssues.filter(iss => iss.severity === "error").map(iss => iss.rowIndex));
+    const sent: ParsedUser[]    = [];
+    const skipped: ParsedUser[] = [];
+    parsedUsers.forEach((u, i) => (errorRowIdx.has(i) ? skipped : sent).push(u));
+    setSentSummary({ sent: sent.length, skipped });
+    setImportPhase("sent");
+    clearDraftStorage();
+  };
+
+  /**
+   * Download just the rows that didn't make it through (called from the sent-phase summary).
+   * Lets the admin grab the failures, fix them in Excel, and re-upload as a follow-up batch.
+   */
+  const downloadSkippedRows = async () => {
+    if (!sentSummary || sentSummary.skipped.length === 0) return;
+    const base = (importFileName ?? "users")
+      .replace(/\.[^.]+$/, "")
+      .replace(/[^a-zA-Z0-9_-]+/g, "_");
+    await downloadExcelTemplate(sentSummary.skipped, `${base}_skipped.xlsx`);
   };
   const [addUserOpen,     setAddUserOpen]     = useState(false);
   const [editUserId,      setEditUserId]      = useState<string|null>(null);
@@ -1041,12 +1350,14 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
 
   /**
    * Build an .xlsx workbook for bulk user import.
-   * Columns mirror the user list table (Name · Admin · Job Title · Email · Phone · Ext).
-   * The Admin and Job Title columns get real Excel data-validation dropdowns so the
-   * uploader picks from the allowed values instead of typing them.
+   * Columns mirror the bulk-upload schema. Address is optional; everything else is required.
+   * Admin and Job Title columns get real Excel data-validation dropdowns so the uploader
+   * picks from allowed values instead of typing them.
+   *
+   * If `seedRows` is provided, the template is pre-filled with those rows (used by the
+   * "Download progress" button to export the user's current in-progress edits as a draft file).
    */
-  const downloadExcelTemplate = async () => {
-    // Lazy-import so exceljs (~150KB) only loads when the user actually clicks Download.
+  const downloadExcelTemplate = async (seedRows?: ParsedUser[], filename = "users_template.xlsx") => {
     const ExcelJS = (await import("exceljs")).default;
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet("Users");
@@ -1058,19 +1369,29 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
       { header: "Email",      key: "email",     width: 28 },
       { header: "Phone",      key: "phone",     width: 16 },
       { header: "Ext",        key: "ext",       width: 8  },
+      { header: "Address",    key: "address",   width: 32 },
     ];
-    // Bold header row
     ws.getRow(1).font = { bold: true };
-    // One example row so the format is obvious at a glance
-    ws.addRow({ firstName: "John", lastName: "Doe", admin: "Read-Only Admin", jobTitle: "Producer", email: "john@example.com", phone: "555-1234", ext: "123" });
+    if (seedRows && seedRows.length > 0) {
+      // Re-export current progress (Download progress button). One row per ParsedUser.
+      seedRows.forEach(u => ws.addRow({
+        firstName: u.firstName, lastName: u.lastName,
+        admin: u.admin, jobTitle: u.jobTitle,
+        email: u.email, phone: u.phone, ext: u.ext, address: u.address,
+      }));
+    } else {
+      // Fresh template — one example row so the format is obvious at a glance.
+      ws.addRow({ firstName: "John", lastName: "Doe", admin: "Read-Only Admin", jobTitle: "Producer", email: "john@example.com", phone: "(555) 123-4567", ext: "123", address: "123 Main St, Springfield, IL 62701" });
+    }
 
-    // Apply data-validation dropdowns to Admin (col C) and Job Title (col D),
-    // rows 2..201. exceljs's per-cell assignment is the documented + most reliably
-    // serialised path. A FRESH validation object is assigned per cell — sharing the
-    // same object across cells can let exceljs drop entries when it dedupes.
-    const adminFormula    = `"${ADMIN_LEVELS.join(",")}"`;     // → "Read-Only Admin,Agency Support Admin,Super Admin"
-    const jobTitleFormula = `"${JOB_TITLES.join(",")}"`;       // → "Principal,Producer,CSR,Accounting,Account Manager"
-    for (let r = 2; r <= 201; r++) {
+    // Apply data-validation dropdowns to Admin (col C) and Job Title (col D), rows 2..501.
+    // Bumped the range from 200 to 500 to fit the 500-row "large file" use case.
+    // exceljs's per-cell assignment is the documented + most reliably serialised path.
+    // A FRESH validation object is assigned per cell — sharing the same object can let
+    // exceljs drop entries when it dedupes.
+    const adminFormula    = `"${ADMIN_LEVELS.join(",")}"`;
+    const jobTitleFormula = `"${JOB_TITLES.join(",")}"`;
+    for (let r = 2; r <= 501; r++) {
       ws.getCell(`C${r}`).dataValidation = {
         type: "list",
         allowBlank: true,
@@ -1083,18 +1404,15 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
       };
     }
 
-    // Cell comment on the Job Title header (now column D) so the rule is discoverable on hover.
     ws.getCell("D1").note = "Only one Principal is allowed per agency.";
+    ws.getCell("H1").note = "Address is optional. Leave blank if you don't have it.";
 
-    // Conditional formatting — highlight any "Principal" cell in red when the column
-    // already contains more than one. Draws attention to the duplicate before upload.
-    // Job Title is now column D (after splitting Name → First Name + Last Name).
     ws.addConditionalFormatting({
-      ref: "D2:D201",
+      ref: "D2:D501",
       rules: [
         {
           type: "expression",
-          formulae: [`AND(D2="Principal", COUNTIF($D$2:$D$201,"Principal")>1)`],
+          formulae: [`AND(D2="Principal", COUNTIF($D$2:$D$501,"Principal")>1)`],
           priority: 1,
           style: {
             fill:   { type: "pattern", pattern: "solid", bgColor: { argb: "FFFEE2E2" } },
@@ -1109,11 +1427,24 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "users_template.xlsx";
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  };
+
+  /**
+   * Download the user's current in-progress edits as an .xlsx file matching the template
+   * format. Lets admins continue their bulk upload on another device or resume after losing
+   * the browser tab — the file can be re-uploaded and the rows will be auto-mapped because
+   * the headers match our template exactly.
+   */
+  const downloadProgressFile = async () => {
+    const base = (importFileName ?? "users_in_progress")
+      .replace(/\.[^.]+$/, "")
+      .replace(/[^a-zA-Z0-9_-]+/g, "_");
+    await downloadExcelTemplate(parsedUsers, `${base}_in_progress.xlsx`);
   };
 
   const US_STATES    = ["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"];
@@ -6088,7 +6419,11 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
       {importUsersOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background:"rgba(0,0,0,0.45)" }}
           onClick={closeImportModal}>
-          <div className="rounded-2xl w-[600px] max-w-[90vw] overflow-hidden"
+          {/* Phase-responsive width: empty/confirm/sent stay compact (600px) for the dialog
+              feel; mapping/ready expand to 1200px because they hold real working surfaces
+              (column-mapper grid, editable table with 8 cols × N rows). Tailwind JIT picks up
+              both classes from the literal source so they're always generated. */}
+          <div className={`rounded-2xl ${importPhase === "ready" || importPhase === "mapping" ? "w-[1200px]" : "w-[600px]"} max-w-[95vw] overflow-hidden`}
             style={{ background:isDark?"#1E2240":"#fff", boxShadow:"0 20px 60px rgba(0,0,0,0.3)" }}
             onClick={e=>e.stopPropagation()}>
             <div className="flex items-center justify-between px-8 pt-7 pb-5" style={{ borderBottom:`1px solid ${c.border}` }}>
@@ -6100,29 +6435,123 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
             </div>
 
             <div className="px-8 py-6 space-y-4">
+              {/* Draft-resume prompt — protects the user from losing in-progress work if they
+                  accidentally closed the modal. localStorage stores per-agency drafts; on modal
+                  open we check for one and surface this prompt. User picks Resume (jumps to the
+                  ready phase with the saved rows) or Start Fresh (clears the draft). Replaces
+                  the normal empty-phase content while open. */}
+              {importPhase === "empty" && draftPrompt && (
+                <div className="rounded-xl px-5 py-6 flex flex-col items-center text-center" style={{ border:`1px solid ${c.border}`, background:isDark?"rgba(166,20,195,0.05)":"#FAF7FF" }}>
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center mb-3" style={{ background:"rgba(166,20,195,0.12)" }}>
+                    <FileText className="w-5 h-5" style={{ color:"#A614C3" }} />
+                  </div>
+                  <p className="text-[16px] font-bold mb-1" style={{ fontFamily:FONT, color:c.text }}>Resume your previous upload?</p>
+                  <p className="text-[12.5px] mb-1.5" style={{ fontFamily:FONT, color:c.muted, lineHeight:"18px" }}>
+                    We saved your in-progress work from <span style={{ fontWeight:600, color:c.text }}>{draftPrompt.fileName}</span>{" "}
+                    with <span style={{ fontWeight:600, color:c.text }}>{draftPrompt.count} {draftPrompt.count === 1 ? "user" : "users"}</span> ready to review.
+                  </p>
+                  <p className="text-[11px] mb-5" style={{ fontFamily:FONT, color:c.muted }}>You can pick up where you left off, or discard it and start over.</p>
+                  <div className="flex items-center gap-2.5">
+                    <button onClick={discardDraft}
+                      className="px-5 py-2.5 rounded-lg text-[13px] font-semibold transition-colors"
+                      style={{ fontFamily:FONT, color:c.text, border:`1px solid ${c.border}`, background:isDark?"rgba(255,255,255,0.04)":"#fff" }}
+                      onMouseEnter={e=>(e.currentTarget.style.background=c.hoverBg)}
+                      onMouseLeave={e=>(e.currentTarget.style.background=isDark?"rgba(255,255,255,0.04)":"#fff")}>
+                      Start fresh
+                    </button>
+                    <button onClick={resumeDraft}
+                      className="px-5 py-2.5 rounded-lg text-[13px] font-semibold text-white transition-all"
+                      style={{ fontFamily:FONT, background:btnGrad, boxShadow:"0 2px 10px rgba(166,20,195,0.25)" }}
+                      onMouseEnter={e=>(e.currentTarget.style.filter="brightness(1.08)")}
+                      onMouseLeave={e=>(e.currentTarget.style.filter="none")}>
+                      Resume editing
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Format reference + template download — only shown in the empty phase.
                   Once the user has uploaded a file, those preparation aids step out of the way so
                   the ready (confirmation) and sent (success) phases each get one focused card. */}
-              {importPhase === "empty" && (<>
-              {/* Compact format reference — title + three tight rows + a Principal-uniqueness note */}
-              <div className="rounded-xl px-4 py-3 space-y-1.5" style={{ border:`1px solid ${c.border}`, background:isDark?"rgba(255,255,255,0.02)":"#F9FAFB" }}>
-                <p className="text-[14px] font-bold" style={{ fontFamily:FONT, color:c.text }}>File Format</p>
-                <p className="text-[12px] pb-1" style={{ fontFamily:FONT, color:c.muted }}>
-                  Please upload a CSV/Excel file with the following columns (header row required):
-                </p>
-                <div className="flex items-baseline gap-2 text-[12px]" style={{ fontFamily:FONT }}>
-                  <span className="flex-shrink-0 w-[68px]" style={{ color:c.muted }}>Columns</span>
-                  <span className="font-mono" style={{ color:"#73C9B7" }}>First Name, Last Name, Admin, Job Title, Email, Phone, Ext</span>
+              {importPhase === "empty" && !draftPrompt && (<>
+              {/* Single help panel — intro ("what is this and how do I use it") at the top,
+                  then a dashed divider, then the dry column-format specs. Merging the two
+                  into one container reads as a coherent "why → how" reference instead of two
+                  stacked boxes competing for attention. */}
+              <div className="rounded-xl px-4 py-3.5 space-y-2.5" style={{ border:`1px solid ${c.border}`, background:isDark?"rgba(255,255,255,0.02)":"#F9FAFB" }}>
+                {/* Intro — purpose + 3-step workflow, in one short paragraph */}
+                <div className="flex items-start gap-2.5">
+                  <Users className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color:"#A614C3" }} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] font-bold" style={{ fontFamily:FONT, color:c.text }}>Invite multiple users at once</p>
+                    <p className="text-[12px] mt-0.5" style={{ fontFamily:FONT, color:c.muted, lineHeight:"17px" }}>
+                      Download the template, fill in each user&apos;s details, and upload the file. We&apos;ll email every valid row a secure registration link.
+                    </p>
+                  </div>
                 </div>
-                <div className="flex items-baseline gap-2 text-[12px]" style={{ fontFamily:FONT }}>
-                  <span className="flex-shrink-0 w-[68px]" style={{ color:c.muted }}>Admin</span>
-                  <span className="font-mono" style={{ color:"#A614C3" }}>{ADMIN_LEVELS.join(" / ")}</span>
+
+                {/* Divider between the "why" and the "what" — dashed, matches the existing
+                    Principal-uniqueness divider below for visual rhythm */}
+                <div style={{ borderTop:`1px dashed ${c.border}` }} />
+
+                {/* Visual preview — mini spreadsheet table showing what a filled-in row
+                    looks like. Much more intuitive than the prior text breakdown of column
+                    names + dropdown options: the user sees exactly what to produce, including
+                    that Phone uses (XXX) XXX-XXXX, Ext can be blank, Address is optional, etc.
+                    Scrolls horizontally on narrow viewports so the full row is reachable. */}
+                <div>
+                  <p className="text-[12px] mb-1.5" style={{ fontFamily:FONT, color:c.muted }}>
+                    Example — what each row should look like:
+                  </p>
+                  <div className="rounded-md overflow-x-auto" style={{ border:`1px solid ${c.border}` }}>
+                    <table className="text-[11px]" style={{ fontFamily:FONT, borderCollapse:"separate", borderSpacing:0, width:"100%" }}>
+                      <thead>
+                        <tr style={{ background:isDark?"rgba(255,255,255,0.03)":"#F3F4F6" }}>
+                          {["First Name","Last Name","Admin","Job Title","Email","Phone","Ext","Address"].map((h, i) => (
+                            <th key={h} className="text-left px-2 py-1.5 font-semibold whitespace-nowrap" style={{ color:c.text, borderBottom:`1px solid ${c.border}`, borderRight: i < 7 ? `1px solid ${c.border}` : "none" }}>
+                              {h}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[
+                          { firstName:"John",  lastName:"Doe",   admin:"Read-Only Admin", jobTitle:"Producer",  email:"john@example.com", phone:"(555) 123-4567", ext:"101", address:"123 Main St" },
+                          { firstName:"Jane",  lastName:"Smith", admin:"Super Admin",     jobTitle:"Principal", email:"jane@example.com", phone:"(555) 987-6543", ext:"",    address:"" },
+                        ].map((r, ri) => (
+                          <tr key={ri}>
+                            {[r.firstName, r.lastName, r.admin, r.jobTitle, r.email, r.phone, r.ext, r.address].map((v, ci) => (
+                              <td key={ci} className="px-2 py-1.5 whitespace-nowrap font-mono" style={{ color: v ? c.text : c.muted, borderRight: ci < 7 ? `1px solid ${c.border}` : "none", borderBottom: ri === 0 ? `1px solid ${c.border}` : "none" }}>
+                                {v || <span style={{ opacity:0.5 }}>—</span>}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {/* Allowed-values legend — the example table shows ONE value per restricted
+                      column; this footnote spells out the full set so users know Admin and Job
+                      Title aren't free-text. Leading line tells the user these are the ONLY
+                      accepted values; rows below list them in brand purple to signal "fixed
+                      dropdown choice". */}
+                  <p className="text-[11px] mt-2 mb-1" style={{ fontFamily:FONT, color:c.text, fontWeight:600 }}>
+                    Admin and Job Title only accept these values:
+                  </p>
+                  <div className="space-y-0.5">
+                    <div className="flex items-baseline gap-2 text-[10.5px]" style={{ fontFamily:FONT }}>
+                      <span className="flex-shrink-0 w-[58px]" style={{ color:c.muted }}>Admin</span>
+                      <span className="font-mono" style={{ color:"#A614C3" }}>{ADMIN_LEVELS.join(" / ")}</span>
+                    </div>
+                    <div className="flex items-baseline gap-2 text-[10.5px]" style={{ fontFamily:FONT }}>
+                      <span className="flex-shrink-0 w-[58px]" style={{ color:c.muted }}>Job Title</span>
+                      <span className="font-mono" style={{ color:"#A614C3" }}>{JOB_TITLES.join(" / ")}</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex items-baseline gap-2 text-[12px]" style={{ fontFamily:FONT }}>
-                  <span className="flex-shrink-0 w-[68px]" style={{ color:c.muted }}>Job Title</span>
-                  <span className="font-mono" style={{ color:"#A614C3" }}>{JOB_TITLES.join(" / ")}</span>
-                </div>
-                <div className="flex items-baseline gap-2 text-[11px] pt-1" style={{ fontFamily:FONT, color:c.muted, borderTop:`1px dashed ${c.border}` }}>
+
+                {/* Principal-uniqueness note — same dashed-divider style as above */}
+                <div className="flex items-baseline gap-2 text-[11px] pt-0.5" style={{ fontFamily:FONT, color:c.muted, borderTop:`1px dashed ${c.border}` }}>
                   <AlertCircle className="w-3 h-3 flex-shrink-0" style={{ color:"#A614C3", transform:"translateY(2px)" }} />
                   <span>
                     Only one <span style={{ fontFamily:"monospace", color:"#A614C3" }}>Principal</span> allowed per agency.
@@ -6143,7 +6572,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
               </>)}
 
               {/* Upload zone — single container, three inline phases */}
-              {importPhase === "empty" && (
+              {importPhase === "empty" && !draftPrompt && (
                 <>
                   {/* Hidden native file input — triggered by the dropzone click + the drag/drop handlers below. */}
                   <input
@@ -6181,7 +6610,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                     <p className="text-[14px] font-semibold mb-1" style={{ fontFamily:FONT, color:c.text }}>
                       {importBusy ? "Reading file…" : "Click to upload or drag and drop"}
                     </p>
-                    <p className="text-[12px]" style={{ fontFamily:FONT, color:c.muted }}>Excel (.xlsx) or CSV files</p>
+                    <p className="text-[12px]" style={{ fontFamily:FONT, color:c.muted }}>Any spreadsheet — we&apos;ll match your columns automatically</p>
                   </div>
                   {importError && (
                     <p className="text-[12px] mt-2 px-3 py-2 rounded-lg" style={{ fontFamily:FONT, color:"#B91C1C", background:"#FEF2F2", border:"1px solid #FECACA" }}>
@@ -6191,140 +6620,434 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                 </>
               )}
 
+              {/* ── Mapping phase — fuzzy header reconciliation ── */}
+              {importPhase === "mapping" && rawParsed && (() => {
+                // Split headers into auto-matched (already on a canonical field) and unmapped
+                // (currently "ignore"). The auto-matched group is shown read-only as confirmation;
+                // unmapped ones get a dropdown so the user can pick a field or explicitly ignore.
+                const headers = rawParsed.headers;
+                const isAuto = (idx: number): boolean => {
+                  const h = headers[idx];
+                  return !!h && autoMapHeader(h) !== null;
+                };
+                const matchedIndices   = headers.map((_, i) => i).filter(i => isAuto(i));
+                const unmatchedIndices = headers.map((_, i) => i).filter(i => !isAuto(i) && headers[i].trim() !== "");
+                // Sample value from the first data row, for context — helps the user decide
+                // what an ambiguous column actually contains.
+                const sampleFor = (colIdx: number): string => {
+                  const v = rawParsed.rows[0]?.[colIdx] ?? "";
+                  return v.length > 28 ? v.slice(0, 25) + "…" : v;
+                };
+                // Each unmapped column needs a chosen field before we can continue. "ignore" counts
+                // as a chosen field too — user is explicitly dropping it. The blank/initial state
+                // is "ignore" by default, so this is essentially always true; we keep the check
+                // for future tightening (e.g. require explicit confirmation).
+                const allChosen = unmatchedIndices.every(i => headerMapping[i] !== undefined);
+                // Available field options for the dropdowns — exclude fields already mapped by
+                // auto-match so we don't offer them twice (user can still pick "ignore").
+                const usedByAuto = new Set<CanonicalField>(matchedIndices.map(i => headerMapping[i]));
+                const allFieldOptions: { value: CanonicalField; label: string }[] = [
+                  { value: "ignore",    label: "Ignore this column" },
+                  { value: "firstName", label: "First Name" },
+                  { value: "lastName",  label: "Last Name" },
+                  { value: "email",     label: "Email" },
+                  { value: "admin",     label: "Admin level" },
+                  { value: "jobTitle",  label: "Job Title" },
+                  { value: "phone",     label: "Phone" },
+                  { value: "ext",       label: "Ext" },
+                  { value: "address",   label: "Address (optional)" },
+                ];
+                const fieldOptions = allFieldOptions.filter(o => o.value === "ignore" || !usedByAuto.has(o.value));
+                return (
+                <div>
+                  <p className="text-[18px] font-bold text-center mb-1.5" style={{ fontFamily:FONT, color:c.text }}>Map your columns</p>
+                  <p className="text-[13px] text-center mx-auto mb-6 max-w-[560px]" style={{ fontFamily:FONT, color:c.muted, lineHeight:"19px", textWrap:"balance" }}>
+                    We found <span style={{ fontWeight:600, color:c.text }}>{headers.filter(h => h.trim() !== "").length}</span> columns in your file. {matchedIndices.length > 0 && <>Auto-matched <span style={{ fontWeight:600, color:c.text }}>{matchedIndices.length}</span>{matchedIndices.length === 1 ? "" : ""} — </>}please tell us what these unrecognized columns are.
+                  </p>
+
+                  {/* Auto-matched columns — compact summary, read-only chips */}
+                  {matchedIndices.length > 0 && (
+                    <div className="rounded-xl px-4 py-3 mb-4" style={{ border:`1px solid ${c.border}`, background:isDark?"rgba(255,255,255,0.02)":"#F9FAFB" }}>
+                      <p className="text-[12px] font-semibold mb-2" style={{ fontFamily:FONT, color:c.muted }}>Auto-matched</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {matchedIndices.map(i => {
+                          const field = headerMapping[i];
+                          const fieldLabel = fieldOptions.find(o => o.value === field)?.label ?? field;
+                          return (
+                            <div key={i} className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11.5px]" style={{ fontFamily:FONT, background:isDark?"rgba(115,201,183,0.10)":"#ECFDF5", color:"#047857", border:"1px solid rgba(5,150,105,0.18)" }}>
+                              <Check className="w-3 h-3" strokeWidth={3}/>
+                              <span className="font-mono">{headers[i]}</span>
+                              <span style={{ opacity:0.6 }}>→</span>
+                              <span className="font-semibold">{fieldLabel}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Unmapped columns — each gets a dropdown. Bordered card per row so the user
+                      can see the header, a sample value, and pick what it maps to in one glance. */}
+                  {unmatchedIndices.length > 0 ? (
+                    <div className="rounded-xl overflow-hidden mb-5" style={{ border:`1px solid ${c.border}` }}>
+                      <div className="px-4 py-2.5 text-[12px] font-semibold flex items-center gap-2" style={{ fontFamily:FONT, color:c.text, background:isDark?"rgba(255,255,255,0.02)":"#FAFAFB", borderBottom:`1px solid ${c.border}` }}>
+                        <AlertCircle className="w-3.5 h-3.5" style={{ color:"#A614C3" }}/>
+                        <span>Needs mapping — {unmatchedIndices.length} {unmatchedIndices.length === 1 ? "column" : "columns"}</span>
+                      </div>
+                      <div style={{ maxHeight: 260, overflowY:"auto" }}>
+                        {unmatchedIndices.map((colIdx, displayIdx) => {
+                          const choice = headerMapping[colIdx] ?? "ignore";
+                          return (
+                            <div key={colIdx} className="px-4 py-3 grid grid-cols-[1fr_auto_1fr] items-center gap-3" style={{ borderBottom: displayIdx < unmatchedIndices.length - 1 ? `1px solid ${c.border}` : "none", fontFamily:FONT }}>
+                              <div className="min-w-0">
+                                <div className="text-[12.5px] font-semibold font-mono truncate" style={{ color:c.text }}>{headers[colIdx]}</div>
+                                <div className="text-[11px] truncate" style={{ color:c.muted }}>
+                                  e.g. {sampleFor(colIdx) || <span style={{ fontStyle:"italic" }}>(empty)</span>}
+                                </div>
+                              </div>
+                              <div className="text-[12px]" style={{ color:c.muted }}>→</div>
+                              <select value={choice}
+                                onChange={e => {
+                                  const nextField = e.target.value as CanonicalField;
+                                  setHeaderMapping(prev => {
+                                    const out = [...prev];
+                                    out[colIdx] = nextField;
+                                    return out;
+                                  });
+                                }}
+                                className="w-full px-3 py-2 rounded-lg text-[12.5px] outline-none transition-colors"
+                                style={{ fontFamily:FONT, color:c.text, background:isDark?"rgba(255,255,255,0.05)":"#fff", border:`1px solid ${c.border}` }}>
+                                {fieldOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                              </select>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="rounded-xl px-4 py-6 mb-5 text-center" style={{ border:`1px solid ${c.border}`, background:isDark?"rgba(255,255,255,0.02)":"#F9FAFB" }}>
+                      <p className="text-[12.5px]" style={{ fontFamily:FONT, color:c.muted }}>
+                        Everything in your file auto-matched cleanly. Hit Continue to review the rows.
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between gap-2">
+                    <button onClick={() => { setImportPhase("empty"); setRawParsed(null); setHeaderMapping([]); setImportFileName(null); }}
+                      className="px-5 py-2.5 rounded-lg text-[13px] font-semibold transition-colors"
+                      style={{ fontFamily:FONT, color:c.text, border:`1px solid ${c.border}`, background:isDark?"rgba(255,255,255,0.04)":"#fff" }}
+                      onMouseEnter={e=>(e.currentTarget.style.background=c.hoverBg)}
+                      onMouseLeave={e=>(e.currentTarget.style.background=isDark?"rgba(255,255,255,0.04)":"#fff")}>
+                      Back
+                    </button>
+                    <button onClick={confirmMapping} disabled={!allChosen}
+                      className="flex items-center gap-1.5 px-6 py-2.5 rounded-lg text-[13px] font-semibold text-white transition-all"
+                      style={{ fontFamily:FONT, background: allChosen ? btnGrad : "#9CA3AF", cursor: allChosen ? "pointer" : "not-allowed", boxShadow: allChosen ? "0 2px 10px rgba(166,20,195,0.25)" : "none" }}
+                      onMouseEnter={e=>{ if (allChosen) e.currentTarget.style.filter = "brightness(1.08)"; }}
+                      onMouseLeave={e=>(e.currentTarget.style.filter="none")}>
+                      Continue<ChevronRight className="w-3.5 h-3.5"/>
+                    </button>
+                  </div>
+                </div>
+                );
+              })()}
+
               {importPhase === "ready" && (() => {
-                // Render the real parsed rows from the uploaded file. The scrollable
-                // container below caps the visible area so a 500-row file doesn't
-                // blow out the modal height — the rest scrolls inside the card.
-                const totalUsers = parsedUsers.length;
-                const errorCount = importIssues.filter(i => i.severity === "error").length;
-                const hasIssues  = importIssues.length > 0;
-                // Map row-index → the issues affecting that row so we can decorate rows in the preview.
+                // Derived state from parsedUsers + importIssues. Recomputed every render — at
+                // 500 rows this is sub-millisecond, much simpler than memo dance.
+                const totalUsers   = parsedUsers.length;
+                const errorRowIdx  = new Set(importIssues.filter(i => i.severity === "error").map(i => i.rowIndex));
+                const warnRowIdx   = new Set(importIssues.filter(i => i.severity === "warning").map(i => i.rowIndex));
+                const errorCount   = errorRowIdx.size;
+                const warningCount = warnRowIdx.size;
+                const validCount   = totalUsers - errorCount;
+                // For per-cell error highlighting + tooltip-on-hover.
                 const issuesByRow = new Map<number, ImportIssue[]>();
                 importIssues.forEach(iss => {
                   const list = issuesByRow.get(iss.rowIndex) ?? [];
                   list.push(iss);
                   issuesByRow.set(iss.rowIndex, list);
                 });
+                // Ordered list of error-row indices for the [↑ Prev] [↓ Next] navigation.
+                const errorRowIndices = Array.from(errorRowIdx).sort((a, b) => a - b);
+                // Helper: scroll a row into view (used by the jump buttons). DOM lookup is
+                // intentional — we attach a stable id per row so this works regardless of which
+                // rows are currently in the viewport, no per-row refs needed.
+                const jumpToRow = (rowIdx: number) => {
+                  if (typeof document === "undefined") return;
+                  const el = document.getElementById(`bulk-row-${rowIdx}`);
+                  if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+                };
+                const jumpToNextError = () => {
+                  if (errorRowIndices.length === 0) return;
+                  // Find the next error AFTER the topmost visible row. For simplicity, just cycle:
+                  // remember the last jumped index in a window data attribute. This avoids needing
+                  // another piece of state for a tiny UX detail.
+                  const container = document.getElementById("bulk-table-scroll");
+                  const lastIdxStr = container?.dataset.lastJumpIdx;
+                  const lastIdx = lastIdxStr ? parseInt(lastIdxStr, 10) : -1;
+                  const next = errorRowIndices.find(i => i > lastIdx) ?? errorRowIndices[0];
+                  jumpToRow(next);
+                  if (container) container.dataset.lastJumpIdx = String(next);
+                };
+                const jumpToPrevError = () => {
+                  if (errorRowIndices.length === 0) return;
+                  const container = document.getElementById("bulk-table-scroll");
+                  const lastIdxStr = container?.dataset.lastJumpIdx;
+                  const lastIdx = lastIdxStr ? parseInt(lastIdxStr, 10) : errorRowIndices.length;
+                  const reversed = [...errorRowIndices].reverse();
+                  const prev = reversed.find(i => i < lastIdx) ?? errorRowIndices[errorRowIndices.length - 1];
+                  jumpToRow(prev);
+                  if (container) container.dataset.lastJumpIdx = String(prev);
+                };
+                // Column definitions for the editable table. `width` is a hint for the layout;
+                // the table is fixed-width so columns stay aligned during scroll.
+                type ColKey = "firstName" | "lastName" | "admin" | "jobTitle" | "email" | "phone" | "ext" | "address";
+                type Col = { key: ColKey; label: string; required: boolean; width: number; kind: "text" | "select"; options?: readonly string[] };
+                const columns: Col[] = [
+                  { key: "firstName", label: "First Name", required: true,  width: 120, kind: "text" },
+                  { key: "lastName",  label: "Last Name",  required: true,  width: 120, kind: "text" },
+                  { key: "admin",     label: "Admin",      required: true,  width: 175, kind: "select", options: ADMIN_LEVELS },
+                  { key: "jobTitle",  label: "Job Title",  required: true,  width: 145, kind: "select", options: JOB_TITLES },
+                  { key: "email",     label: "Email",      required: true,  width: 200, kind: "text" },
+                  { key: "phone",     label: "Phone",      required: true,  width: 130, kind: "text" },
+                  { key: "ext",       label: "Ext",        required: false, width: 70,  kind: "text" },
+                  { key: "address",   label: "Address",    required: false, width: 220, kind: "text" },
+                ];
+                // Map each ImportIssue field to the ParsedUser key for per-cell coloring.
+                // "principal" maps to jobTitle so the Principal-conflict warning paints that cell.
+                const issueFieldToCol = (field: ImportIssue["field"]): ColKey => field === "principal" ? "jobTitle" : field;
                 return (
-                <div>
-                  {/* Question first — copy adapts to the validation outcome */}
-                  <p className="text-[18px] font-bold text-center mb-1.5" style={{ fontFamily:FONT, color:c.text }}>
-                    {hasIssues ? "We spotted some issues" : "Are you sure you want to send?"}
-                  </p>
-                  <p className="text-[13px] text-center mx-auto mb-5 max-w-[480px]" style={{ fontFamily:FONT, color:c.muted, lineHeight:"19px", textWrap: "balance" }}>
-                    {hasIssues ? (
-                      errorCount > 0 ? (
-                        <>Rows with <span style={{ color: "#B91C1C", fontWeight: 600 }}>errors</span> below won&apos;t be sent — we&apos;ll only invite the valid users. Cancel if you&apos;d rather fix the file first.</>
-                      ) : (
-                        <>Rows with <span style={{ color: "#B45309", fontWeight: 600 }}>warnings</span> below look unusual but will still be sent. Cancel if you&apos;d rather review the file first.</>
-                      )
-                    ) : (
-                      <>We&apos;ll email each of these users a secure registration link so they can activate their account. This can&apos;t be undone.</>
-                    )}
-                  </p>
-
-                  {/* No standalone issues panel — problem rows are decorated in the preview
-                      below (red/amber background, alert icon, colored field text), which is
-                      already the actionable signal and scales naturally to any file size. */}
-
-                  {/* Preview — file caption header + scrollable user list (capped height for large files) */}
-                  <div className="rounded-xl overflow-hidden mb-5" style={{ border:`1px solid ${c.border}` }}>
-                    <div className="flex items-center gap-1.5 px-4 py-2 text-[11.5px]" style={{ borderBottom:`1px solid ${c.border}`, background:isDark?"rgba(255,255,255,0.02)":"#FAFAFB", fontFamily:FONT, color:c.muted }}>
+                <div style={{ position: "relative" }}>
+                  {/* Sticky toolbar — file caption, summary counts, error-nav, download progress */}
+                  <div className="flex items-center gap-3 px-4 py-2.5 mb-3 rounded-xl flex-wrap" style={{ border:`1px solid ${c.border}`, background:isDark?"rgba(255,255,255,0.02)":"#FAFAFB" }}>
+                    <div className="flex items-center gap-1.5 min-w-0">
                       <FileText className="w-3.5 h-3.5 flex-shrink-0" style={{ color:"#73C9B7" }}/>
-                      <span className="font-medium truncate" style={{ color:c.text }}>{importFileName}</span>
-                      <span className="ml-auto text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded flex-shrink-0" style={{ fontFamily:FONT, color:"#A614C3", background:"rgba(168,85,247,0.10)" }}>
-                        {totalUsers} {totalUsers === 1 ? "user" : "users"}
-                      </span>
+                      <span className="text-[12.5px] font-semibold truncate" style={{ fontFamily:FONT, color:c.text }}>{importFileName}</span>
                     </div>
-                    {/* Scroll body — caps at ~240px so a 500-row file still fits the modal */}
-                    <div style={{ maxHeight: 240, overflowY: "auto" }}>
-                      {parsedUsers.map((u, i) => {
-                        // Compose the display name from First Name + Last Name; trim handles
-                        // rows where only one half is present.
-                        const fullName = `${u.firstName} ${u.lastName}`.trim() || u.email || "(no name)";
-                        const rowIssues = issuesByRow.get(i) ?? [];
-                        const rowHasError = rowIssues.some(iss => iss.severity === "error");
-                        const rowHasWarn  = rowIssues.some(iss => iss.severity === "warning");
-                        const fieldsWithIssue = new Set(rowIssues.map(iss => iss.field));
-                        // Soft red tint for errors, soft amber for warnings-only.
-                        const rowBg = rowHasError ? (isDark ? "rgba(239,68,68,0.06)" : "#FEF7F7") : rowHasWarn ? (isDark ? "rgba(245,158,11,0.06)" : "#FFFBF0") : c.cardBg;
-                        return (
-                          <div key={`${u.email}-${i}`}
-                            className="flex items-center justify-between gap-4 px-4 py-2.5 text-[12px]"
-                            style={{ borderBottom: i < parsedUsers.length - 1 ? `1px solid ${c.border}` : "none", fontFamily:FONT, background: rowBg }}>
-                            <div className="min-w-0 flex-1 flex items-start gap-2">
-                              {(rowHasError || rowHasWarn) && (
-                                <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: rowHasError ? "#B91C1C" : "#B45309" }} />
-                              )}
-                              <div className="min-w-0 flex-1">
-                                <div className="font-semibold truncate" style={{ color: fieldsWithIssue.has("name") ? "#B91C1C" : c.text }}>{fullName}</div>
-                                <div className="text-[11px] truncate" style={{ color: fieldsWithIssue.has("email") ? "#B91C1C" : c.muted }}>{u.email || "(no email)"}</div>
-                              </div>
-                            </div>
-                            <div className="text-right flex-shrink-0">
-                              <div className="text-[11px]" style={{ color: fieldsWithIssue.has("jobTitle") || fieldsWithIssue.has("principal") ? "#B91C1C" : c.text }}>{u.jobTitle || "—"}</div>
-                              <div className="text-[11px] font-mono" style={{ color: fieldsWithIssue.has("admin") ? "#B91C1C" : "#A614C3" }}>{u.admin || "—"}</div>
-                            </div>
-                          </div>
-                        );
-                      })}
+                    <div className="flex items-center gap-2 text-[11.5px]" style={{ fontFamily:FONT }}>
+                      <span className="px-2 py-0.5 rounded font-semibold" style={{ background:"rgba(168,85,247,0.10)", color:"#A614C3" }}>{totalUsers} {totalUsers === 1 ? "user" : "users"}</span>
+                      {errorCount > 0 && <span className="px-2 py-0.5 rounded font-semibold" style={{ background:"rgba(239,68,68,0.10)", color:"#B91C1C" }}>{errorCount} {errorCount === 1 ? "error" : "errors"}</span>}
+                      {warningCount > 0 && <span className="px-2 py-0.5 rounded font-semibold" style={{ background:"rgba(245,158,11,0.10)", color:"#B45309" }}>{warningCount} {warningCount === 1 ? "warning" : "warnings"}</span>}
+                      {errorCount === 0 && warningCount === 0 && <span className="px-2 py-0.5 rounded font-semibold" style={{ background:"rgba(5,150,105,0.10)", color:"#047857" }}>all clear</span>}
+                    </div>
+                    <div className="flex items-center gap-1.5 ml-auto">
+                      {/* Error-nav buttons — only meaningful when at least one error exists */}
+                      <button type="button" onClick={jumpToPrevError} disabled={errorCount === 0} title="Previous error"
+                        className="w-7 h-7 rounded-md flex items-center justify-center transition-colors"
+                        style={{ fontFamily:FONT, color:errorCount === 0 ? c.muted : c.text, border:`1px solid ${c.border}`, background:isDark?"rgba(255,255,255,0.04)":"#fff", cursor: errorCount === 0 ? "not-allowed" : "pointer", opacity: errorCount === 0 ? 0.5 : 1 }}
+                        onMouseEnter={e=>{ if (errorCount > 0) e.currentTarget.style.background = c.hoverBg; }}
+                        onMouseLeave={e=>(e.currentTarget.style.background = isDark?"rgba(255,255,255,0.04)":"#fff")}>
+                        <ChevronUp className="w-3.5 h-3.5"/>
+                      </button>
+                      <button type="button" onClick={jumpToNextError} disabled={errorCount === 0} title="Next error"
+                        className="w-7 h-7 rounded-md flex items-center justify-center transition-colors"
+                        style={{ fontFamily:FONT, color:errorCount === 0 ? c.muted : c.text, border:`1px solid ${c.border}`, background:isDark?"rgba(255,255,255,0.04)":"#fff", cursor: errorCount === 0 ? "not-allowed" : "pointer", opacity: errorCount === 0 ? 0.5 : 1 }}
+                        onMouseEnter={e=>{ if (errorCount > 0) e.currentTarget.style.background = c.hoverBg; }}
+                        onMouseLeave={e=>(e.currentTarget.style.background = isDark?"rgba(255,255,255,0.04)":"#fff")}>
+                        <ChevronDown className="w-3.5 h-3.5"/>
+                      </button>
+                      <button type="button" onClick={() => { void downloadProgressFile(); }} title="Download in-progress file"
+                        className="flex items-center gap-1.5 px-3 h-7 rounded-md text-[11.5px] font-semibold transition-colors"
+                        style={{ fontFamily:FONT, color:c.text, border:`1px solid ${c.border}`, background:isDark?"rgba(255,255,255,0.04)":"#fff" }}
+                        onMouseEnter={e=>(e.currentTarget.style.background=c.hoverBg)}
+                        onMouseLeave={e=>(e.currentTarget.style.background=isDark?"rgba(255,255,255,0.04)":"#fff")}>
+                        <Download className="w-3 h-3"/>Download progress
+                      </button>
                     </div>
                   </div>
 
-                  {/* Actions — Cancel on the left, primary confirm pushed to the right. Confirm CTA
-                      adapts when there are issues: amber-tinted "Send Anyway" so the user knows
-                      they're acknowledging that some rows will be skipped. */}
+                  {/* Editable table — fixed-layout grid, scrollable y. The id on the scroll
+                      container lets the jump-to-error buttons query it for the last-jumped index. */}
+                  <div id="bulk-table-scroll" className="rounded-xl overflow-auto mb-4" style={{ border:`1px solid ${c.border}`, maxHeight: 420 }}>
+                    <table className="text-[12px]" style={{ fontFamily:FONT, borderCollapse:"separate", borderSpacing:0, tableLayout:"fixed", width: columns.reduce((a, c) => a + c.width, 24) }}>
+                      <thead style={{ position:"sticky", top:0, zIndex:1, background:isDark?"#1E2240":"#F9FAFB" }}>
+                        <tr>
+                          {columns.map(col => (
+                            <th key={col.key} className="text-left px-2.5 py-2 text-[11px] font-semibold" style={{ width: col.width, color:c.muted, borderBottom:`1px solid ${c.border}` }}>
+                              {col.label}{col.required && <span style={{ color:"#A614C3", marginLeft:2 }}>*</span>}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {parsedUsers.map((u, i) => {
+                          const rowIssues = issuesByRow.get(i) ?? [];
+                          const rowHasError = rowIssues.some(iss => iss.severity === "error");
+                          const rowHasWarn  = rowIssues.some(iss => iss.severity === "warning");
+                          // Per-field issue map → message string for the cell tooltip.
+                          const issueByCol = new Map<ColKey, ImportIssue>();
+                          rowIssues.forEach(iss => {
+                            const col = issueFieldToCol(iss.field);
+                            // Errors take precedence over warnings on the same cell.
+                            const existing = issueByCol.get(col);
+                            if (!existing || (existing.severity === "warning" && iss.severity === "error")) {
+                              issueByCol.set(col, iss);
+                            }
+                          });
+                          const rowBg = rowHasError ? (isDark ? "rgba(239,68,68,0.06)" : "#FEF7F7") : rowHasWarn ? (isDark ? "rgba(245,158,11,0.06)" : "#FFFBF0") : "transparent";
+                          return (
+                            <tr key={i} id={`bulk-row-${i}`} style={{ background: rowBg }}>
+                              {columns.map(col => {
+                                const cellIssue = issueByCol.get(col.key);
+                                const cellHasError = cellIssue?.severity === "error";
+                                const cellHasWarn  = cellIssue?.severity === "warning";
+                                const cellBorderColor = cellHasError ? "#FCA5A5" : cellHasWarn ? "#FDE68A" : c.border;
+                                const cellBg = cellHasError ? (isDark ? "rgba(239,68,68,0.05)" : "#FFF5F5") : cellHasWarn ? (isDark ? "rgba(245,158,11,0.05)" : "#FFFBEB") : (isDark ? "rgba(255,255,255,0.03)" : "#fff");
+                                const cellTitle = cellIssue?.message;
+                                const value = u[col.key];
+                                return (
+                                  <td key={col.key} className="px-1.5 py-1" style={{ width: col.width, borderBottom:`1px solid ${c.border}` }}>
+                                    {col.kind === "select" ? (
+                                      // Right padding bumped to pr-7 so the native dropdown caret
+                                      // has breathing room next to the value text (default pr-2 puts
+                                      // the caret right up against long values like "Read-Only Admin").
+                                      <select value={value} onChange={e => updateRow(i, col.key, e.target.value)} title={cellTitle}
+                                        className="w-full pl-2 pr-7 py-1.5 rounded-md text-[12px] outline-none"
+                                        style={{ fontFamily:FONT, color: value ? c.text : c.muted, background: cellBg, border:`1px solid ${cellBorderColor}` }}>
+                                        <option value="">—</option>
+                                        {col.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                        {/* If the current value isn't a valid option, surface it so the user can see what's wrong */}
+                                        {value && !col.options?.includes(value) && <option value={value}>{value}</option>}
+                                      </select>
+                                    ) : (
+                                      <input value={value} onChange={e => updateRow(i, col.key, e.target.value)} title={cellTitle}
+                                        placeholder={col.required ? "" : "—"}
+                                        className="w-full px-2 py-1.5 rounded-md text-[12px] outline-none"
+                                        style={{ fontFamily:FONT, color:c.text, background: cellBg, border:`1px solid ${cellBorderColor}` }} />
+                                    )}
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Footer — Cancel / Send. Send is disabled when no row is sendable. */}
                   <div className="flex items-center justify-between gap-2">
-                    <button onClick={() => { setImportPhase("empty"); setImportFileName(null); setImportUserCount(0); setParsedUsers([]); setImportIssues([]); }}
+                    <button onClick={closeImportModal}
                       className="px-5 py-2.5 rounded-lg text-[13px] font-semibold transition-colors"
                       style={{ fontFamily:FONT, color:c.text, border:`1px solid ${c.border}`, background:isDark?"rgba(255,255,255,0.04)":"#fff" }}
                       onMouseEnter={e=>(e.currentTarget.style.background=c.hoverBg)}
                       onMouseLeave={e=>(e.currentTarget.style.background=isDark?"rgba(255,255,255,0.04)":"#fff")}>
                       Cancel
                     </button>
-                    {hasIssues ? (
-                      <button onClick={() => setImportPhase("sent")}
-                        className="flex items-center gap-1.5 px-6 py-2.5 rounded-lg text-[13px] font-semibold text-white transition-all"
-                        style={{ fontFamily:FONT, background: errorCount > 0 ? "#DC2626" : "#D97706", boxShadow: errorCount > 0 ? "0 2px 10px rgba(220,38,38,0.25)" : "0 2px 10px rgba(217,119,6,0.25)" }}
-                        onMouseEnter={e=>(e.currentTarget.style.filter="brightness(1.08)")}
-                        onMouseLeave={e=>(e.currentTarget.style.filter="none")}>
-                        <AlertCircle className="w-3.5 h-3.5"/>Send Anyway
-                      </button>
-                    ) : (
-                      <button onClick={() => setImportPhase("sent")}
-                        className="flex items-center gap-1.5 px-6 py-2.5 rounded-lg text-[13px] font-semibold text-white transition-all"
-                        style={{ fontFamily:FONT, background:btnGrad, boxShadow:"0 2px 10px rgba(166,20,195,0.25)" }}
-                        onMouseEnter={e=>(e.currentTarget.style.filter="brightness(1.08)")}
-                        onMouseLeave={e=>(e.currentTarget.style.filter="none")}>
-                        <Send className="w-3.5 h-3.5"/>Yes, Send Invites
-                      </button>
-                    )}
+                    <div className="text-[11.5px] text-center" style={{ fontFamily:FONT, color:c.muted, maxWidth:340 }}>
+                      {errorCount > 0 ? (
+                        <>Rows with errors will be skipped on send. Use the arrow buttons above to jump between them.</>
+                      ) : (
+                        <>Every row is valid. Ready to send.</>
+                      )}
+                    </div>
+                    <button onClick={() => setSendConfirmOpen(true)} disabled={validCount === 0}
+                      className="flex items-center gap-1.5 px-6 py-2.5 rounded-lg text-[13px] font-semibold text-white transition-all"
+                      style={{ fontFamily:FONT, background: validCount === 0 ? "#9CA3AF" : btnGrad, cursor: validCount === 0 ? "not-allowed" : "pointer", boxShadow: validCount === 0 ? "none" : "0 2px 10px rgba(166,20,195,0.25)" }}
+                      onMouseEnter={e=>{ if (validCount > 0) e.currentTarget.style.filter = "brightness(1.08)"; }}
+                      onMouseLeave={e=>(e.currentTarget.style.filter="none")}>
+                      <Send className="w-3.5 h-3.5"/>Send {validCount} {validCount === 1 ? "invite" : "invites"}
+                    </button>
                   </div>
+
+                  {/* Send-confirm overlay — sits ON TOP of the editable table when sendConfirmOpen.
+                      Centered card, dim backdrop. Recaps how many are sending and how many are
+                      being skipped (with explicit row numbers) so the user can back out if they
+                      didn't realise. */}
+                  {sendConfirmOpen && (
+                    <div className="absolute inset-0 z-10 flex items-center justify-center rounded-2xl" style={{ background:"rgba(15,23,42,0.55)" }}
+                      onClick={() => setSendConfirmOpen(false)}>
+                      <div className="rounded-xl p-6 w-[440px] max-w-[90%]" style={{ background:isDark?"#1E2240":"#fff", boxShadow:"0 16px 40px rgba(0,0,0,0.35)" }}
+                        onClick={e => e.stopPropagation()}>
+                        <p className="text-[16px] font-bold mb-1.5" style={{ fontFamily:FONT, color:c.text }}>Ready to send?</p>
+                        <p className="text-[13px] mb-4" style={{ fontFamily:FONT, color:c.muted, lineHeight:"19px" }}>
+                          We&apos;ll email <span style={{ fontWeight:600, color:c.text }}>{validCount}</span> users a secure registration link.
+                          {errorCount > 0 && <> {errorCount} {errorCount === 1 ? "row" : "rows"} with errors will be skipped.</>}
+                        </p>
+                        {errorCount > 0 && (
+                          <div className="rounded-lg px-3 py-2 mb-4 text-[11.5px]" style={{ fontFamily:FONT, border:"1px solid #FECACA", background:"#FEF2F2", color:"#B91C1C", lineHeight:"17px" }}>
+                            <span className="font-semibold">Skipped rows:</span>{" "}
+                            {errorRowIndices.slice(0, 10).map(i => i + 2).join(", ")}
+                            {errorRowIndices.length > 10 && <> + {errorRowIndices.length - 10} more</>}
+                          </div>
+                        )}
+                        <div className="flex items-center justify-end gap-2">
+                          <button onClick={() => setSendConfirmOpen(false)}
+                            className="px-4 py-2 rounded-lg text-[12.5px] font-semibold transition-colors"
+                            style={{ fontFamily:FONT, color:c.text, border:`1px solid ${c.border}`, background:isDark?"rgba(255,255,255,0.04)":"#fff" }}
+                            onMouseEnter={e=>(e.currentTarget.style.background=c.hoverBg)}
+                            onMouseLeave={e=>(e.currentTarget.style.background=isDark?"rgba(255,255,255,0.04)":"#fff")}>
+                            Go back and fix
+                          </button>
+                          <button onClick={() => { setSendConfirmOpen(false); executeSend(); }}
+                            className="flex items-center gap-1.5 px-5 py-2 rounded-lg text-[12.5px] font-semibold text-white transition-all"
+                            style={{ fontFamily:FONT, background:btnGrad, boxShadow:"0 2px 10px rgba(166,20,195,0.25)" }}
+                            onMouseEnter={e=>(e.currentTarget.style.filter="brightness(1.08)")}
+                            onMouseLeave={e=>(e.currentTarget.style.filter="none")}>
+                            <Send className="w-3.5 h-3.5"/>Send {validCount} {validCount === 1 ? "invite" : "invites"}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 );
               })()}
 
               {importPhase === "sent" && (
-                <div className="flex flex-col items-center text-center py-10">
-                  {/* Brand-gradient circle with a white check — feels more decisive than the chip */}
+                <div className="flex flex-col items-center text-center py-8">
                   <div className="flex items-center justify-center mb-4"
                     style={{ width:56, height:56, borderRadius:9999, background:btnGrad }}>
                     <Check className="w-7 h-7 text-white" strokeWidth={3}/>
                   </div>
                   <p className="text-[18px] font-bold mb-1.5" style={{ fontFamily:FONT, color:c.text }}>
-                    Invitations sent
+                    {sentSummary && sentSummary.skipped.length > 0 ? "Invitations sent — with a few skips" : "Invitations sent"}
                   </p>
-                  <p className="text-[13px] mb-6 max-w-[400px]" style={{ fontFamily:FONT, color:c.muted, lineHeight:"19px" }}>
-                    Each user will receive an email with a secure link to register and activate their Norbielink account.
+                  <p className="text-[13px] mb-5 max-w-[440px]" style={{ fontFamily:FONT, color:c.muted, lineHeight:"19px" }}>
+                    {sentSummary ? (
+                      <>
+                        We emailed <span style={{ fontWeight:600, color:c.text }}>{sentSummary.sent}</span> {sentSummary.sent === 1 ? "user" : "users"} a secure registration link.
+                        {sentSummary.skipped.length > 0 && <> <span style={{ fontWeight:600, color:c.text }}>{sentSummary.skipped.length}</span> {sentSummary.skipped.length === 1 ? "row" : "rows"} with errors were skipped — download them below to fix and re-upload.</>}
+                      </>
+                    ) : (
+                      <>Each user will receive an email with a secure link to register and activate their Norbielink account.</>
+                    )}
                   </p>
-                  {/* Single Upload More button, centered. The × in the modal header serves as the close affordance. */}
-                  <button onClick={() => { setImportPhase("empty"); setImportFileName(null); setImportUserCount(0); setParsedUsers([]); }}
-                    className="flex items-center gap-1.5 px-5 py-2.5 rounded-lg text-[13px] font-semibold transition-colors"
-                    style={{ fontFamily:FONT, color:c.text, border:`1px solid ${c.border}`, background:isDark?"rgba(255,255,255,0.04)":"#fff" }}
-                    onMouseEnter={e=>(e.currentTarget.style.background=c.hoverBg)}
-                    onMouseLeave={e=>(e.currentTarget.style.background=isDark?"rgba(255,255,255,0.04)":"#fff")}>
-                    <Upload className="w-3.5 h-3.5"/>Upload More
-                  </button>
+                  {/* Skipped rows count chips — only when there's something to show */}
+                  {sentSummary && sentSummary.skipped.length > 0 && (
+                    <div className="flex items-center gap-2 mb-5 text-[11.5px]" style={{ fontFamily:FONT }}>
+                      <span className="px-2.5 py-1 rounded font-semibold" style={{ background:"rgba(5,150,105,0.10)", color:"#047857" }}>{sentSummary.sent} sent</span>
+                      <span className="px-2.5 py-1 rounded font-semibold" style={{ background:"rgba(239,68,68,0.10)", color:"#B91C1C" }}>{sentSummary.skipped.length} skipped</span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2">
+                    {sentSummary && sentSummary.skipped.length > 0 && (
+                      <button onClick={() => { void downloadSkippedRows(); }}
+                        className="flex items-center gap-1.5 px-5 py-2.5 rounded-lg text-[13px] font-semibold transition-colors"
+                        style={{ fontFamily:FONT, color:c.text, border:`1px solid ${c.border}`, background:isDark?"rgba(255,255,255,0.04)":"#fff" }}
+                        onMouseEnter={e=>(e.currentTarget.style.background=c.hoverBg)}
+                        onMouseLeave={e=>(e.currentTarget.style.background=isDark?"rgba(255,255,255,0.04)":"#fff")}>
+                        <Download className="w-3.5 h-3.5"/>Download skipped rows
+                      </button>
+                    )}
+                    <button onClick={() => {
+                        setImportPhase("empty");
+                        setImportFileName(null);
+                        setImportUserCount(0);
+                        setParsedUsers([]);
+                        setImportIssues([]);
+                        setRawParsed(null);
+                        setHeaderMapping([]);
+                        setSentSummary(null);
+                      }}
+                      className="flex items-center gap-1.5 px-5 py-2.5 rounded-lg text-[13px] font-semibold text-white transition-all"
+                      style={{ fontFamily:FONT, background:btnGrad, boxShadow:"0 2px 10px rgba(166,20,195,0.25)" }}
+                      onMouseEnter={e=>(e.currentTarget.style.filter="brightness(1.08)")}
+                      onMouseLeave={e=>(e.currentTarget.style.filter="none")}>
+                      <Upload className="w-3.5 h-3.5"/>Upload More
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
