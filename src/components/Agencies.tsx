@@ -721,6 +721,23 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
   type ImportPhase = "empty" | "mapping" | "ready" | "sent";
   const [importPhase, setImportPhase] = useState<ImportPhase>("empty");
   const [sendConfirmOpen, setSendConfirmOpen] = useState(false);
+  // Custom-dropdown state for the Admin / Job Title cells in the editable bulk-upload table.
+  // We replace the native <select> for two reasons: (1) the native caret sits flush against
+  // the right border with no breathing room, and (2) the browser's dropdown menu doesn't match
+  // app styling. One overlay is open at a time; rect is captured at open so the panel can use
+  // `position: fixed` and float above the table's scroll container without being clipped.
+  type CellSelectState = {
+    rowIdx: number;
+    field: "admin" | "jobTitle";
+    options: string[];
+    triggerRect: { top: number; left: number; width: number; height: number };
+  };
+  const [cellSelect, setCellSelect] = useState<CellSelectState | null>(null);
+  // Table filter — lets the user focus the editable table on just the problem rows. Clicking
+  // the "X errors" chip filters to error rows, etc. Indispensable at 500-row scale: scrolling
+  // through every row to find the 30 with issues isn't workable, and a wall-of-text tooltip on
+  // the chip doesn't help fix them. Filter auto-resets when the chosen category becomes empty.
+  const [tableFilter, setTableFilter] = useState<"all" | "errors" | "warnings">("all");
   const [importFileName, setImportFileName] = useState<string | null>(null);
   const [importUserCount, setImportUserCount] = useState<number>(0);
   // Parsed users from the uploaded file. Address is optional (the Add New User modal asks for it,
@@ -768,7 +785,31 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
     setSentSummary(null);
     setDraftPrompt(null);
     setSendConfirmOpen(false);
+    setCellSelect(null);
+    setTableFilter("all");
   };
+
+  // Cell-select scroll-to-close. The panel uses fixed coords captured at open time, so a
+  // scroll would float it detached from its trigger. Click-outside is handled by a visible
+  // backdrop element in the overlay JSX (more reliable than a document mousedown listener,
+  // which can race with React batching and lose the option click). Capture phase = true so
+  // scrolls inside nested containers (the table scroller) trigger as well.
+  useEffect(() => {
+    if (!cellSelect) return;
+    const close = () => setCellSelect(null);
+    document.addEventListener("scroll", close, true);
+    return () => document.removeEventListener("scroll", close, true);
+  }, [cellSelect]);
+
+  // Auto-reset the table filter when the filtered category becomes empty — otherwise the
+  // user fixes the last error and is left looking at a blank table with no obvious recovery.
+  useEffect(() => {
+    if (tableFilter === "all") return;
+    const stillHasErrors   = importIssues.some(i => i.severity === "error");
+    const stillHasWarnings = importIssues.some(i => i.severity === "warning");
+    if (tableFilter === "errors" && !stillHasErrors)     setTableFilter("all");
+    if (tableFilter === "warnings" && !stillHasWarnings) setTableFilter("all");
+  }, [importIssues, tableFilter]);
 
   /**
    * Normalize a header string for fuzzy matching: lowercase, strip non-alphanumeric.
@@ -1013,7 +1054,9 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
       admin:     normalizeAdminValue(pick(row, "admin")),
       jobTitle:  normalizeJobTitleValue(pick(row, "jobTitle")),
       email:     pick(row, "email").trim(),
-      phone:     pick(row, "phone").trim(),
+      // Format phones at parse time so a file with raw digits ("5551234567") or assorted
+      // separators ("555.123.4567") all land as canonical "(555) 123-4567" in the table.
+      phone:     formatPhone(pick(row, "phone").trim()),
       ext:       pick(row, "ext").trim(),
       address:   pick(row, "address").trim(),
     })).filter(r => r.firstName || r.lastName || r.email);
@@ -1175,6 +1218,10 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
         // Normalize on the way in for Admin/Job Title so the cell snaps to canonical casing.
         if (field === "admin")    return { ...u, admin:    normalizeAdminValue(value) };
         if (field === "jobTitle") return { ...u, jobTitle: normalizeJobTitleValue(value) };
+        // Phone gets live-formatted as the user types — `formatPhone` is the same
+        // progressive `(XXX) XXX-XXXX` formatter used in the single-user input forms
+        // elsewhere in this component, so the bulk-upload table feels consistent.
+        if (field === "phone")    return { ...u, phone:    formatPhone(value) };
         return { ...u, [field]: value };
       });
       setImportIssues(validateParsedUsers(next));
@@ -6674,7 +6721,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                           const field = headerMapping[i];
                           const fieldLabel = fieldOptions.find(o => o.value === field)?.label ?? field;
                           return (
-                            <div key={i} className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11.5px]" style={{ fontFamily:FONT, background:isDark?"rgba(115,201,183,0.10)":"#ECFDF5", color:"#047857", border:"1px solid rgba(5,150,105,0.18)" }}>
+                            <div key={i} className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11.5px]" style={{ fontFamily:FONT, background:"rgba(115,201,183,0.12)", color:"#73C9B7", border:"1px solid rgba(115,201,183,0.35)" }}>
                               <Check className="w-3 h-3" strokeWidth={3}/>
                               <span className="font-mono">{headers[i]}</span>
                               <span style={{ opacity:0.6 }}>→</span>
@@ -6769,7 +6816,13 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                   issuesByRow.set(iss.rowIndex, list);
                 });
                 // Ordered list of error-row indices for the [↑ Prev] [↓ Next] navigation.
-                const errorRowIndices = Array.from(errorRowIdx).sort((a, b) => a - b);
+                const errorRowIndices   = Array.from(errorRowIdx).sort((a, b) => a - b);
+                const warningRowIndices = Array.from(warnRowIdx).sort((a, b) => a - b);
+                // Build human-readable summaries of all error + warning messages for the chip
+                // tooltips. Without these, a chip like "1 warning" is opaque — the user knows
+                // there IS a warning but doesn't know WHICH one or how to fix it.
+                const errorSummary   = importIssues.filter(i => i.severity === "error").map(i => i.message).join("\n");
+                const warningSummary = importIssues.filter(i => i.severity === "warning").map(i => i.message).join("\n");
                 // Helper: scroll a row into view (used by the jump buttons). DOM lookup is
                 // intentional — we attach a stable id per row so this works regardless of which
                 // rows are currently in the viewport, no per-row refs needed.
@@ -6826,10 +6879,55 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                       <span className="text-[12.5px] font-semibold truncate" style={{ fontFamily:FONT, color:c.text }}>{importFileName}</span>
                     </div>
                     <div className="flex items-center gap-2 text-[11.5px]" style={{ fontFamily:FONT }}>
-                      <span className="px-2 py-0.5 rounded font-semibold" style={{ background:"rgba(168,85,247,0.10)", color:"#A614C3" }}>{totalUsers} {totalUsers === 1 ? "user" : "users"}</span>
-                      {errorCount > 0 && <span className="px-2 py-0.5 rounded font-semibold" style={{ background:"rgba(239,68,68,0.10)", color:"#B91C1C" }}>{errorCount} {errorCount === 1 ? "error" : "errors"}</span>}
-                      {warningCount > 0 && <span className="px-2 py-0.5 rounded font-semibold" style={{ background:"rgba(245,158,11,0.10)", color:"#B45309" }}>{warningCount} {warningCount === 1 ? "warning" : "warnings"}</span>}
-                      {errorCount === 0 && warningCount === 0 && <span className="px-2 py-0.5 rounded font-semibold" style={{ background:"rgba(5,150,105,0.10)", color:"#047857" }}>all clear</span>}
+                      {/* "X users" chip = "Show all" filter. Active when no filter is applied. */}
+                      <button type="button" title="Show all rows"
+                        onClick={() => setTableFilter("all")}
+                        className="px-2 py-0.5 rounded font-semibold cursor-pointer transition-colors"
+                        style={{
+                          background: tableFilter === "all" ? "rgba(168,85,247,0.22)" : "rgba(168,85,247,0.10)",
+                          color: "#A614C3", border: "none",
+                          outline: tableFilter === "all" ? "1.5px solid rgba(166,20,195,0.55)" : "none",
+                          outlineOffset: -1,
+                        }}>
+                        {totalUsers} {totalUsers === 1 ? "user" : "users"}
+                      </button>
+                      {/* Error / warning chips are filter TOGGLES — click to focus the table on
+                          just the rows of that severity (essential at 500-row scale). Active filter
+                          has a stronger background + outline ring. Tooltip still lists the messages
+                          so a quick hover shows what the issues actually are. */}
+                      {errorCount > 0 && (
+                        <button type="button"
+                          title={errorSummary || "Click to filter to error rows"}
+                          onClick={() => setTableFilter(prev => prev === "errors" ? "all" : "errors")}
+                          className="px-2 py-0.5 rounded font-semibold cursor-pointer transition-colors"
+                          style={{
+                            background: tableFilter === "errors" ? "rgba(239,68,68,0.22)" : "rgba(239,68,68,0.10)",
+                            color: "#B91C1C", border: "none",
+                            outline: tableFilter === "errors" ? "1.5px solid rgba(185,28,28,0.55)" : "none",
+                            outlineOffset: -1,
+                          }}
+                          onMouseEnter={e => { if (tableFilter !== "errors") e.currentTarget.style.background = "rgba(239,68,68,0.18)"; }}
+                          onMouseLeave={e => { if (tableFilter !== "errors") e.currentTarget.style.background = "rgba(239,68,68,0.10)"; }}>
+                          {errorCount} {errorCount === 1 ? "error" : "errors"}
+                        </button>
+                      )}
+                      {warningCount > 0 && (
+                        <button type="button"
+                          title={warningSummary || "Click to filter to warning rows"}
+                          onClick={() => setTableFilter(prev => prev === "warnings" ? "all" : "warnings")}
+                          className="px-2 py-0.5 rounded font-semibold cursor-pointer transition-colors"
+                          style={{
+                            background: tableFilter === "warnings" ? "rgba(245,158,11,0.22)" : "rgba(245,158,11,0.10)",
+                            color: "#B45309", border: "none",
+                            outline: tableFilter === "warnings" ? "1.5px solid rgba(180,83,9,0.55)" : "none",
+                            outlineOffset: -1,
+                          }}
+                          onMouseEnter={e => { if (tableFilter !== "warnings") e.currentTarget.style.background = "rgba(245,158,11,0.18)"; }}
+                          onMouseLeave={e => { if (tableFilter !== "warnings") e.currentTarget.style.background = "rgba(245,158,11,0.10)"; }}>
+                          {warningCount} {warningCount === 1 ? "warning" : "warnings"}
+                        </button>
+                      )}
+                      {errorCount === 0 && warningCount === 0 && <span className="px-2 py-0.5 rounded font-semibold" style={{ background:"rgba(115,201,183,0.15)", color:"#73C9B7" }}>all clear</span>}
                     </div>
                     <div className="flex items-center gap-1.5 ml-auto">
                       {/* Error-nav buttons — only meaningful when at least one error exists */}
@@ -6857,8 +6955,73 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                     </div>
                   </div>
 
+                  {/* Warning summary — always visible when warnings exist so the user knows
+                      WHAT the warning is and WHICH rows are affected without having to hover
+                      the chip. Grouped by category so the count of rows is communicated even
+                      with many warnings. Currently only one warning category exists ("Multiple
+                      Principals"); the categoryOf branch makes it easy to extend later. */}
+                  {warningCount > 0 && (() => {
+                    const warnings = importIssues.filter(i => i.severity === "warning");
+                    const categoryOf = (iss: ImportIssue): string =>
+                      iss.field === "principal" ? "Multiple Principals" : "Warning";
+                    const groups = new Map<string, { rows: number[]; rule: string }>();
+                    warnings.forEach(iss => {
+                      const key = categoryOf(iss);
+                      const rule = iss.field === "principal"
+                        ? "only one Principal allowed per agency"
+                        : "review the affected rows";
+                      const existing = groups.get(key);
+                      if (existing) existing.rows.push(iss.rowIndex + 2);
+                      else groups.set(key, { rows: [iss.rowIndex + 2], rule });
+                    });
+                    return (
+                      <div className="rounded-md px-3 py-2 mb-2 text-[11.5px] space-y-0.5"
+                        style={{ fontFamily:FONT, background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.25)" }}>
+                        {Array.from(groups.entries()).map(([label, info]) => {
+                          const shown = info.rows.slice(0, 6);
+                          const rowText = info.rows.length === 1
+                            ? `Row ${shown[0]}`
+                            : `Rows ${shown.join(", ")}${info.rows.length > shown.length ? `, +${info.rows.length - shown.length} more` : ""}`;
+                          return (
+                            <div key={label} className="flex items-start gap-1.5">
+                              <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: "#B45309" }} />
+                              <div className="flex-1 min-w-0" style={{ color: "#B45309" }}>
+                                <span style={{ fontWeight: 600 }}>{label}</span>
+                                <span style={{ color: c.muted }}> · {rowText} · {info.rule}</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+
                   {/* Editable table — fixed-layout grid, scrollable y. The id on the scroll
                       container lets the jump-to-error buttons query it for the last-jumped index. */}
+                  {/* Active-filter status — minimal: no counts (the chip already shows them),
+                      just a label confirming what's being shown + a quick "Show all" escape. */}
+                  {tableFilter !== "all" && (() => {
+                    const labelColor = tableFilter === "errors" ? "#B91C1C" : "#B45309";
+                    const bgColor    = tableFilter === "errors" ? "rgba(239,68,68,0.06)" : "rgba(245,158,11,0.06)";
+                    const borderColor= tableFilter === "errors" ? "rgba(239,68,68,0.25)" : "rgba(245,158,11,0.30)";
+                    return (
+                      <div className="flex items-center gap-2 px-3 py-1.5 mb-2 rounded-md text-[11.5px]"
+                        style={{ fontFamily:FONT, background: bgColor, border: `1px solid ${borderColor}` }}>
+                        <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" style={{ color: labelColor }} />
+                        <span style={{ color: labelColor, fontWeight: 600 }}>
+                          {tableFilter === "errors" ? "Errors only" : "Warnings only"}
+                        </span>
+                        <button type="button" onClick={() => setTableFilter("all")}
+                          className="ml-auto text-[11px] underline transition-colors"
+                          style={{ color: c.muted, background: "transparent", border: "none", cursor: "pointer" }}
+                          onMouseEnter={e => (e.currentTarget.style.color = c.text)}
+                          onMouseLeave={e => (e.currentTarget.style.color = c.muted)}>
+                          Show all rows
+                        </button>
+                      </div>
+                    );
+                  })()}
+
                   <div id="bulk-table-scroll" className="rounded-xl overflow-auto mb-4" style={{ border:`1px solid ${c.border}`, maxHeight: 420 }}>
                     <table className="text-[12px]" style={{ fontFamily:FONT, borderCollapse:"separate", borderSpacing:0, tableLayout:"fixed", width: columns.reduce((a, c) => a + c.width, 24) }}>
                       <thead style={{ position:"sticky", top:0, zIndex:1, background:isDark?"#1E2240":"#F9FAFB" }}>
@@ -6871,7 +7034,17 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                         </tr>
                       </thead>
                       <tbody>
-                        {parsedUsers.map((u, i) => {
+                        {/* Filter applies the active chip's category — preserve the ORIGINAL row
+                            index `i` so updateRow, the row id (`bulk-row-${i}`), and the row-number
+                            messaging all stay anchored to the spreadsheet row, not the visible position. */}
+                        {parsedUsers
+                          .map((u, i) => ({ u, i }))
+                          .filter(({ i }) => {
+                            if (tableFilter === "errors")   return errorRowIdx.has(i);
+                            if (tableFilter === "warnings") return warnRowIdx.has(i);
+                            return true;
+                          })
+                          .map(({ u, i }) => {
                           const rowIssues = issuesByRow.get(i) ?? [];
                           const rowHasError = rowIssues.some(iss => iss.severity === "error");
                           const rowHasWarn  = rowIssues.some(iss => iss.severity === "warning");
@@ -6899,17 +7072,27 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                                 return (
                                   <td key={col.key} className="px-1.5 py-1" style={{ width: col.width, borderBottom:`1px solid ${c.border}` }}>
                                     {col.kind === "select" ? (
-                                      // Right padding bumped to pr-7 so the native dropdown caret
-                                      // has breathing room next to the value text (default pr-2 puts
-                                      // the caret right up against long values like "Read-Only Admin").
-                                      <select value={value} onChange={e => updateRow(i, col.key, e.target.value)} title={cellTitle}
-                                        className="w-full pl-2 pr-7 py-1.5 rounded-md text-[12px] outline-none"
-                                        style={{ fontFamily:FONT, color: value ? c.text : c.muted, background: cellBg, border:`1px solid ${cellBorderColor}` }}>
-                                        <option value="">—</option>
-                                        {col.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                                        {/* If the current value isn't a valid option, surface it so the user can see what's wrong */}
-                                        {value && !col.options?.includes(value) && <option value={value}>{value}</option>}
-                                      </select>
+                                      // Custom-styled dropdown trigger — fully replaces native <select>
+                                      // because the browser puts the caret flush against the right edge
+                                      // and shows its own un-styleable dropdown menu. The actual options
+                                      // list is rendered ONCE outside the table (as a fixed-position
+                                      // overlay) so it floats above the table's overflow-clipped area.
+                                      <button type="button" title={cellTitle}
+                                        onClick={e => {
+                                          e.stopPropagation();
+                                          const rect = e.currentTarget.getBoundingClientRect();
+                                          setCellSelect({
+                                            rowIdx: i,
+                                            field: col.key as "admin" | "jobTitle",
+                                            options: col.options as string[],
+                                            triggerRect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height },
+                                          });
+                                        }}
+                                        className="w-full pl-2 pr-7 py-1.5 rounded-md text-[12px] outline-none text-left relative truncate"
+                                        style={{ fontFamily:FONT, color: value ? c.text : c.muted, background: cellBg, border:`1px solid ${cellBorderColor}`, cursor: "pointer" }}>
+                                        {value || "—"}
+                                        <ChevronDown className="absolute w-3 h-3 pointer-events-none" style={{ right: 6, top: "50%", transform: "translateY(-50%)", color: c.muted }} />
+                                      </button>
                                     ) : (
                                       <input value={value} onChange={e => updateRow(i, col.key, e.target.value)} title={cellTitle}
                                         placeholder={col.required ? "" : "—"}
@@ -6925,6 +7108,73 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                       </tbody>
                     </table>
                   </div>
+
+                  {/* Custom cell-select overlay — backdrop (full-viewport invisible div that
+                      catches outside clicks) + panel (fixed-positioned over the trigger).
+                      The backdrop is the click-outside dismissal — clicks on options bubble
+                      up but are caught by the option's onClick first (with stopPropagation),
+                      so option clicks register without also closing the panel. Styling matches
+                      the existing DropList component used elsewhere in this file. */}
+                  {cellSelect && (() => {
+                    const { triggerRect, options, rowIdx, field } = cellSelect;
+                    // Estimate panel height for drop-up detection. Each row is ~38px + chrome.
+                    const panelEstHeight = Math.min(options.length * 38 + 8, 240);
+                    const spaceBelow = window.innerHeight - (triggerRect.top + triggerRect.height);
+                    const openUp = spaceBelow < panelEstHeight + 16;
+                    const top = openUp
+                      ? triggerRect.top - panelEstHeight - 4
+                      : triggerRect.top + triggerRect.height + 4;
+                    const currentValue = parsedUsers[rowIdx]?.[field] ?? "";
+                    return (
+                      <>
+                        {/* Invisible backdrop — catches any click outside the panel and closes */}
+                        <div className="fixed inset-0" style={{ zIndex: 9998 }}
+                          onClick={() => setCellSelect(null)} />
+                        <div className="fixed rounded-xl overflow-y-auto"
+                          style={{
+                            top, left: triggerRect.left, width: Math.max(triggerRect.width, 180),
+                            maxHeight: 240,
+                            background: c.cardBg,
+                            border: `1px solid ${c.border}`,
+                            boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
+                            zIndex: 9999,
+                          }}
+                          onClick={e => e.stopPropagation()}>
+                          {options.map(opt => {
+                            const selected = opt === currentValue;
+                            // Brand-purple tinted background for selected so it's distinct from
+                            // hover (light gray). Selected state should always be visually obvious
+                            // even when the user mouses to another row.
+                            const selectedBg = isDark ? "rgba(166,20,195,0.18)" : "rgba(166,20,195,0.08)";
+                            const hoverBg    = isDark ? "rgba(255,255,255,0.06)" : "#F9FAFB";
+                            return (
+                              <button key={opt} type="button"
+                                onClick={e => {
+                                  e.stopPropagation();
+                                  updateRow(rowIdx, field, opt);
+                                  setCellSelect(null);
+                                }}
+                                className="w-full text-left px-4 py-2.5 text-[13px] transition-colors"
+                                style={{
+                                  fontFamily: FONT,
+                                  color: selected ? "#A614C3" : c.text,
+                                  fontWeight: selected ? 600 : 400,
+                                  background: selected ? selectedBg : "transparent",
+                                  cursor: "pointer",
+                                }}
+                                onMouseEnter={e => (e.currentTarget.style.background = selected ? selectedBg : hoverBg)}
+                                onMouseLeave={e => (e.currentTarget.style.background = selected ? selectedBg : "transparent")}>
+                                <div className="flex items-center justify-between gap-2">
+                                  <span>{opt}</span>
+                                  {selected && <Check className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#A614C3" }} />}
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </>
+                    );
+                  })()}
 
                   {/* Footer — Cancel / Send. Send is disabled when no row is sendable. */}
                   <div className="flex items-center justify-between gap-2">
@@ -6961,17 +7211,14 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                       <div className="rounded-xl p-6 w-[440px] max-w-[90%]" style={{ background:isDark?"#1E2240":"#fff", boxShadow:"0 16px 40px rgba(0,0,0,0.35)" }}
                         onClick={e => e.stopPropagation()}>
                         <p className="text-[16px] font-bold mb-1.5" style={{ fontFamily:FONT, color:c.text }}>Ready to send?</p>
-                        <p className="text-[13px] mb-4" style={{ fontFamily:FONT, color:c.muted, lineHeight:"19px" }}>
-                          We&apos;ll email <span style={{ fontWeight:600, color:c.text }}>{validCount}</span> users a secure registration link.
-                          {errorCount > 0 && <> {errorCount} {errorCount === 1 ? "row" : "rows"} with errors will be skipped.</>}
+                        <p className="text-[13px] mb-5" style={{ fontFamily:FONT, color:c.muted, lineHeight:"19px" }}>
+                          We&apos;ll email <span style={{ fontWeight:600, color:c.text }}>{validCount}</span> {validCount === 1 ? "user" : "users"} a secure registration link.
+                          {errorCount > 0 && (
+                            <> <span style={{ fontWeight:600, color:"#B91C1C" }}>{errorCount}</span>{" "}
+                              {errorCount === 1 ? "row" : "rows"} with errors will be skipped — you can fix and re-upload them later.
+                            </>
+                          )}
                         </p>
-                        {errorCount > 0 && (
-                          <div className="rounded-lg px-3 py-2 mb-4 text-[11.5px]" style={{ fontFamily:FONT, border:"1px solid #FECACA", background:"#FEF2F2", color:"#B91C1C", lineHeight:"17px" }}>
-                            <span className="font-semibold">Skipped rows:</span>{" "}
-                            {errorRowIndices.slice(0, 10).map(i => i + 2).join(", ")}
-                            {errorRowIndices.length > 10 && <> + {errorRowIndices.length - 10} more</>}
-                          </div>
-                        )}
                         <div className="flex items-center justify-end gap-2">
                           <button onClick={() => setSendConfirmOpen(false)}
                             className="px-4 py-2 rounded-lg text-[12.5px] font-semibold transition-colors"
@@ -7001,26 +7248,25 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                     style={{ width:56, height:56, borderRadius:9999, background:btnGrad }}>
                     <Check className="w-7 h-7 text-white" strokeWidth={3}/>
                   </div>
-                  <p className="text-[18px] font-bold mb-1.5" style={{ fontFamily:FONT, color:c.text }}>
-                    {sentSummary && sentSummary.skipped.length > 0 ? "Invitations sent — with a few skips" : "Invitations sent"}
+                  <p className="text-[18px] font-bold mb-2" style={{ fontFamily:FONT, color:c.text }}>
+                    Invitations sent
                   </p>
-                  <p className="text-[13px] mb-5 max-w-[440px]" style={{ fontFamily:FONT, color:c.muted, lineHeight:"19px" }}>
-                    {sentSummary ? (
+                  {/* Status line + body merged into one paragraph — numbers appear once each,
+                      semantically colored (green = sent, red = skipped). Drops the floating
+                      chips below the body since they were just restating these same numbers. */}
+                  <p className="text-[13.5px] mb-6 max-w-[460px]" style={{ fontFamily:FONT, color:c.muted, lineHeight:"20px" }}>
+                    {sentSummary && sentSummary.skipped.length > 0 ? (
                       <>
-                        We emailed <span style={{ fontWeight:600, color:c.text }}>{sentSummary.sent}</span> {sentSummary.sent === 1 ? "user" : "users"} a secure registration link.
-                        {sentSummary.skipped.length > 0 && <> <span style={{ fontWeight:600, color:c.text }}>{sentSummary.skipped.length}</span> {sentSummary.skipped.length === 1 ? "row" : "rows"} with errors were skipped — download them below to fix and re-upload.</>}
+                        <span style={{ fontWeight:600, color:"#73C9B7" }}>{sentSummary.sent}</span> {sentSummary.sent === 1 ? "user" : "users"} invited
+                        {" · "}
+                        <span style={{ fontWeight:600, color:"#B91C1C" }}>{sentSummary.skipped.length}</span> {sentSummary.skipped.length === 1 ? "row" : "rows"} skipped.
+                        <br/>
+                        Download the skipped rows below to fix and re-upload.
                       </>
                     ) : (
                       <>Each user will receive an email with a secure link to register and activate their Norbielink account.</>
                     )}
                   </p>
-                  {/* Skipped rows count chips — only when there's something to show */}
-                  {sentSummary && sentSummary.skipped.length > 0 && (
-                    <div className="flex items-center gap-2 mb-5 text-[11.5px]" style={{ fontFamily:FONT }}>
-                      <span className="px-2.5 py-1 rounded font-semibold" style={{ background:"rgba(5,150,105,0.10)", color:"#047857" }}>{sentSummary.sent} sent</span>
-                      <span className="px-2.5 py-1 rounded font-semibold" style={{ background:"rgba(239,68,68,0.10)", color:"#B91C1C" }}>{sentSummary.skipped.length} skipped</span>
-                    </div>
-                  )}
                   <div className="flex items-center gap-2">
                     {sentSummary && sentSummary.skipped.length > 0 && (
                       <button onClick={() => { void downloadSkippedRows(); }}
