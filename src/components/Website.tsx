@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
-import { Eye, EyeOff, X, Check, Lock, IdCard, HelpCircle, Mail } from "lucide-react";
+import { Eye, EyeOff, X, Check, Lock, IdCard, HelpCircle, Mail, AlertCircle } from "lucide-react";
 import norbielinkLogoDark from "@/assets/norbielink-logo-dark.png";
 import btisLogoDark from "@/assets/btislogo-dark.png";
 import loginN from "@/assets/login-n.svg";
@@ -18,7 +18,10 @@ interface WebsiteProps {
 export default function Website({ isDark = false }: WebsiteProps) {
   const [step, setStep] = useState<Step>("login");
   // description is a ReactNode so we can highlight key words (e.g. "Principal's") with the brand magenta.
-  const [toast, setToast] = useState<{ title: string; description: React.ReactNode } | null>(null);
+  // `kind` switches the icon + chip color: "email" for confirmation messages (brand purple
+  // Mail icon), "warning" for validation nudges like the agency-code-detected case (amber
+  // AlertCircle). Defaults to "email" so any caller that doesn't specify still works.
+  const [toast, setToast] = useState<{ title: string; description: React.ReactNode; kind?: "email" | "warning" } | null>(null);
 
   useEffect(() => {
     if (!toast) return;
@@ -146,10 +149,32 @@ export default function Website({ isDark = false }: WebsiteProps) {
           ))}
         </div>
 
-          <div className="w-full" style={{ maxWidth: 520 }}>
+          {/* Form wrapper scaled to ~85% — gives the whole sign-in surface a more compact feel
+              without resizing every individual element. `transformOrigin: center` keeps it
+              vertically and horizontally centered as it shrinks. */}
+          <div className="w-full" style={{ maxWidth: 520, transform: "scale(0.85)", transformOrigin: "center" }}>
             {step === "login"  && <LoginView  c={c} font={font} inputStyle={inputStyle} labelStyle={labelStyle} primaryBtnStyle={primaryBtnStyle} btnGrad={btnGrad}
-              onContinue={() => setStep("verify")}
+              onContinue={() => {
+                // Continue stays a no-op for now — clicking shouldn't navigate the demo away
+                // from the login page. Re-wire to `setStep("verify")` (or a real auth call)
+                // when the next step is ready.
+              }}
               onResetLinkClicked={() => setStep("reset")}
+              onAgencyCodeDetected={(code) => {
+                // Agency codes identify the agency, not a specific user — they can't be used
+                // to sign in. Top-right toast: name what was typed (so user sees we recognized
+                // it), tell them what to try instead.
+                setToast({
+                  kind: "warning",
+                  title: "We can't find you by agency code",
+                  description: (
+                    <>
+                      <span style={{ fontFamily: "monospace", color: "#A614C3", fontWeight: 600 }}>{code}</span>
+                      {" "}looks like an agency code. Try your <span style={{ fontWeight: 600 }}>email</span> or <span style={{ fontWeight: 600 }}>User ID</span>.
+                    </>
+                  ),
+                });
+              }}
               onResetEmailSent={(_email, mode) => {
                 // Two different destinations:
                 //   - "password" mode: the simple password reset — goes to the user's OWN email
@@ -190,10 +215,21 @@ export default function Website({ isDark = false }: WebsiteProps) {
                 animation: "slideInRight 0.25s ease-out",
               }}>
               <div className="flex items-start gap-3">
-                <span className="flex items-center justify-center flex-shrink-0"
-                  style={{ width: 32, height: 32, borderRadius: 9, background: "rgba(166,20,195,0.08)" }}>
-                  <Mail className="w-4 h-4" style={{ color: "#A614C3" }} strokeWidth={1.75} />
-                </span>
+                {(() => {
+                  // Pick the icon by kind, but both kinds use the brand magenta color so the
+                  // toast always reads as "Norbielink" rather than the generic amber that
+                  // browsers tend to use for warnings.
+                  //   warning → AlertCircle (validation nudge — e.g. agency code in login)
+                  //   email   → Mail (confirmation message — reset link sent, etc.)
+                  const isWarning = toast.kind === "warning";
+                  const Icon = isWarning ? AlertCircle : Mail;
+                  return (
+                    <span className="flex items-center justify-center flex-shrink-0"
+                      style={{ width: 32, height: 32, borderRadius: 9, background: "rgba(166,20,195,0.08)" }}>
+                      <Icon className="w-4 h-4" style={{ color: "#A614C3" }} strokeWidth={1.75} />
+                    </span>
+                  );
+                })()}
                 <div className="flex-1 min-w-0">
                   <div style={{ fontSize: 13, fontWeight: 600, color: c.text }}>{toast.title}</div>
                   <div style={{ fontSize: 12, color: c.muted, marginTop: 2, lineHeight: "16px" }}>{toast.description}</div>
@@ -214,7 +250,7 @@ export default function Website({ isDark = false }: WebsiteProps) {
 }
 
 /* ──────────────────────────── LOGIN ──────────────────────────── */
-function LoginView({ c, font, inputStyle, labelStyle, primaryBtnStyle, btnGrad, onContinue, onResetLinkClicked, onResetEmailSent }: {
+function LoginView({ c, font, inputStyle, labelStyle, primaryBtnStyle, btnGrad, onContinue, onResetLinkClicked, onResetEmailSent, onAgencyCodeDetected }: {
   c: Record<string, string>;
   font: React.CSSProperties;
   inputStyle: React.CSSProperties;
@@ -224,7 +260,20 @@ function LoginView({ c, font, inputStyle, labelStyle, primaryBtnStyle, btnGrad, 
   onContinue: () => void;
   onResetLinkClicked: () => void;
   onResetEmailSent: (email: string, mode: "password" | "both") => void;
+  // Called when the user blurs the identifier field having typed something that looks like
+  // an agency code (e.g. ACME01, AAA364). Parent surfaces a toast explaining that agency
+  // codes don't sign in here — login needs email or User ID.
+  onAgencyCodeDetected: (code: string) => void;
 }) {
+  // Heuristic for "looks like an agency code": 2–5 uppercase letters followed by 1–4 digits,
+  // optionally with a separating dash or space — covers patterns like ACME01, AAA364, AC-364,
+  // and the Affiliations strings like "AC364" pulled out of the agency directory. Doesn't
+  // false-positive on emails (caught by the @), proper User IDs (lowercase), or short typos.
+  const looksLikeAgencyCode = (s: string): boolean => {
+    const t = s.trim().toUpperCase().replace(/[\s-]+/g, "");
+    if (t.includes("@")) return false;
+    return /^[A-Z]{2,5}\d{1,4}$/.test(t);
+  };
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(false);
@@ -253,10 +302,36 @@ function LoginView({ c, font, inputStyle, labelStyle, primaryBtnStyle, btnGrad, 
       </p>
 
       <div className="mb-5">
-        <label style={labelStyle}>User ID</label>
+        {/* Label suffix carries ONLY the warning ("not your agency code") since the input's
+            placeholder already says "Enter your email or User ID" — duplicating that in the
+            label suffix would be redundant. The two pieces complement each other:
+              label → what NOT to use
+              placeholder → what TO use */}
+        {/* Inline label — "User ID" + a small AlertCircle icon + a quiet hint, separated by
+            the icon (no em-dash needed). Icon in brand purple draws the eye just enough to
+            register the warning without dominating. */}
+        {/* `alignItems: baseline` centers by the text baseline rather than the content-box
+            center — the previous `center` setting was lining up boxes-not-text, which left
+            "User ID" sitting above the hint because they had different line-heights. */}
+        <label style={{ ...labelStyle, display: "flex", alignItems: "baseline", gap: 6, flexWrap: "wrap", lineHeight: 1.4 }}>
+          <span>User ID</span>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontWeight: 400, fontSize: 11.5, color: c.muted, opacity: 0.85 }}>
+            <AlertCircle style={{ width: 11, height: 11, color: "#A614C3", flexShrink: 0, display: "block", transform: "translateY(0.5px)" }} strokeWidth={2} />
+            We can&apos;t recognize you by agency code
+          </span>
+        </label>
         <input type="text" value={identifier} onChange={e => setIdentifier(e.target.value)}
-          placeholder="Enter your email or User ID"
+          onBlur={() => {
+            // Detect on blur (when the user leaves the field) rather than every keystroke —
+            // avoids firing the toast while they're still typing their actual identifier.
+            if (looksLikeAgencyCode(identifier)) onAgencyCodeDetected(identifier.trim());
+          }}
+          placeholder="Enter your Email or User ID"
           style={inputStyle} />
+        {/* No persistent hint here — most users don't have an agency code at all, so a
+            preemptive "agency code isn't a login" line would be both presumptuous and noisy
+            for the majority. The onBlur toast catches the case contextually if/when someone
+            actually does type a code. */}
       </div>
 
       <div className="mb-5">
