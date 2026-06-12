@@ -316,9 +316,9 @@ function LoginView({ c, font, inputStyle, labelStyle, primaryBtnStyle, btnGrad, 
             "User ID" sitting above the hint because they had different line-heights. */}
         <label style={{ ...labelStyle, display: "flex", alignItems: "baseline", gap: 6, flexWrap: "wrap", lineHeight: 1.4 }}>
           <span>User ID</span>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontWeight: 400, fontSize: 11.5, color: c.muted, opacity: 0.85 }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontWeight: 500, fontSize: 11.5, color: "#6B7280" }}>
             <AlertCircle style={{ width: 11, height: 11, color: "#A614C3", flexShrink: 0, display: "block", transform: "translateY(0.5px)" }} strokeWidth={2} />
-            <span>We can&apos;t recognize you by <span style={{ color: c.muted, fontWeight: 600, opacity: 1 }}>Agency Code</span></span>
+            <span>We can&apos;t recognize you by <span style={{ fontWeight: 700 }}>Agency Code</span></span>
           </span>
         </label>
         <input type="text" value={identifier} onChange={e => setIdentifier(e.target.value)}
