@@ -21,7 +21,8 @@ export default function Website({ isDark = false }: WebsiteProps) {
   // `kind` switches the icon + chip color: "email" for confirmation messages (brand purple
   // Mail icon), "warning" for validation nudges like the agency-code-detected case (amber
   // AlertCircle). Defaults to "email" so any caller that doesn't specify still works.
-  const [toast, setToast] = useState<{ title: string; description: React.ReactNode; kind?: "email" | "warning" } | null>(null);
+  // `title` is ReactNode so callers can highlight specific terms (e.g. "Agency Code") inline.
+  const [toast, setToast] = useState<{ title: React.ReactNode; description: React.ReactNode; kind?: "email" | "warning" } | null>(null);
 
   useEffect(() => {
     if (!toast) return;
@@ -166,11 +167,11 @@ export default function Website({ isDark = false }: WebsiteProps) {
                 // it), tell them what to try instead.
                 setToast({
                   kind: "warning",
-                  title: "We can't find you by agency code",
+                  title: <>We can&apos;t find you by <span style={{ fontWeight: 600 }}>Agency Code</span></>,
                   description: (
                     <>
                       <span style={{ fontFamily: "monospace", color: "#A614C3", fontWeight: 600 }}>{code}</span>
-                      {" "}looks like an agency code. Try your <span style={{ fontWeight: 600 }}>email</span> or <span style={{ fontWeight: 600 }}>User ID</span>.
+                      {" "}looks like an <span style={{ fontWeight: 600 }}>Agency Code</span>. Try your <span style={{ fontWeight: 600 }}>Email</span> or <span style={{ fontWeight: 600 }}>User ID</span>.
                     </>
                   ),
                 });
@@ -317,7 +318,7 @@ function LoginView({ c, font, inputStyle, labelStyle, primaryBtnStyle, btnGrad, 
           <span>User ID</span>
           <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontWeight: 400, fontSize: 11.5, color: c.muted, opacity: 0.85 }}>
             <AlertCircle style={{ width: 11, height: 11, color: "#A614C3", flexShrink: 0, display: "block", transform: "translateY(0.5px)" }} strokeWidth={2} />
-            We can&apos;t recognize you by agency code
+            <span>We can&apos;t recognize you by <span style={{ color: c.muted, fontWeight: 600, opacity: 1 }}>Agency Code</span></span>
           </span>
         </label>
         <input type="text" value={identifier} onChange={e => setIdentifier(e.target.value)}
