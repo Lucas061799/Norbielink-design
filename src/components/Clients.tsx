@@ -7,8 +7,8 @@ import {
   Activity, FileText, ClipboardList, Shield, Star, Phone, Mail,
   Calendar, DollarSign, TrendingUp, FileStack, Upload, Download,
   MessageSquare, UserCircle, X, MapPin, Users, ChevronRight, RefreshCw,
-  StickyNote, LayoutGrid, AlertTriangle, Trash2, FileArchive, FolderOpen, NotebookPen, CopyPlus, Video, Clock, Link, Bell, Paperclip,
-  Maximize2, Minimize2, Lock, Unlock, Copy, Archive, Type, Pin, List, Table2, CheckSquare, Globe,
+  StickyNote, LayoutGrid, AlertTriangle, Trash2, FileArchive, FolderOpen, NotebookPen, CopyPlus, Video, Clock, Bell, Paperclip, Filter, Eye,
+  Maximize2, Minimize2, Lock, Unlock, Copy, Archive, Type, Pin, List, Table2, CheckSquare,
 } from "lucide-react";
 import { AddressAutocomplete } from "./AddressAutocomplete";
 
@@ -16,12 +16,25 @@ const FONT = "var(--font-montserrat), Montserrat, sans-serif";
 const AGENCY_PHONE = "+1 (888) 555-0188"; // Fixed agency outbound number
 
 /* ─── Types ─────────────────────────────────────────────────────────────── */
+// ACORD-aligned contact roles. A client can have multiple contacts of each type.
+type ClientContactType = "inspection" | "accounting" | "claims";
+interface ClientContact {
+  id: string; type: ClientContactType;
+  firstName: string; lastName: string;
+  phone?: string; email?: string;
+}
+const CONTACT_TYPE_PALETTE: Record<ClientContactType, { color: string; bg: string }> = {
+  inspection: { color: "#A614C3", bg: "rgba(166,20,195,0.10)" },
+  accounting: { color: "#73C9B7", bg: "rgba(115,201,183,0.14)" },
+  claims:     { color: "#5C2ED4", bg: "rgba(92,46,212,0.10)" },
+};
 interface Client {
   id: string; type: "Individual" | "Corporation" | "LLC" | "Partnership";
   companyName?: string; dbaName?: string;
   firstName?: string; lastName?: string;
   contactFirstName?: string; contactLastName?: string;
   inspectionFirstName?: string; inspectionLastName?: string;
+  contacts?: ClientContact[];
   email: string; phone: string;
   address: { street: string; city: string; state: string; zipCode: string };
   status: "Active" | "Inactive" | "Prospect";
@@ -34,13 +47,17 @@ interface Client {
 }
 interface Quote { id: string; quoteId: string; policyType: string; status: "Pending"|"Approved"|"Declined"|"Expired"|"Sold/Issued"|"Incomplete"|"Pending/Action Req."|"Upcoming Renewals"; createdDate: string; premium: number; clientId: string; applicant: string; dba?: string; effectiveDate?: string; lob: string; producer: string; }
 interface Policy { id: string; policyNumber: string; policyType: string; status: "Active"|"Expired"|"Cancelled"|"Upcoming Renewal"; effectiveDate: string; expirationDate: string; premium: number; clientId: string; applicant: string; dba?: string; lob: string; producer: string; createdDate: string; }
-interface Document { id: string; name: string; type: string; uploadDate: string; size: string; clientId: string; category: string; }
+interface Document { id: string; name: string; type: string; uploadDate: string; size: string; clientId: string; category: string; policyNumber?: string; lob?: string; docType?: string; }
 interface ActivityLog { id: string; action: string; description: string; timestamp: string; user: string; clientId: string; type: "policy"|"quote"|"document"|"email"|"call"|"note"; }
-interface Note { id: string; title: string; content: string; author: string; timestamp: string; clientId: string; type: "General" | "Policy" | "Follow-up" | "Meeting" | "Task"; visibility?: "Private" | "Shared" | "Public"; }
+interface Note { id: string; title: string; content: string; author: string; timestamp: string; clientId: string; type: "General" | "Policy" | "Follow-up" | "Meeting" | "Task"; visibility?: "Private" | "Shared"; }
 
 /* ─── Mock Data ──────────────────────────────────────────────────────────── */
 const mockClients: Client[] = [
-  { id:"1", type:"Corporation", companyName:"Tech Solutions Inc.", dbaName:"TechSol", contactFirstName:"David", contactLastName:"Chen", inspectionFirstName:"Lisa", inspectionLastName:"Wang", email:"contact@techsolutions.com", phone:"(555) 123-4567", address:{street:"123 Innovation Drive",city:"San Francisco",state:"CA",zipCode:"94105"}, status:"Active", assignedAgent:"Jane Smith", agencyId:"1", createdDate:"2024-01-15", lastActivity:"2024-04-10", isStarred:true, totalPremium:45000, activePolicies:3, pendingQuotes:1, industry:"Technology", website:"www.techsolutions.com", primaryClassCode:"8810 - Auto Repair Shops", federalId:"82-1234567", contractorLicense:"CA-789456", grossSales:"$12,500,000", payroll:"$3,200,000", owners:"2", employees:"85" },
+  { id:"1", type:"Corporation", companyName:"Tech Solutions Inc.", dbaName:"TechSol", contactFirstName:"David", contactLastName:"Chen", inspectionFirstName:"Lisa", inspectionLastName:"Wang", email:"contact@techsolutions.com", phone:"(555) 123-4567", address:{street:"123 Innovation Drive",city:"San Francisco",state:"CA",zipCode:"94105"}, status:"Active", assignedAgent:"Jane Smith", agencyId:"1", createdDate:"2024-01-15", lastActivity:"2024-04-10", isStarred:true, totalPremium:45000, activePolicies:3, pendingQuotes:1, industry:"Technology", website:"www.techsolutions.com", primaryClassCode:"8810 - Auto Repair Shops", federalId:"82-1234567", contractorLicense:"CA-789456", grossSales:"$12,500,000", payroll:"$3,200,000", owners:"2", employees:"85", contacts:[
+    { id:"c1-1", type:"inspection", firstName:"Lisa",   lastName:"Wang",     phone:"(555) 123-4570", email:"lisa.wang@techsolutions.com" },
+    { id:"c1-2", type:"accounting", firstName:"Marcus", lastName:"Reyes",    phone:"(555) 123-4571", email:"ap@techsolutions.com" },
+    { id:"c1-3", type:"claims",     firstName:"Priya",  lastName:"Patel",    phone:"(555) 123-4572", email:"claims@techsolutions.com" },
+  ] },
   { id:"2", type:"Individual", firstName:"John", lastName:"Anderson", email:"john.anderson@email.com", phone:"(555) 234-5678", address:{street:"456 Oak Street",city:"Los Angeles",state:"CA",zipCode:"90001"}, status:"Active", assignedAgent:"Mike Chen", agencyId:"1", createdDate:"2024-02-20", lastActivity:"2024-04-08", isStarred:false, totalPremium:12000, activePolicies:2, pendingQuotes:0 },
   { id:"3", type:"LLC", companyName:"Green Earth Logistics", dbaName:"GEL Transport", contactFirstName:"Tom", contactLastName:"Harris", inspectionFirstName:"Amy", inspectionLastName:"Lee", email:"info@greenearth.com", phone:"(555) 345-6789", address:{street:"789 Commerce Blvd",city:"Chicago",state:"IL",zipCode:"60601"}, status:"Prospect", assignedAgent:"Sarah Johnson", agencyId:"1", createdDate:"2024-03-10", lastActivity:"2024-04-12", isStarred:true, totalPremium:17500, activePolicies:1, pendingQuotes:2, industry:"Logistics", website:"www.greenearthlogistics.com", primaryClassCode:"7219 - Trucking", federalId:"36-9876543", grossSales:"$8,750,000", payroll:"$2,100,000", owners:"3", employees:"120" },
   { id:"4", type:"Partnership", companyName:"Metro Construction LLC", dbaName:"MetroBuild", contactFirstName:"James", contactLastName:"Wilson", inspectionFirstName:"Robert", inspectionLastName:"Kim", email:"contact@metroconstruction.com", phone:"(555) 456-7890", address:{street:"321 Builder Lane",city:"New York",state:"NY",zipCode:"10001"}, status:"Active", assignedAgent:"Jane Smith", agencyId:"1", createdDate:"2023-11-05", lastActivity:"2024-04-11", isStarred:true, totalPremium:78000, activePolicies:5, pendingQuotes:0, industry:"Construction", website:"www.metroconstruction.com", primaryClassCode:"5403 - Carpentry", federalId:"13-5678901", contractorLicense:"NY-654321", grossSales:"$25,000,000", payroll:"$6,800,000", owners:"2", employees:"210" },
@@ -106,12 +123,29 @@ const mockPolicies: Policy[] = [
   { id:"13", policyNumber:"POL-2023-5101", policyType:"Auto Insurance",       status:"Active",            effectiveDate:"2023-12-01", expirationDate:"2024-12-01", premium:8500,  clientId:"5", applicant:"Maria Rodriguez",                   lob:"Auto Insurance",   producer:"Mike Chen",     createdDate:"2023-12-01" },
 ];
 const mockDocuments: Document[] = [
-  { id:"1", name:"Certificate of Insurance", type:"PDF", uploadDate:"2024-04-05", size:"2.3 MB", clientId:"1", category:"Certificate" },
-  { id:"2", name:"Policy Application - GL Coverage", type:"PDF", uploadDate:"2024-03-20", size:"1.8 MB", clientId:"1", category:"Application" },
-  { id:"3", name:"Loss Run Report 2023", type:"PDF", uploadDate:"2024-02-15", size:"3.5 MB", clientId:"1", category:"Loss Run" },
-  { id:"4", name:"Commercial Auto Schedule", type:"XLSX", uploadDate:"2024-02-10", size:"0.9 MB", clientId:"1", category:"Schedule" },
-  { id:"5", name:"Signed Broker of Record Letter", type:"PDF", uploadDate:"2024-01-18", size:"0.4 MB", clientId:"1", category:"Authorization" },
-  { id:"6", name:"W-9 Form", type:"PDF", uploadDate:"2024-01-15", size:"0.2 MB", clientId:"1", category:"Tax" },
+  // Client 1 — Tech Solutions Inc.
+  { id:"1", name:"Certificate of Insurance", type:"PDF", uploadDate:"2024-04-05", size:"2.3 MB", clientId:"1", category:"Certificate", policyNumber:"POL-2024-1001", lob:"General Liability", docType:"Certificate" },
+  { id:"2", name:"Policy Application - GL Coverage", type:"PDF", uploadDate:"2024-03-20", size:"1.8 MB", clientId:"1", category:"Policy", policyNumber:"POL-2024-1001", lob:"General Liability", docType:"Application" },
+  { id:"3", name:"Endorsement - Add Cyber Rider", type:"PDF", uploadDate:"2024-03-18", size:"0.6 MB", clientId:"1", category:"Endorsement", policyNumber:"POL-2024-1001", lob:"General Liability", docType:"Endorsement" },
+  { id:"4", name:"Auto Policy Declarations", type:"PDF", uploadDate:"2024-02-12", size:"1.1 MB", clientId:"1", category:"Policy", policyNumber:"POL-2024-1002", lob:"Commercial Auto", docType:"Declarations" },
+  { id:"5", name:"Loss Run Report 2023", type:"PDF", uploadDate:"2024-02-15", size:"3.5 MB", clientId:"1", category:"Loss Run" },
+  { id:"6", name:"Commercial Auto Schedule", type:"XLSX", uploadDate:"2024-02-10", size:"0.9 MB", clientId:"1", category:"Schedule" },
+  { id:"7", name:"Signed Broker of Record Letter", type:"PDF", uploadDate:"2024-01-18", size:"0.4 MB", clientId:"1", category:"Authorization" },
+  { id:"8", name:"W-9 Form", type:"PDF", uploadDate:"2024-01-15", size:"0.2 MB", clientId:"1", category:"Tax" },
+  // Client 3 — Green Earth Logistics (1 active policy, lighter doc set)
+  { id:"9",  name:"Certificate of Insurance",        type:"PDF", uploadDate:"2024-04-12", size:"1.9 MB", clientId:"3", category:"Certificate", policyNumber:"POL-2024-3101", lob:"General Liability", docType:"Certificate" },
+  { id:"10", name:"GL Policy Declarations",          type:"PDF", uploadDate:"2024-05-01", size:"2.1 MB", clientId:"3", category:"Policy",      policyNumber:"POL-2024-3101", lob:"General Liability", docType:"Declarations" },
+  { id:"11", name:"Loss Run Report 2023",            type:"PDF", uploadDate:"2024-03-15", size:"1.4 MB", clientId:"3", category:"Loss Run" },
+  { id:"12", name:"W-9 Form",                         type:"PDF", uploadDate:"2024-03-10", size:"0.2 MB", clientId:"3", category:"Tax" },
+  // Client 4 — Metro Construction LLC (5 policies, fuller doc set)
+  { id:"13", name:"Workers Comp Policy Declarations",         type:"PDF",  uploadDate:"2024-03-01", size:"2.4 MB", clientId:"4", category:"Policy",      policyNumber:"POL-2024-2201", lob:"Worker's Comp",     docType:"Declarations" },
+  { id:"14", name:"Certificate of Insurance",                  type:"PDF",  uploadDate:"2024-04-08", size:"2.0 MB", clientId:"4", category:"Certificate", policyNumber:"POL-2024-2201", lob:"Worker's Comp",     docType:"Certificate" },
+  { id:"15", name:"Commercial Auto Policy Application",        type:"PDF",  uploadDate:"2024-04-01", size:"1.7 MB", clientId:"4", category:"Policy",      policyNumber:"POL-2024-4201", lob:"Commercial Auto",   docType:"Application" },
+  { id:"16", name:"Endorsement - Increase Liability Limits",   type:"PDF",  uploadDate:"2024-04-20", size:"0.5 MB", clientId:"4", category:"Endorsement", policyNumber:"POL-2024-4202", lob:"General Liability", docType:"Endorsement" },
+  { id:"17", name:"Builder's Risk Policy Declarations",        type:"PDF",  uploadDate:"2024-04-15", size:"2.2 MB", clientId:"4", category:"Policy",      policyNumber:"POL-2024-4203", lob:"Builder's Risk",    docType:"Declarations" },
+  { id:"18", name:"Premium Audit Worksheet 2023",              type:"XLSX", uploadDate:"2024-02-22", size:"1.3 MB", clientId:"4", category:"Schedule" },
+  { id:"19", name:"Loss Run Report 2023",                       type:"PDF",  uploadDate:"2024-02-18", size:"4.1 MB", clientId:"4", category:"Loss Run" },
+  { id:"20", name:"W-9 Form",                                   type:"PDF",  uploadDate:"2023-11-08", size:"0.2 MB", clientId:"4", category:"Tax" },
 ];
 const mockActivity: ActivityLog[] = [
   { id:"1",  action:"Policy Renewed",       description:"Policy POL-2024-1001 (General Liability) renewed for another year at $15,000 premium", timestamp:"2024-04-10 10:30 AM", user:"Jane Smith", clientId:"1", type:"policy" },
@@ -163,10 +197,10 @@ const mockActivity: ActivityLog[] = [
 const mockNotes: Note[] = [
   /* Client 1 — Tech Solutions Inc */
   { id:"n1",  title:"Q2 Policy Discussion",      content:"Called to discuss new policy options. Principal mentioned interest in expanding into commercial auto insurance. Follow up scheduled for next week.", author:"Sarah Johnson", timestamp:"2026-04-05T14:30:00", clientId:"1", type:"Follow-up", visibility:"Shared"  },
-  { id:"n2",  title:"Renewal Documents Sent",    content:"Renewal documents sent via email. Waiting for signature on updated contract. Expected completion by end of week.", author:"Mike Chen", timestamp:"2026-04-03T10:15:00", clientId:"1", type:"Policy", visibility:"Public"  },
+  { id:"n2",  title:"Renewal Documents Sent",    content:"Renewal documents sent via email. Waiting for signature on updated contract. Expected completion by end of week.", author:"Mike Chen", timestamp:"2026-04-03T10:15:00", clientId:"1", type:"Policy", visibility:"Shared"  },
   { id:"n3",  title:"Q1 Performance Review",     content:"Outstanding performance this quarter — 25% increase in new policies. Discussed expanding coverage scope for Q2.", author:"Sarah Johnson", timestamp:"2026-04-01T16:45:00", clientId:"1", type:"Meeting", visibility:"Private" },
   { id:"n4",  title:"Coverage Gap Identified",   content:"Identified two coverage gaps in current policy setup. Need to follow up with underwriter on cyber liability options before renewal.", author:"Sarah Johnson", timestamp:"2026-03-20T11:00:00", clientId:"1", type:"Policy", visibility:"Shared"  },
-  { id:"n5",  title:"Task: Send Updated SOV",    content:"Send updated schedule of values to underwriter before end of month. Client expanding to new warehouse — need to update property limits.", author:"Mike Chen", timestamp:"2026-03-15T09:30:00", clientId:"1", type:"Task", visibility:"Public"  },
+  { id:"n5",  title:"Task: Send Updated SOV",    content:"Send updated schedule of values to underwriter before end of month. Client expanding to new warehouse — need to update property limits.", author:"Mike Chen", timestamp:"2026-03-15T09:30:00", clientId:"1", type:"Task", visibility:"Shared"  },
   /* Client 2 — John Anderson */
   { id:"n6",  title:"Umbrella Coverage Interest",content:"Client expressed interest in adding umbrella coverage on top of existing auto and homeowners. Prefers phone contact. Follow up in May for homeowners renewal.", author:"Mike Chen", timestamp:"2026-04-08T09:30:00", clientId:"2", type:"Follow-up" },
   { id:"n7",  title:"Homeowners Renewal Review", content:"Discussed upcoming homeowners renewal expiring Oct 1. Client wants to review deductible options and possibly increase dwelling coverage.", author:"Mike Chen", timestamp:"2026-03-22T14:00:00", clientId:"2", type:"Policy" },
@@ -292,19 +326,111 @@ function StatusBadge({ status, isDark }: { status: string; isDark: boolean }) {
 /* ─── Add Client Modal ───────────────────────────────────────────────────── */
 function AddClientModal({ isOpen, onClose, isDark }: { isOpen: boolean; onClose: () => void; isDark: boolean }) {
   const [clientType, setClientType] = useState("");
-  const [sameAddress, setSameAddress] = useState(false);
-  const [street, setStreet]   = useState("");
-  const [city, setCity]       = useState("");
-  const [stateVal, setStateVal] = useState("");
-  const [zip, setZip]         = useState("");
-  const [mStreet, setMStreet] = useState("");
-  const [mCity, setMCity]     = useState("");
-  const [mState, setMState]   = useState("");
-  const [mZip, setMZip]       = useState("");
+  const [clientTypeOpen, setClientTypeOpen] = useState(false);
+  const [fields, setFields] = useState<Record<string, string>>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [submitted, setSubmitted] = useState(false);
+  const [contacts, setContacts] = useState<ClientContact[]>([
+    { id: `c-${Date.now()}`, type: "inspection", firstName: "", lastName: "", phone: "", email: "" },
+  ]);
+
+  const formatPhone = (raw: string) => {
+    const digits = raw.replace(/\D/g, "").slice(0, 10);
+    if (digits.length === 0) return "";
+    if (digits.length <= 3) return `(${digits}`;
+    if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+  };
+
+  const validators: Record<string, (v: string) => string | null> = {
+    email: v => !v ? null : /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ? null : "Enter a valid email",
+    phone: v => !v ? null : v.replace(/\D/g, "").length === 10 ? null : "Enter a 10-digit phone",
+    zip: v => !v ? null : /^\d{5}(-\d{4})?$/.test(v) ? null : "Enter a valid ZIP (5 digits)",
+    website: v => !v ? null : /^(https?:\/\/)?([\w-]+\.)+[\w-]+.*$/.test(v) ? null : "Enter a valid URL",
+    number: v => !v ? null : /^\$?[\d,]+(\.\d+)?$/.test(v) ? null : "Enter a valid number",
+    federalId: v => !v ? null : /^\d{2}-?\d{7}$/.test(v.replace(/\s/g, "")) ? null : "Enter a valid Federal ID (XX-XXXXXXX)",
+  };
+
+  const requiredFields = new Set([
+    "companyName", "email", "phone", "primaryClassCode", "federalId",
+    "grossSales", "payroll", "street", "city", "state", "zip",
+  ]);
+
+  const fieldValidators: Record<string, keyof typeof validators> = {
+    email: "email",
+    phone: "phone",
+    zip: "zip",
+    mailZip: "zip",
+    website: "website",
+    grossSales: "number",
+    payroll: "number",
+    owners: "number",
+    employees: "number",
+    federalId: "federalId",
+  };
+
+  const validateField = (key: string, val: string): string | null => {
+    if (requiredFields.has(key) && !val.trim()) return "Required";
+    const v = fieldValidators[key];
+    if (v) return validators[v](val);
+    return null;
+  };
+
+  const setField = (key: string, val: string) => {
+    setFields(f => ({ ...f, [key]: val }));
+    const hasFormatValidator = !!fieldValidators[key];
+    if (submitted || errors[key] || (hasFormatValidator && val)) {
+      const err = validateField(key, val);
+      setErrors(e => {
+        const n = { ...e };
+        if (err && (err !== "Required" || submitted)) n[key] = err;
+        else delete n[key];
+        return n;
+      });
+    }
+  };
 
   const handleSameAddress = (checked: boolean) => {
-    setSameAddress(checked);
-    if (checked) { setMStreet(street); setMCity(city); setMState(stateVal); setMZip(zip); }
+    setField("sameAddress", checked ? "true" : "false");
+    if (checked) {
+      setField("mailStreet", fields.street || "");
+      setField("mailCity", fields.city || "");
+      setField("mailState", fields.state || "");
+      setField("mailZip", fields.zip || "");
+    }
+  };
+  const sameAddress = fields.sameAddress === "true";
+  const street = fields.street || "";
+  const city = fields.city || "";
+  const stateVal = fields.state || "";
+  const zip = fields.zip || "";
+  const mStreet = fields.mailStreet || "";
+  const mCity = fields.mailCity || "";
+  const mState = fields.mailState || "";
+  const mZip = fields.mailZip || "";
+
+  const setStreet = (v: string) => setField("street", v);
+  const setCity = (v: string) => setField("city", v);
+  const setStateVal = (v: string) => setField("state", v);
+  const setZip = (v: string) => setField("zip", v);
+  const setMStreet = (v: string) => setField("mailStreet", v);
+  const setMCity = (v: string) => setField("mailCity", v);
+  const setMState = (v: string) => setField("mailState", v);
+  const setMZip = (v: string) => setField("mailZip", v);
+
+  const handleSubmit = () => {
+    const allKeys = [...requiredFields, ...Object.keys(fieldValidators), "companyName"];
+    const newErrors: Record<string, string> = {};
+    for (const k of allKeys) {
+      const err = validateField(k, fields[k] || "");
+      if (err) newErrors[k] = err;
+    }
+    if (!clientType) newErrors.clientType = "Required";
+    setErrors(newErrors);
+    setSubmitted(true);
+    if (Object.keys(newErrors).length === 0) {
+      onClose();
+    }
   };
 
   if (!isOpen) return null;
@@ -324,10 +450,20 @@ function AddClientModal({ isOpen, onClose, isDark }: { isOpen: boolean; onClose:
   const secCard: React.CSSProperties = { paddingBottom: 8 };
   const secTitle: React.CSSProperties = { fontFamily: FONT, fontSize: 12, fontWeight: 700, color: muted, marginBottom: 14, textTransform: "uppercase" as const, letterSpacing: "0.06em" };
 
-  const F = ({ label, placeholder, req, type = "text", cols = 1 }: { label: string; placeholder?: string; req?: boolean; type?: string; cols?: number }) => (
+  const errInpSty = (key: string): React.CSSProperties =>
+    errors[key]
+      ? { ...inpSty, border: `1px solid #EF4444`, background: isDark ? "rgba(239,68,68,0.06)" : "#FEF2F2" }
+      : inpSty;
+
+  const F = ({ label, placeholder, req, type = "text", cols = 1, fieldKey }: { label: string; placeholder?: string; req?: boolean; type?: string; cols?: number; fieldKey: string }) => (
     <div style={cols > 1 ? { gridColumn: `span ${cols}` } : {}}>
       <label style={lblSty}>{label}{req && reqStar}</label>
-      <input type={type} placeholder={placeholder} style={inpSty} className="outline-none w-full" />
+      <input type={type} placeholder={placeholder}
+        value={fields[fieldKey] || ""}
+        onChange={e => setField(fieldKey, e.target.value)}
+        onBlur={e => { const err = validateField(fieldKey, e.target.value); setErrors(x => { const n = { ...x }; if (err) n[fieldKey] = err; else delete n[fieldKey]; return n; }); }}
+        style={errInpSty(fieldKey)} className="outline-none w-full" />
+      {errors[fieldKey] && <p className="text-[11px] mt-1" style={{ color: "#EF4444", fontFamily: FONT }}>{errors[fieldKey]}</p>}
     </div>
   );
 
@@ -357,38 +493,128 @@ function AddClientModal({ isOpen, onClose, isDark }: { isOpen: boolean; onClose:
           <div style={secCard}>
             <p style={secTitle}>Account Information</p>
             <div className="grid grid-cols-2 gap-x-4 gap-y-4">
-              <F label="Company Name"   placeholder="Enter company name" req />
+              <F label="Company Name"   placeholder="Enter company name" req fieldKey="companyName" />
               <div>
                 <label style={lblSty}>Entity{reqStar}</label>
-                <select value={clientType} onChange={e => setClientType(e.target.value)} style={{ ...inpSty, background: "transparent", cursor: "pointer" }}>
-                  <option value="">Select...</option>
-                  <option value="Individual">Individual</option>
-                  <option value="Corporation">Corporation</option>
-                  <option value="LLC">LLC</option>
-                  <option value="Partnership">Partnership</option>
-                </select>
+                <div className="relative" onClick={e => e.stopPropagation()}>
+                  <button type="button" onClick={() => setClientTypeOpen(o => !o)}
+                    className="w-full flex items-center justify-between outline-none"
+                    style={errors.clientType ? { ...inpSty, cursor: "pointer", border: `1px solid #EF4444`, background: isDark ? "rgba(239,68,68,0.06)" : "#FEF2F2" } : { ...inpSty, cursor: "pointer" }}>
+                    <span style={{ color: clientType ? text : muted }}>{clientType || "Select..."}</span>
+                    <ChevronDown className={`w-3.5 h-3.5 transition-transform ${clientTypeOpen ? "rotate-180" : ""}`} style={{ color: muted }} />
+                  </button>
+                  {clientTypeOpen && (
+                    <div className="absolute left-0 right-0 top-full mt-1 z-20 rounded-lg overflow-hidden"
+                      style={{ background: cardBg, border: `1px solid ${border}`, boxShadow: "0 8px 24px rgba(0,0,0,0.12)" }}>
+                      {["Individual", "Corporation", "LLC", "Partnership"].map(opt => {
+                        const active = clientType === opt;
+                        return (
+                          <button key={opt} type="button" onClick={() => { setClientType(opt); setClientTypeOpen(false); setErrors(e => { const n = { ...e }; delete n.clientType; return n; }); }}
+                            className="w-full text-left px-3 py-2 text-[13px] flex items-center justify-between transition-colors"
+                            style={{ fontFamily: FONT, color: active ? "#A614C3" : text, background: active ? "rgba(168,85,247,0.08)" : "transparent" }}
+                            onMouseEnter={e => { if (!active) e.currentTarget.style.background = isDark ? "rgba(255,255,255,0.06)" : "#F9FAFB"; }}
+                            onMouseLeave={e => { if (!active) e.currentTarget.style.background = "transparent"; }}>
+                            <span>{opt}</span>
+                            {active && <svg width="10" height="8" viewBox="0 0 9 7" fill="none"><path d="M1 3.5L3.5 6L8 1" stroke="#A614C3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+                {errors.clientType && <p className="text-[11px] mt-1" style={{ color: "#EF4444", fontFamily: FONT }}>{errors.clientType}</p>}
               </div>
-              <F label="DBA Name or Operating Name" placeholder="Doing business as" />
-              <F label="Contact First Name" placeholder="Enter first name" />
-              <F label="Contact Last Name"  placeholder="Enter last name" />
-              <F label="Inspection First Name" placeholder="Enter first name" />
-              <F label="Inspection Last Name"  placeholder="Enter last name" />
-              <F label="Email"           placeholder="email@example.com" type="email" req />
-              <F label="Phone"           placeholder="(555) 123-4567" req />
-              <F label="Website"         placeholder="www.example.com" />
-              <F label="Primary Class Code" placeholder="(555) 123-4567" req />
+              <F label="DBA Name or Operating Name" placeholder="Doing business as" fieldKey="dbaName" />
+              <F label="Primary Class Code" placeholder="8810-Auto Repair Shops" req fieldKey="primaryClassCode" />
+              <F label="Primary Contact First Name" placeholder="Enter first name" fieldKey="contactFirstName" />
+              <F label="Primary Contact Last Name"  placeholder="Enter last name" fieldKey="contactLastName" />
+              <F label="Email"           placeholder="email@example.com" type="email" req fieldKey="email" />
+              <div>
+                <label style={lblSty}>Phone{reqStar}</label>
+                <input value={fields.phone || ""}
+                  onChange={e => setField("phone", formatPhone(e.target.value))}
+                  onBlur={e => { const err = validateField("phone", e.target.value); setErrors(x => { const n = { ...x }; if (err) n.phone = err; else delete n.phone; return n; }); }}
+                  placeholder="(555) 123-4567" style={errInpSty("phone")} className="outline-none w-full" inputMode="tel" />
+                {errors.phone && <p className="text-[11px] mt-1" style={{ color: "#EF4444", fontFamily: FONT }}>{errors.phone}</p>}
+              </div>
+              <F label="Website"         placeholder="www.example.com" fieldKey="website" />
               <div style={{ gridColumn: "span 2" }}>
                 <label style={lblSty}>Description of Operations</label>
                 <textarea rows={4} placeholder="Installation, maintenance, and repair of water, sewage, and drainage systems in residential and commercial properties..."
+                  value={fields.descOps || ""}
+                  onChange={e => setField("descOps", e.target.value)}
                   style={{ ...inpSty, resize: "none", height: "calc(100% - 22px)" }} className="outline-none w-full" />
               </div>
-              <F label="Federal ID # (optional)" placeholder="ABC123456" req />
-              <F label="Contractor License # (optional)" placeholder="987654321" />
-              <F label="Gross Sales" placeholder="email@example.com" req />
-              <F label="Payroll"     placeholder="(555) 123-4567" req />
-              <F label="# Owners"    placeholder="email@example.com" />
-              <F label="# Employees" placeholder="www.example.com" />
+              <F label="Federal ID #" placeholder="12-3456789" req fieldKey="federalId" />
+              <F label="Contractor License # (optional)" placeholder="987654321" fieldKey="contractorLicense" />
+              <F label="Gross Sales" placeholder="$1000" req fieldKey="grossSales" />
+              <F label="Payroll"     placeholder="$1000" req fieldKey="payroll" />
+              <F label="# Owners"    placeholder="3" fieldKey="owners" />
+              <F label="# Employees" placeholder="5000" fieldKey="employees" />
             </div>
+          </div>
+
+          {/* ── Contacts (ACORD: inspection / accounting / claims) ── */}
+          <div style={secCard}>
+            <div className="flex items-center justify-between mb-3">
+              <p style={{ ...secTitle, marginBottom: 0 }}>Contacts</p>
+              <span className="text-[11px]" style={{ fontFamily: FONT, color: muted }}>
+                {contacts.length} contact{contacts.length === 1 ? "" : "s"}
+              </span>
+            </div>
+            <div className="space-y-3">
+              {contacts.map((ct, idx) => {
+                const palette = CONTACT_TYPE_PALETTE[ct.type];
+                return (
+                  <div key={ct.id} className="rounded-xl p-3"
+                    style={{ background: cardBg, border: `1px solid ${border}`, position: "relative", overflow: "hidden" }}>
+                    <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: palette.color }} />
+                    <div className="flex items-center justify-between mb-2.5" style={{ paddingLeft: 4 }}>
+                      <select value={ct.type}
+                        onChange={e => setContacts(prev => prev.map((p,i) => i===idx ? { ...p, type: e.target.value as ClientContactType } : p))}
+                        className="px-2.5 py-1 rounded-md outline-none text-[10px] font-bold uppercase tracking-wider cursor-pointer"
+                        style={{ fontFamily: FONT, background: palette.bg, border: `1px solid ${palette.bg}`, color: palette.color, letterSpacing: "0.08em" }}>
+                        <option value="inspection">Inspection</option>
+                        <option value="accounting">Accounting</option>
+                        <option value="claims">Claims</option>
+                      </select>
+                      {contacts.length > 1 && (
+                        <button type="button" title="Remove contact"
+                          onClick={() => setContacts(prev => prev.filter((_,i) => i !== idx))}
+                          className="flex items-center justify-center w-7 h-7 rounded-md transition-colors"
+                          style={{ color: muted }}
+                          onMouseEnter={e => { e.currentTarget.style.background = "rgba(239,68,68,0.10)"; e.currentTarget.style.color = "#EF4444"; }}
+                          onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = muted; }}>
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 gap-2.5" style={{ paddingLeft: 4 }}>
+                      <input value={ct.firstName} placeholder="First name"
+                        onChange={e => setContacts(prev => prev.map((p,i) => i===idx ? { ...p, firstName: e.target.value } : p))}
+                        style={{ ...inpSty, padding: "7px 10px", fontSize: 12 }} className="outline-none" />
+                      <input value={ct.lastName} placeholder="Last name"
+                        onChange={e => setContacts(prev => prev.map((p,i) => i===idx ? { ...p, lastName: e.target.value } : p))}
+                        style={{ ...inpSty, padding: "7px 10px", fontSize: 12 }} className="outline-none" />
+                      <input value={ct.phone || ""} placeholder="(555) 123-4567" inputMode="tel"
+                        onChange={e => setContacts(prev => prev.map((p,i) => i===idx ? { ...p, phone: formatPhone(e.target.value) } : p))}
+                        style={{ ...inpSty, padding: "7px 10px", fontSize: 12 }} className="outline-none" />
+                      <input value={ct.email || ""} placeholder="name@example.com" type="email"
+                        onChange={e => setContacts(prev => prev.map((p,i) => i===idx ? { ...p, email: e.target.value } : p))}
+                        style={{ ...inpSty, padding: "7px 10px", fontSize: 12 }} className="outline-none" />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <button type="button"
+              onClick={() => setContacts(prev => [...prev, { id: `c-${Date.now()}`, type: "inspection", firstName: "", lastName: "", phone: "", email: "" }])}
+              className="mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-colors"
+              style={{ fontFamily: FONT, border: `1px dashed ${border}`, color: text, background: "transparent" }}
+              onMouseEnter={e => (e.currentTarget.style.background = isDark ? "rgba(255,255,255,0.04)" : "#F9FAFB")}
+              onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+              <Plus className="w-3.5 h-3.5" />Add another contact
+            </button>
           </div>
 
           {/* ── Physical Address ── */}
@@ -407,26 +633,32 @@ function AddClientModal({ isOpen, onClose, isDark }: { isOpen: boolean; onClose:
                     if (a.zip) setZip(a.zip);
                   }}
                   placeholder="123 Main Street"
-                  inputStyle={inpSty}
+                  inputStyle={errInpSty("street")}
                   className="outline-none w-full"
                   dropdownBg={inputBg} dropdownText={text} dropdownBorder={border}
                 />
+                {errors.street && <p className="text-[11px] mt-1" style={{ color: "#EF4444", fontFamily: FONT }}>{errors.street}</p>}
               </div>
               <div className="grid grid-cols-3 gap-x-4">
                 <div>
                   <label style={lblSty}>City{reqStar}</label>
                   <input value={city} onChange={e => setCity(e.target.value)} placeholder="City"
-                    autoComplete="address-level2" style={inpSty} className="outline-none w-full" />
+                    autoComplete="address-level2" style={errInpSty("city")} className="outline-none w-full" />
+                  {errors.city && <p className="text-[11px] mt-1" style={{ color: "#EF4444", fontFamily: FONT }}>{errors.city}</p>}
                 </div>
                 <div>
                   <label style={lblSty}>State{reqStar}</label>
                   <input value={stateVal} onChange={e => setStateVal(e.target.value)} placeholder="State"
-                    autoComplete="address-level1" style={inpSty} className="outline-none w-full" />
+                    autoComplete="address-level1" style={errInpSty("state")} className="outline-none w-full" />
+                  {errors.state && <p className="text-[11px] mt-1" style={{ color: "#EF4444", fontFamily: FONT }}>{errors.state}</p>}
                 </div>
                 <div>
                   <label style={lblSty}>ZIP Code{reqStar}</label>
-                  <input value={zip} onChange={e => setZip(e.target.value)} placeholder="12345"
-                    autoComplete="postal-code" style={inpSty} className="outline-none w-full" />
+                  <input value={zip} onChange={e => setZip(e.target.value)}
+                    onBlur={e => { const err = validateField("zip", e.target.value); setErrors(x => { const n = { ...x }; if (err) n.zip = err; else delete n.zip; return n; }); }}
+                    placeholder="12345"
+                    autoComplete="postal-code" style={errInpSty("zip")} className="outline-none w-full" />
+                  {errors.zip && <p className="text-[11px] mt-1" style={{ color: "#EF4444", fontFamily: FONT }}>{errors.zip}</p>}
                 </div>
               </div>
             </div>
@@ -438,8 +670,8 @@ function AddClientModal({ isOpen, onClose, isDark }: { isOpen: boolean; onClose:
             <label className="flex items-center gap-2 cursor-pointer select-none mb-4" style={{ fontFamily: FONT, fontSize: 12, color: "#6B7280" }}>
               <div onClick={() => handleSameAddress(!sameAddress)}
                 className="w-[16px] h-[16px] rounded flex items-center justify-center flex-shrink-0"
-                style={{ background: inputBg, border: `1.5px solid ${border}` }}>
-                {sameAddress && <svg width="9" height="7" viewBox="0 0 9 7" fill="none"><path d="M1 3.5L3 5.5L8 1" stroke="#73C9B7" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                style={{ background: sameAddress ? "linear-gradient(88.54deg, #5C2ED4 0.1%, #A614C3 63.88%)" : inputBg, border: sameAddress ? "none" : `1.5px solid ${border}` }}>
+                {sameAddress && <svg width="9" height="7" viewBox="0 0 9 7" fill="none"><path d="M1 3.5L3 5.5L8 1" stroke="#FFFFFF" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>}
               </div>
               Same as Physical Address
             </label>
@@ -486,26 +718,20 @@ function AddClientModal({ isOpen, onClose, isDark }: { isOpen: boolean; onClose:
             </div>
           </div>
 
-          {/* ── Additional Information ── */}
-          <div style={secCard}>
-            <p style={secTitle}>Additional Information</p>
-            <div>
-              <label style={lblSty}>Notes</label>
-              <textarea rows={3} placeholder="Additional notes about this client..."
-                style={{ ...inpSty, resize: "none" }} className="outline-none w-full" />
-            </div>
-          </div>
         </form>
 
         {/* Footer */}
         <div className="flex items-center justify-between px-7 py-4 flex-shrink-0" style={{ borderTop: `1px solid ${border}`, background: cardBg, borderRadius: "0 0 16px 16px" }}>
           <button onClick={onClose}
             className="px-5 py-[8px] rounded-lg text-[12px] font-normal transition-colors"
-            style={{ fontFamily: FONT, border: `1px solid ${border}`, color: text, background: "linear-gradient(to bottom, rgba(255,255,255,0.10), rgba(192,192,192,0.10), rgba(172,172,172,0.10))" }}>
+            style={{ fontFamily: FONT, border: `1px solid ${border}`, color: text, background: "#FFFFFF" }}>
             Cancel
           </button>
-          <button className="px-5 py-[8px] rounded-lg text-[12px] font-semibold text-white"
-            style={{ fontFamily: FONT, background: tealBg }}>
+          <button onClick={handleSubmit}
+            className="px-5 py-[8px] rounded-lg text-[12px] font-semibold text-white transition-all"
+            style={{ fontFamily: FONT, background: tealBg }}
+            onMouseEnter={e => (e.currentTarget.style.filter = "brightness(1.1)")}
+            onMouseLeave={e => (e.currentTarget.style.filter = "none")}>
             Create Client
           </button>
         </div>
@@ -541,8 +767,57 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
   const [producerOpen, setProducerOpen] = useState(false);
   const [qpSortKey, setQpSortKey] = useState<"createdDate"|"submissionId"|"policyNumber"|"dba"|"effectiveDate">("createdDate");
   const [qpSortDir, setQpSortDir] = useState<"asc"|"desc">("desc");
+  const [qpViewOpen, setQpViewOpen] = useState(false);
+  const [qpHiddenCols, setQpHiddenCols] = useState<Set<string>>(new Set());
+  const QP_COLUMNS: Array<{ key: string; label: string; width: string }> = [
+    { key: "created",      label: "Created",       width: "1.1fr" },
+    { key: "policyNumber", label: "Policy Number", width: "1.6fr" },
+    { key: "applicant",    label: "Applicant",     width: "1.2fr" },
+    { key: "dba",          label: "DBA",           width: "1fr"   },
+    { key: "effective",    label: "Effective",     width: "1.1fr" },
+    { key: "lob",          label: "LOB",           width: "1.1fr" },
+    { key: "status",       label: "Status",        width: "1.2fr" },
+    { key: "producer",     label: "Producer",      width: "1.2fr" },
+  ];
+  const qpVisibleCols = QP_COLUMNS.filter(col => !qpHiddenCols.has(col.key));
+  const qpGridTemplate = qpVisibleCols.map(col => col.width).join(" ");
   const [docDragOver, setDocDragOver] = useState(false);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  // File-cabinet right-click menu state.
+  const [fileCtxMenu, setFileCtxMenu] = useState<{ x: number; y: number; docId: string } | null>(null);
+  const [renamingDocId, setRenamingDocId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  // Demo overrides for renamed/deleted file-cabinet docs (mockDocuments stays untouched).
+  const [docNameOverrides, setDocNameOverrides] = useState<Record<string, string>>({});
+  const [deletedDocIds, setDeletedDocIds] = useState<Set<string>>(new Set());
+  const [archivedDocIds, setArchivedDocIds] = useState<Set<string>>(new Set());
+  // Newly-uploaded docs appended at runtime (mockDocuments stays untouched).
+  const [extraDocs, setExtraDocs] = useState<Document[]>([]);
+  // Doc preview pane (shared between Policy Documents & File Cabinet — only one open at a time).
+  const [previewDoc, setPreviewDoc] = useState<Document | null>(null);
+  const [previewExpanded, setPreviewExpanded] = useState(false);
+  // Doc-tab toolbar state — separate per tab so filters don't bleed.
+  type DocView = "all" | "byType" | "table";
+  const [pdView, setPdView] = useState<DocView>("table");
+  const [pdShowArchived, setPdShowArchived] = useState(false);
+  const [pdShowTrashed, setPdShowTrashed] = useState(false);
+  const [pdFilterCat, setPdFilterCat] = useState<string>("All");
+  const [pdSortDir, setPdSortDir] = useState<"asc"|"desc">("desc");
+  const [pdSearch, setPdSearch] = useState("");
+  const [pdSearchOpen, setPdSearchOpen] = useState(false);
+  const [pdFilterOpen, setPdFilterOpen] = useState(false);
+  const [pdSortOpen, setPdSortOpen] = useState(false);
+  const [pdUploadOpen, setPdUploadOpen] = useState(false);
+  const [fcView, setFcView] = useState<DocView>("all");
+  const [fcShowArchived, setFcShowArchived] = useState(false);
+  const [fcShowTrashed, setFcShowTrashed] = useState(false);
+  const [fcFilterCat, setFcFilterCat] = useState<string>("All");
+  const [fcSortDir, setFcSortDir] = useState<"asc"|"desc">("desc");
+  const [fcSearch, setFcSearch] = useState("");
+  const [fcSearchOpen, setFcSearchOpen] = useState(false);
+  const [fcFilterOpen, setFcFilterOpen] = useState(false);
+  const [fcSortOpen, setFcSortOpen] = useState(false);
+  const [fcUploadOpen, setFcUploadOpen] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>(null);
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [notes, setNotes] = useState<Note[]>(mockNotes);
@@ -564,7 +839,7 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
   const [editingNoteContent, setEditingNoteContent] = useState("");
   const [editingNoteType, setEditingNoteType] = useState<Note["type"]>("General");
   const [editingNoteVisibility, setEditingNoteVisibility] = useState<NonNullable<Note["visibility"]>>("Shared");
-  const [visibilityFilter, setVisibilityFilter] = useState<"All"|"Private"|"Shared"|"Public">("All");
+  const [visibilityFilter, setVisibilityFilter] = useState<"All"|"Private"|"Shared">("All");
   const [noteExpanded, setNoteExpanded] = useState(false);
   const [noteLocked, setNoteLocked] = useState(false);
   const [lockedBy, setLockedBy] = useState("Sarah Johnson");
@@ -577,18 +852,6 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
   const [copyToast, setCopyToast] = useState("");
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [selectedNoteIds, setSelectedNoteIds] = useState<Set<string>>(new Set());
-  const [noteShareOpen, setNoteShareOpen] = useState(false);
-  const [inviteEmail, setInviteEmail] = useState("");
-  const [shareAccess, setShareAccess] = useState<Record<string,string>>({ "Jane Smith": "edit", "Mike Chen": "view", "Tom Harris": "view" });
-  const [noteOwner, setNoteOwner] = useState("Sarah Johnson");
-  const [shareMenuFor, setShareMenuFor] = useState<string|null>(null);
-  const [removedShares, setRemovedShares] = useState<Set<string>>(new Set());
-  const [removeConfirm, setRemoveConfirm] = useState<string|null>(null);
-  const [pendingRequests, setPendingRequests] = useState<{name:string; email:string; access:"view"|"edit"}[]>([
-    { name: "Lokesh", email: "lokesh.gorijavolu@amyntagroup.com", access: "edit" },
-  ]);
-  const [extraMembers, setExtraMembers] = useState<{name:string; email:string}[]>([]);
-  const [requestSent, setRequestSent] = useState(false);
   const CURRENT_USER = "Sarah Johnson";
   const [activityFilter, setActivityFilter] = useState<"all"|"policy"|"quote"|"document"|"email"|"call"|"note">("all");
   const [activityLogs, setActivityLogs] = useState(mockActivity);
@@ -606,6 +869,10 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
   const [zoomNotes, setZoomNotes] = useState("");
   const [editingInfo, setEditingInfo] = useState(false);
   const [editingAddr, setEditingAddr] = useState(false);
+  // Live, editable contacts list while in edit mode. Populated from `selected.contacts` on entering edit.
+  const [contactsDraft, setContactsDraft] = useState<ClientContact[]>([]);
+  // Per-client overrides applied after Save (so the new shape persists across detail re-opens for the demo).
+  const [contactsOverrides, setContactsOverrides] = useState<Record<string, ClientContact[]>>({});
   const [editWarningOpen, setEditWarningOpen] = useState(false);
   const [pendingEditAction, setPendingEditAction] = useState<(() => void) | null>(null);
   const [contactCardEditing, setContactCardEditing] = useState(false);
@@ -613,6 +880,7 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
   const [contactDraftPhone, setContactDraftPhone] = useState("");
   const [contactDraftEmail, setContactDraftEmail] = useState("");
   const [editFields, setEditFields] = useState<Record<string, string>>({});
+  const [editSelectOpen, setEditSelectOpen] = useState<string | null>(null);
 
   /* Colours */
   const c = {
@@ -749,206 +1017,9 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
     ? "radial-gradient(171.32% 99.33% at 33.13% -9%, #282550 0%, #191735 55.82%, rgba(0,0,0,0.3) 74%, rgba(0,0,0,0) 100%), linear-gradient(88.34deg, #5C2ED4 0.11%, #A614C3 63.8%)"
     : "linear-gradient(90deg,#5C2ED4 0%,#A614C3 65%)";
 
-  const TEAMMATES = [
-    { name: CURRENT_USER, email: "sarah.johnson@btis.com" },
-    { name: "Mike Chen",  email: "mike.chen@btis.com" },
-    { name: "Jane Smith", email: "jane.smith@btis.com" },
-    { name: "Tom Harris", email: "tom.harris@btis.com" },
-    { name: "Amy Lee",    email: "amy.lee@btis.com" },
-  ];
   const initials = (n: string) => { const parts = n.trim().split(/\s+/); return parts.length >= 2 ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase() : n.slice(0, 2).toUpperCase(); };
   const avatarStyle: React.CSSProperties = { background: isDark ? "rgba(168,85,247,0.18)" : "rgba(168,85,247,0.12)" };
   const avatarTextStyle: React.CSSProperties = { backgroundImage: "linear-gradient(88.54deg, #5C2ED4 0.1%, #A614C3 63.88%)", backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" };
-  const renderSharePanel = () => (
-    <div className="fixed inset-0 z-[55] flex items-center justify-center p-6"
-      onClick={() => setNoteShareOpen(false)}
-      style={{ background: "rgba(0,0,0,0.45)" }}>
-      <div id="note-share-panel" className="relative w-[480px] rounded-xl shadow-2xl overflow-hidden flex flex-col"
-        onClick={e => e.stopPropagation()}
-        style={{ background: c.cardBg, border: `1px solid ${c.border}`, maxHeight: "min(640px, 85vh)" }}>
-      <div className="flex items-center justify-between px-4 py-3 flex-shrink-0" style={{ borderBottom: `1px solid ${c.border}` }}>
-        <span className="text-[13px] font-semibold" style={{ fontFamily: FONT, color: c.text }}>Share note</span>
-        <div className="flex items-center gap-3">
-          <button onClick={() => { navigator.clipboard.writeText(window.location.href); setCopyToast("Link copied!"); setTimeout(()=>setCopyToast(""),2000); }}
-            className="flex items-center gap-1.5 text-[11px] font-semibold transition-colors"
-            style={{ fontFamily: FONT, color: "#A855F7" }}>
-            <Link className="w-3 h-3" />Copy link
-          </button>
-          <button onClick={() => setNoteShareOpen(false)} className="p-1 rounded-md transition-colors" style={{ color: c.muted }}
-            onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
-            onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
-      {/* Pending requests */}
-      {pendingRequests.length > 0 && (
-        <div className="px-4 py-3 flex-shrink-0" style={{ borderBottom: `1px solid ${c.border}` }}>
-          {pendingRequests.map(req => (
-            <div key={req.email} className="flex items-center gap-3">
-              <div className="relative flex-shrink-0">
-                <div className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold" style={avatarStyle}><span style={avatarTextStyle}>{initials(req.name)}</span></div>
-                <div className="absolute top-0 right-0 w-2.5 h-2.5 rounded-full" style={{ background: "#EF4444", border: `2px solid ${c.cardBg}` }} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-[12px]" style={{ fontFamily: FONT, color: c.text }}><strong>{req.name}</strong> wants to {req.access}</p>
-                <p className="text-[11px] truncate" style={{ fontFamily: FONT, color: c.muted }}>{req.email}</p>
-              </div>
-              <button onClick={() => { setPendingRequests(prev => prev.filter(p => p.email !== req.email)); setCopyToast(`Denied ${req.name}`); setTimeout(()=>setCopyToast(""),2000); }}
-                className="px-3 py-1.5 rounded-lg text-[11px] font-normal transition-colors"
-                style={{ fontFamily: FONT, border: `1px solid #E5E7EB`, color: c.text, background: "linear-gradient(to bottom, rgba(255,255,255,0.10), rgba(192,192,192,0.10), rgba(172,172,172,0.10))" }}>Deny</button>
-              <button onClick={() => {
-                setExtraMembers(prev => [...prev, { name: req.name, email: req.email }]);
-                setShareAccess(prev => ({ ...prev, [req.name]: req.access }));
-                setPendingRequests(prev => prev.filter(p => p.email !== req.email));
-                setCopyToast(`${req.name} joined the note`); setTimeout(()=>setCopyToast(""),2000);
-              }}
-                className="px-3 py-1.5 rounded-lg text-[11px] font-semibold text-white transition-all"
-                style={{ fontFamily: FONT, background: btnGrad }}
-                onMouseEnter={e => (e.currentTarget.style.filter = "brightness(1.1)")}
-                onMouseLeave={e => (e.currentTarget.style.filter = "none")}>Approve</button>
-            </div>
-          ))}
-        </div>
-      )}
-      {/* Visibility selector */}
-      <div className="px-4 pt-3 pb-3 flex-shrink-0" style={{ borderBottom: `1px solid ${c.border}` }}>
-        <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ fontFamily: FONT, color: c.muted }}>Visibility</p>
-        <div className="flex gap-1.5">
-          {([["Private",Lock,"Only you"],["Shared",Users,"Specific teammates"],["Public",Globe,"Everyone in team"]] as const).map(([v,Ic,desc]) => {
-            const active = editingNoteVisibility === v;
-            return (
-            <button key={v} onClick={() => setEditingNoteVisibility(v)}
-              className="flex-1 flex flex-col items-start gap-1 px-3 py-2 rounded-lg text-[11px] font-medium transition-all"
-              style={{ fontFamily:FONT, background:active?"rgba(168,85,247,0.10)":"transparent", color:c.text, border:`1px solid ${active?"rgba(168,85,247,0.35)":c.border}` }}>
-              <span className="flex items-center gap-1.5 font-semibold">
-                <Ic className="w-3 h-3" style={{ color: active ? "#A614C3" : c.text }} />
-                {active
-                  ? <span style={{ backgroundImage: "linear-gradient(88.54deg, #5C2ED4 0.1%, #A614C3 63.88%)", backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>{v}</span>
-                  : <span>{v}</span>}
-              </span>
-              <span className="text-[10px] font-normal" style={{ color: c.muted }}>{desc}</span>
-            </button>
-          ); })}
-        </div>
-      </div>
-      <div className="flex items-center gap-2 px-3 py-3 flex-shrink-0" style={{ borderBottom: `1px solid ${c.border}` }}>
-        <input placeholder="Add email to invite" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)}
-          className="flex-1 outline-none px-3 py-2 text-[12px] rounded-lg"
-          style={{ fontFamily: FONT, background: isDark ? "rgba(255,255,255,0.03)" : "#F9FAFB", border: `1px solid ${c.border}`, color: c.text }} />
-        <button onClick={() => { if (inviteEmail.trim()) { setCopyToast(`Invited ${inviteEmail.trim()}`); setTimeout(()=>setCopyToast(""),2000); setInviteEmail(""); } }}
-          disabled={!inviteEmail.trim()}
-          className="px-3 py-2 rounded-lg text-[11px] font-semibold transition-all"
-          style={{ fontFamily: FONT, background: inviteEmail.trim() ? btnGrad : (isDark ? "rgba(255,255,255,0.05)" : "#F3F4F6"), color: inviteEmail.trim() ? "#fff" : c.muted, cursor: inviteEmail.trim() ? "pointer" : "not-allowed" }}>
-          Invite
-        </button>
-      </div>
-      <div className="px-4 pt-3 pb-1 flex-shrink-0">
-        <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ fontFamily: FONT, color: c.muted }}>Who has access</p>
-      </div>
-      <div className="flex-1 overflow-y-auto pb-2 min-h-0">
-        {[...TEAMMATES, ...extraMembers].filter(a => !removedShares.has(a.name)).map(a => {
-          const isOwner = a.name === noteOwner;
-          const isYou = a.name === CURRENT_USER;
-          const access = shareAccess[a.name] || "view";
-          const accessLabel = isOwner ? "Owner" : access === "edit" ? "can edit" : "can view";
-          return (
-            <div key={a.name} className="flex items-center justify-between px-4 py-2 transition-colors"
-              onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
-              onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0" style={avatarStyle}>
-                  <span style={avatarTextStyle}>{initials(a.name)}</span>
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[12px] font-medium truncate" style={{ fontFamily: FONT, color: c.text }}>
-                    {a.name}{isYou && <span className="ml-1 font-normal" style={{ color: c.muted }}>(You)</span>}
-                  </p>
-                  <p className="text-[10px] truncate" style={{ fontFamily: FONT, color: c.muted }}>{a.email}</p>
-                </div>
-              </div>
-              {isOwner ? (
-                <span className="text-[11px] font-medium flex-shrink-0" style={{ fontFamily: FONT, color: c.muted }}>Owner</span>
-              ) : (
-                <div className="relative flex-shrink-0" onClick={e => e.stopPropagation()}>
-                  <button onClick={e => { e.stopPropagation(); setShareMenuFor(p => p === a.name ? null : a.name); }}
-                    className="flex items-center gap-1 text-[11px] font-medium pl-2 pr-1 py-1 rounded-md transition-colors"
-                    style={{ fontFamily: FONT, background: "transparent", color: c.text }}
-                    onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
-                    onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-                    {accessLabel}
-                    <ChevronDown className="w-3 h-3" style={{ color: c.muted }} />
-                  </button>
-                  {shareMenuFor === a.name && (
-                    <div className="absolute right-0 top-8 z-50 w-36 rounded-xl shadow-2xl py-1.5"
-                      style={{ background: c.cardBg, border: `1px solid ${c.border}` }}
-                      onClick={e => e.stopPropagation()}>
-                      <button onClick={() => { setNoteOwner(a.name); setShareAccess(prev => ({ ...prev, [noteOwner]: "edit" })); setShareMenuFor(null); }}
-                        className="w-full text-left px-3 py-1.5 text-[12px] flex items-center justify-between transition-colors"
-                        style={{ fontFamily: FONT, color: c.text }}
-                        onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
-                        onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-                        Owner
-                      </button>
-                      <button onClick={() => { setShareAccess(prev => ({ ...prev, [a.name]: "edit" })); setShareMenuFor(null); }}
-                        className="w-full text-left px-3 py-1.5 text-[12px] flex items-center justify-between transition-colors"
-                        style={{ fontFamily: FONT, color: c.text }}
-                        onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
-                        onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-                        can edit{access === "edit" && <span style={{ color: "#A855F7" }}>✓</span>}
-                      </button>
-                      <button onClick={() => { setShareAccess(prev => ({ ...prev, [a.name]: "view" })); setShareMenuFor(null); }}
-                        className="w-full text-left px-3 py-1.5 text-[12px] flex items-center justify-between transition-colors"
-                        style={{ fontFamily: FONT, color: c.text }}
-                        onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
-                        onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-                        can view{access === "view" && <span style={{ color: "#A855F7" }}>✓</span>}
-                      </button>
-                      <div style={{ height: 1, background: c.border, margin: "4px 0" }} />
-                      <button onClick={() => { setRemoveConfirm(a.name); setShareMenuFor(null); }}
-                        className="w-full text-left px-3 py-1.5 text-[12px] transition-colors"
-                        style={{ fontFamily: FONT, color: "#EF4444" }}
-                        onMouseEnter={e => (e.currentTarget.style.background = "rgba(239,68,68,0.08)")}
-                        onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-                        Remove
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-      {removeConfirm && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.4)" }}
-          onClick={e => { e.stopPropagation(); setRemoveConfirm(null); }}>
-          <div className="rounded-2xl p-6 w-[380px] shadow-2xl" style={{ background: c.cardBg }} onClick={e => e.stopPropagation()}>
-            <div className="flex items-start gap-4 mb-5">
-              <div className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "rgba(239,68,68,0.10)" }}>
-                <X className="w-6 h-6" style={{ color: "#EF4444" }} />
-              </div>
-              <div>
-                <h3 className="text-[16px] font-bold mb-1" style={{ fontFamily: FONT, color: c.text }}>Remove access?</h3>
-                <p className="text-[12px] leading-relaxed" style={{ fontFamily: FONT, color: c.muted }}><strong style={{ color: c.text }}>{removeConfirm}</strong> will no longer have access to this note.</p>
-              </div>
-            </div>
-            <div className="flex gap-3 justify-end">
-              <button onClick={() => setRemoveConfirm(null)} className="px-4 py-2 rounded-lg text-[12px] font-medium transition-colors"
-                style={{ fontFamily: FONT, border: `1px solid ${c.border}`, color: c.text }}
-                onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
-                onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>Cancel</button>
-              <button onClick={() => { setRemovedShares(prev => { const s = new Set(prev); s.add(removeConfirm!); return s; }); setRemoveConfirm(null); }}
-                className="px-4 py-2 rounded-lg text-[12px] font-semibold text-white transition-colors"
-                style={{ fontFamily: FONT, background: "#EF4444" }}>Remove</button>
-            </div>
-          </div>
-        </div>
-      )}
-      </div>
-    </div>
-  );
-
   /* Input style */
   const inputSty: React.CSSProperties = {
     fontFamily: FONT, background: c.inputBg, border: `1px solid ${c.border}`,
@@ -959,7 +1030,9 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
   const detailTabBtn = (tab: DetailTab, label: string, Icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>) => (
     <button onClick={() => { setDetailTab(tab); setDetailSearch(""); setHighlightFilter(null); }}
       className="flex items-center gap-1.5 px-4 py-3 text-[13px] font-normal relative transition-colors"
-      style={{ fontFamily: FONT, color: detailTab === tab ? (isDark ? "#fff" : "#A614C3") : c.muted, letterSpacing: "0.01em" }}>
+      style={{ fontFamily: FONT, color: detailTab === tab ? (isDark ? "#fff" : "#A614C3") : c.muted, letterSpacing: "0.01em" }}
+      onMouseEnter={e => { if (detailTab !== tab) e.currentTarget.style.color = c.text; }}
+      onMouseLeave={e => { if (detailTab !== tab) e.currentTarget.style.color = c.muted; }}>
       <Icon className="w-[15px] h-[15px]" style={{ color: detailTab === tab ? "#A614C3" : undefined }} />
       {label}
       {detailTab === tab && <div className="absolute bottom-0 left-0 right-0 h-[2px]" style={{ background: "linear-gradient(90deg,#5C2ED4 0%,#A614C3 65%)" }} />}
@@ -1001,7 +1074,14 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
     .filter(q => producerFilter.size === 0 || producerFilter.has(q.producer)));
   const incompleteQuotesCount = selected ? mockQuotes.filter(q => q.clientId === selected.id && q.status === "Incomplete").length : 0;
   const upcomingRenewalsCount = selected ? mockPolicies.filter(p => p.clientId === selected.id && p.status === "Upcoming Renewal").length : 0;
-  const clientDocs     = selected ? mockDocuments.filter(d => d.clientId === selected.id && (!detailSearch || d.name.toLowerCase().includes(detailSearch.toLowerCase()))) : [];
+  const clientDocs     = selected ? mockDocuments
+    .filter(d => !deletedDocIds.has(d.id))
+    .map(d => docNameOverrides[d.id] ? { ...d, name: docNameOverrides[d.id] } : d)
+    .filter(d => d.clientId === selected.id && (!detailSearch || d.name.toLowerCase().includes(detailSearch.toLowerCase()))) : [];
+  // Includes archived + trashed — used by the Documents toolbar for Archive/Trash views.
+  const allClientDocs = selected ? [...mockDocuments, ...extraDocs]
+    .map(d => docNameOverrides[d.id] ? { ...d, name: docNameOverrides[d.id] } : d)
+    .filter(d => d.clientId === selected.id) : [];
   const clientActivity = selected ? activityLogs.filter(a => a.clientId === selected.id) : [];
   const clientNotes    = selected ? notes.filter(n => n.clientId === selected.id) : [];
 
@@ -1019,7 +1099,7 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
         {sectionTitle}
 
         {/* Search + Add */}
-        <div className="flex items-center gap-3 mb-4">
+        <div className="flex items-center gap-2 mb-7">
           <div className="flex flex-1 max-w-[340px]" style={{ background: c.cardBg, border: `1px solid ${isDark ? "rgba(255,255,255,0.10)" : "#E5E7EB"}`, borderRadius: 10, overflow: "hidden", transition: "background 0.15s, border-color 0.15s" }}>
             <input placeholder="Search clients..." value={search} onChange={e => { setSearch(e.target.value); setPage(1); }}
               className="flex-1 outline-none" style={{ fontFamily: FONT, background: "transparent", color: c.text, padding: "8px 14px", fontSize: 13, border: "none" }} />
@@ -1042,7 +1122,6 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
         {/* Filter Pills — no divider line */}
         <div className="flex items-center gap-2 mb-3 flex-wrap">
           {filterPill("All")}
-          {filterPill("Starred")}
           {filterPill("Active")}
           {filterPill("Inactive")}
           {filterPill("Prospect")}
@@ -1055,7 +1134,7 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
           <div className="flex items-center gap-2 mb-3">
             <Star className="w-4 h-4" style={{ fill: "#F59E0B", color: "#F59E0B" }} />
             <span className="text-[13px] font-bold" style={{ fontFamily: FONT, color: c.text }}>
-              Starred Clients <span style={{ color: c.muted, fontWeight: 400 }}>({starredClients.length} of {allClients.length})</span>
+              Starred Clients <span style={{ color: c.muted, fontWeight: 400 }}>({starredClients.length} of 6)</span>
             </span>
           </div>
           <div style={{ display: "flex", flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
@@ -1195,6 +1274,482 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
   if (!selected) return null;
   const isStarred = stars.has(selected.id);
 
+  /* ── Documents tab renderer (shared between Policy Documents & File Cabinet) ── */
+  type DocsCfg = {
+    docPredicate: (d: Document) => boolean;
+    categoryOptions: string[];
+    emptyTitle: string;
+    emptyHint: string;
+    enableContextMenu: boolean;
+    showPolicyCols: boolean;
+    syncSource?: string; // shows a "Synced from X" banner above the list (Policy Docs only)
+    view: DocView; setView: (v: DocView) => void;
+    showArchived: boolean; setShowArchived: (v: boolean) => void;
+    showTrashed: boolean; setShowTrashed: (v: boolean) => void;
+    filterCat: string; setFilterCat: (v: string) => void;
+    sortDir: "asc"|"desc"; setSortDir: (v: "asc"|"desc") => void;
+    search: string; setSearch: (v: string) => void;
+    searchOpen: boolean; setSearchOpen: (v: boolean) => void;
+    filterOpen: boolean; setFilterOpen: (v: boolean) => void;
+    sortOpen: boolean; setSortOpen: (v: boolean) => void;
+    uploadOpen: boolean; setUploadOpen: (v: boolean) => void;
+  };
+  const renderDocsTab = (cfg: DocsCfg) => {
+    const tabDocs = allClientDocs.filter(cfg.docPredicate);
+    const isArchived = (d: Document) => archivedDocIds.has(d.id);
+    const isTrashed  = (d: Document) => deletedDocIds.has(d.id);
+    const archivedCount = tabDocs.filter(d => isArchived(d) && !isTrashed(d)).length;
+    const trashedCount  = tabDocs.filter(d => isTrashed(d)).length;
+    const base = cfg.showTrashed
+      ? tabDocs.filter(isTrashed)
+      : cfg.showArchived
+        ? tabDocs.filter(d => isArchived(d) && !isTrashed(d))
+        : tabDocs.filter(d => !isArchived(d) && !isTrashed(d));
+    const visible = base
+      .filter(d => cfg.filterCat === "All" || d.category === cfg.filterCat)
+      .filter(d => !cfg.search || d.name.toLowerCase().includes(cfg.search.toLowerCase()) || d.category.toLowerCase().includes(cfg.search.toLowerCase()))
+      .sort((a, b) => {
+        const ta = Date.parse(a.uploadDate); const tb = Date.parse(b.uploadDate);
+        return cfg.sortDir === "desc" ? tb - ta : ta - tb;
+      });
+    const closeAllDropdowns = () => { cfg.setFilterOpen(false); cfg.setSortOpen(false); cfg.setUploadOpen(false); };
+    const handleUpload = (cat: string) => {
+      const today = new Date().toISOString().slice(0, 10);
+      const newDoc: Document = {
+        id: `new-${Date.now()}`,
+        name: `New ${cat}.pdf`,
+        type: "PDF", uploadDate: today, size: "0.5 MB",
+        clientId: selected!.id, category: cat,
+      };
+      setExtraDocs(prev => [newDoc, ...prev]);
+      cfg.setUploadOpen(false);
+    };
+    const archive = (id: string) => setArchivedDocIds(p => { const s = new Set(p); s.add(id); return s; });
+    const unarchive = (id: string) => setArchivedDocIds(p => { const s = new Set(p); s.delete(id); return s; });
+    const trash = (id: string) => setDeletedDocIds(p => { const s = new Set(p); s.add(id); return s; });
+    const restore = (id: string) => setDeletedDocIds(p => { const s = new Set(p); s.delete(id); return s; });
+    const purge = (id: string) => {
+      setExtraDocs(p => p.filter(d => d.id !== id));
+      setDeletedDocIds(p => { const s = new Set(p); s.delete(id); return s; });
+    };
+
+    const Toolbar = (
+      <div className="flex items-center justify-between mb-3 flex-shrink-0 min-w-0" onClick={closeAllDropdowns}>
+        <div className="flex items-center gap-0.5 min-w-0">
+          {([["all","All Documents",List],["byType","By Type",LayoutGrid],["table","Table",Table2]] as [DocView, string, React.ComponentType<{className?:string}>][]).map(([v, label, Icon]) => {
+            const isActive = cfg.view === v && !cfg.showArchived && !cfg.showTrashed;
+            return (
+              <button key={v} title={label} onClick={e => { e.stopPropagation(); cfg.setView(v); cfg.setShowArchived(false); cfg.setShowTrashed(false); }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium transition-all whitespace-nowrap"
+                style={{ fontFamily: FONT, background: isActive ? (isDark ? "rgba(255,255,255,0.08)" : "#F3F4F6") : "transparent", color: isActive ? c.text : c.muted }}>
+                <Icon className="w-3 h-3" />{label}
+              </button>
+            );
+          })}
+          <div className="mx-1.5" style={{ width: 1, height: 16, background: c.border }} />
+          <button title="Archive" onClick={e => { e.stopPropagation(); cfg.setShowArchived(true); cfg.setShowTrashed(false); }}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[12px] font-medium transition-all"
+            style={{ fontFamily: FONT, background: cfg.showArchived ? "rgba(245,158,11,0.10)" : "transparent", color: cfg.showArchived ? "#F59E0B" : c.muted }}>
+            <Archive className="w-3 h-3" />Archive
+            {archivedCount > 0 && <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: cfg.showArchived ? "rgba(245,158,11,0.25)" : (isDark ? "rgba(255,255,255,0.08)" : "#F3F4F6"), color: cfg.showArchived ? "#F59E0B" : c.muted }}>{archivedCount}</span>}
+          </button>
+          <button title="Trash" onClick={e => { e.stopPropagation(); cfg.setShowTrashed(true); cfg.setShowArchived(false); }}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[12px] font-medium transition-all"
+            style={{ fontFamily: FONT, background: cfg.showTrashed ? "rgba(239,68,68,0.10)" : "transparent", color: cfg.showTrashed ? "#EF4444" : c.muted }}>
+            <Trash2 className="w-3 h-3" />Trash
+            {trashedCount > 0 && <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: cfg.showTrashed ? "rgba(239,68,68,0.20)" : (isDark ? "rgba(255,255,255,0.08)" : "#F3F4F6"), color: cfg.showTrashed ? "#EF4444" : c.muted }}>{trashedCount}</span>}
+          </button>
+        </div>
+        <div className="flex items-center gap-1">
+          {/* Filter */}
+          <div className="relative" onClick={e => e.stopPropagation()}>
+            <button onClick={() => { cfg.setFilterOpen(!cfg.filterOpen); cfg.setSortOpen(false); cfg.setUploadOpen(false); }}
+              className="p-1.5 rounded-md transition-all"
+              style={{ color: cfg.filterCat !== "All" ? "#A855F7" : c.muted, background: cfg.filterCat !== "All" ? "rgba(168,85,247,0.10)" : "transparent" }}>
+              <Filter className="w-3.5 h-3.5" />
+            </button>
+            {cfg.filterOpen && (
+              <div className="absolute right-0 top-8 z-30 w-52 rounded-xl shadow-xl py-1.5" style={{ background: c.cardBg, border: `1px solid ${c.border}` }}>
+                <p className="text-[10px] font-semibold uppercase tracking-wide px-3 py-1.5" style={{ fontFamily: FONT, color: c.muted }}>Filter by Category</p>
+                {(["All", ...cfg.categoryOptions]).map(t => (
+                  <button key={t} onClick={() => { cfg.setFilterCat(t); cfg.setFilterOpen(false); }}
+                    className="w-full text-left px-3 py-1.5 text-[12px] flex items-center justify-between transition-colors"
+                    style={{ fontFamily: FONT, color: cfg.filterCat === t ? "#A614C3" : c.text, background: cfg.filterCat === t ? "rgba(168,85,247,0.08)" : "transparent" }}>
+                    {t === "All" ? "All Categories" : t}
+                    {cfg.filterCat === t && <svg width="10" height="8" viewBox="0 0 9 7" fill="none"><path d="M1 3.5L3.5 6L8 1" stroke="#A614C3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          {/* Sort */}
+          <div className="relative" onClick={e => e.stopPropagation()}>
+            <button onClick={() => { cfg.setSortOpen(!cfg.sortOpen); cfg.setFilterOpen(false); cfg.setUploadOpen(false); }}
+              className="p-1.5 rounded-md transition-all" style={{ color: c.muted }}>
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M2 4h12v1.5H2V4zm2 3.5h8V9H4V7.5zm2 3.5h4v1.5H6V11z"/></svg>
+            </button>
+            {cfg.sortOpen && (
+              <div className="absolute right-0 top-8 z-30 w-40 rounded-xl shadow-xl overflow-hidden" style={{ background: c.cardBg, border: `1px solid ${c.border}` }}>
+                <p className="text-[10px] font-semibold uppercase tracking-wide px-3 pt-2 pb-1.5" style={{ fontFamily: FONT, color: c.muted }}>Sort by Date</p>
+                {([["desc","Newest first"],["asc","Oldest first"]] as const).map(([d, label]) => (
+                  <button key={d} onClick={() => { cfg.setSortDir(d); cfg.setSortOpen(false); }}
+                    className="w-full text-left px-3 py-2 text-[12px] flex items-center justify-between"
+                    style={{ fontFamily: FONT, color: cfg.sortDir === d ? "#A614C3" : c.text, background: cfg.sortDir === d ? "rgba(168,85,247,0.08)" : "transparent" }}>
+                    <span>{label}</span>{cfg.sortDir === d && <svg width="10" height="8" viewBox="0 0 9 7" fill="none"><path d="M1 3.5L3.5 6L8 1" stroke="#A614C3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          {/* Search */}
+          <div className="flex items-center transition-all overflow-hidden" style={{ width: cfg.searchOpen ? 160 : 28 }}>
+            <button onClick={e => { e.stopPropagation(); cfg.setSearchOpen(!cfg.searchOpen); if (cfg.searchOpen) cfg.setSearch(""); }}
+              className="p-1.5 rounded-md flex-shrink-0" style={{ color: cfg.search ? "#A855F7" : c.muted }}>
+              <Search className="w-3.5 h-3.5" />
+            </button>
+            {cfg.searchOpen && (
+              <input autoFocus value={cfg.search} onChange={e => cfg.setSearch(e.target.value)}
+                onClick={e => e.stopPropagation()} placeholder="Search documents…"
+                className="outline-none text-[12px] flex-1 min-w-0"
+                style={{ fontFamily: FONT, color: c.text, background: "transparent", borderBottom: `1px solid ${c.border}` }} />
+            )}
+          </div>
+          {/* Upload (split-button) — hidden in archive/trash */}
+          {!cfg.showArchived && !cfg.showTrashed && (
+            <div className="relative ml-1" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center rounded-lg overflow-hidden" style={{ background: btnGrad }}>
+                <button onClick={() => cfg.setUploadOpen(!cfg.uploadOpen)}
+                  className="px-3 py-1.5 text-[12px] font-semibold text-white flex items-center gap-1.5"
+                  style={{ fontFamily: FONT }}>
+                  <Upload className="w-3 h-3" />Upload
+                </button>
+                <div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.2)" }} />
+                <button onClick={() => cfg.setUploadOpen(!cfg.uploadOpen)} className="px-2 py-1.5 text-white flex items-center">
+                  <ChevronDown className="w-3 h-3" />
+                </button>
+              </div>
+              {cfg.uploadOpen && (
+                <div className="absolute right-0 top-9 z-30 w-44 rounded-xl shadow-xl py-1.5" style={{ background: c.cardBg, border: `1px solid ${c.border}` }}>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide px-3 py-1.5" style={{ fontFamily: FONT, color: c.muted }}>Upload to</p>
+                  {cfg.categoryOptions.map(cat => (
+                    <button key={cat} onClick={() => handleUpload(cat)}
+                      className="w-full text-left px-3 py-1.5 text-[12px] flex items-center gap-2 transition-colors"
+                      style={{ fontFamily: FONT, color: c.text }}
+                      onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+                      onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                      <FolderOpen className="w-3 h-3" style={{ color: "#A855F7" }} />{cat}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+
+    const RowActions = ({ d }: { d: Document }) => {
+      if (cfg.showTrashed) {
+        return (
+          <div className="flex items-center gap-1">
+            <button title="Restore" onClick={e => { e.stopPropagation(); restore(d.id); }} className="p-1.5 rounded transition-colors" style={{ color: c.muted }}
+              onMouseEnter={e => { e.currentTarget.style.background = c.hoverBg; e.currentTarget.style.color = c.text; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = c.muted; }}>
+              <RefreshCw className="w-3.5 h-3.5" />
+            </button>
+            <button title="Delete forever" onClick={e => { e.stopPropagation(); purge(d.id); }} className="p-1.5 rounded transition-colors" style={{ color: c.muted }}
+              onMouseEnter={e => { e.currentTarget.style.background = "rgba(239,68,68,0.08)"; e.currentTarget.style.color = "#EF4444"; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = c.muted; }}>
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        );
+      }
+      if (cfg.showArchived) {
+        return (
+          <div className="flex items-center gap-1">
+            <button title="Unarchive" onClick={e => { e.stopPropagation(); unarchive(d.id); }} className="p-1.5 rounded transition-colors" style={{ color: c.muted }}
+              onMouseEnter={e => { e.currentTarget.style.background = c.hoverBg; e.currentTarget.style.color = c.text; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = c.muted; }}>
+              <RefreshCw className="w-3.5 h-3.5" />
+            </button>
+            <button title="Move to Trash" onClick={e => { e.stopPropagation(); trash(d.id); }} className="p-1.5 rounded transition-colors" style={{ color: c.muted }}
+              onMouseEnter={e => { e.currentTarget.style.background = "rgba(239,68,68,0.08)"; e.currentTarget.style.color = "#EF4444"; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = c.muted; }}>
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        );
+      }
+      return (
+        <div className="flex items-center gap-1">
+          <button title="Preview" onClick={e => { e.stopPropagation(); setPreviewDoc(previewDoc?.id === d.id ? null : d); }} className="p-1.5 rounded transition-colors"
+            style={{ color: previewDoc?.id === d.id ? "#A855F7" : c.muted, background: previewDoc?.id === d.id ? "rgba(168,85,247,0.10)" : "transparent" }}
+            onMouseEnter={e => { if (previewDoc?.id !== d.id) { e.currentTarget.style.background = c.hoverBg; e.currentTarget.style.color = c.text; } }}
+            onMouseLeave={e => { if (previewDoc?.id !== d.id) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = c.muted; } }}>
+            <Eye className="w-3.5 h-3.5" />
+          </button>
+          <button title="Download" onClick={e => e.stopPropagation()} className="p-1.5 rounded transition-colors" style={{ color: c.muted }}
+            onMouseEnter={e => { e.currentTarget.style.background = c.hoverBg; e.currentTarget.style.color = c.text; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = c.muted; }}>
+            <Download className="w-3.5 h-3.5" />
+          </button>
+          <button title="Archive" onClick={e => { e.stopPropagation(); archive(d.id); }} className="p-1.5 rounded transition-colors" style={{ color: c.muted }}
+            onMouseEnter={e => { e.currentTarget.style.background = c.hoverBg; e.currentTarget.style.color = c.text; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = c.muted; }}>
+            <Archive className="w-3.5 h-3.5" />
+          </button>
+          <button title="Move to Trash" onClick={e => { e.stopPropagation(); trash(d.id); }} className="p-1.5 rounded transition-colors" style={{ color: c.muted }}
+            onMouseEnter={e => { e.currentTarget.style.background = "rgba(239,68,68,0.08)"; e.currentTarget.style.color = "#EF4444"; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = c.muted; }}>
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      );
+    };
+
+    const DocIcon = ({ d }: { d: Document }) => (
+      <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+        style={{ background: d.type === "PDF" ? "rgba(239,68,68,0.1)" : "rgba(34,197,94,0.1)" }}>
+        {d.type === "PDF"
+          ? <FileText className="w-4 h-4" style={{ color: "#EF4444" }} />
+          : <FileArchive className="w-4 h-4" style={{ color: "#22C55E" }} />}
+      </div>
+    );
+
+    const NameCell = ({ d }: { d: Document }) => (
+      cfg.enableContextMenu && renamingDocId === d.id ? (
+        <input autoFocus value={renameValue} onChange={e => setRenameValue(e.target.value)}
+          onBlur={() => { if (renameValue.trim()) setDocNameOverrides(prev => ({ ...prev, [d.id]: renameValue.trim() })); setRenamingDocId(null); }}
+          onKeyDown={e => {
+            if (e.key === "Enter") { if (renameValue.trim()) setDocNameOverrides(prev => ({ ...prev, [d.id]: renameValue.trim() })); setRenamingDocId(null); }
+            if (e.key === "Escape") setRenamingDocId(null);
+          }}
+          className="flex-1 outline-none rounded px-2 py-1 text-[13px] font-medium"
+          style={{ fontFamily: FONT, color: c.text, background: c.cardBg, border: `1px solid #A614C3` }} />
+      ) : (
+        <span className="text-[13px] font-medium truncate" style={{ fontFamily: FONT, color: c.text }}>{d.name}</span>
+      )
+    );
+
+    /* ── Empty state ── */
+    if (visible.length === 0) {
+      return (
+        <div className="flex flex-col flex-1 min-h-0">
+          {Toolbar}
+          <div className="flex-shrink-0 mb-3" style={{ height: 1, background: c.border }} />
+          <div className="rounded-xl flex flex-col flex-1 min-h-0" style={{ background: c.cardBg, border: `1px solid ${c.border}` }}>
+            <div className="flex flex-col items-center justify-center h-full min-h-[220px]">
+              {cfg.showTrashed
+                ? <Trash2 className="w-7 h-7 mb-3" style={{ color: c.muted }} />
+                : cfg.showArchived
+                  ? <Archive className="w-7 h-7 mb-3" style={{ color: c.muted }} />
+                  : <FileText className="w-7 h-7 mb-3" style={{ color: c.muted }} />}
+              <span className="text-[13px] font-medium" style={{ fontFamily: FONT, color: c.text }}>
+                {cfg.showTrashed ? "Trash is empty" : cfg.showArchived ? "Nothing archived" : cfg.emptyTitle}
+              </span>
+              <span className="text-[11px] mt-1 max-w-[360px] text-center" style={{ fontFamily: FONT, color: c.muted }}>
+                {cfg.showTrashed ? "Deleted documents will appear here." : cfg.showArchived ? "Archived documents will appear here." : cfg.emptyHint}
+              </span>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    /* ── Table view (default for Policy Docs) ── */
+    const renderTable = () => {
+      const tpl = cfg.showPolicyCols ? "1.3fr 1.3fr 1fr 2fr 1fr 110px" : "1.5fr 3fr 110px";
+      const headers = cfg.showPolicyCols
+        ? ["Policy #", "LOB", "Document Type", "Document Name", "Date", ""]
+        : ["Upload Date", "Document Name", ""];
+      return (
+        <div className="rounded-xl overflow-hidden flex flex-col flex-1 min-h-0" style={{ background: c.cardBg, border: `1px solid ${c.border}` }}>
+          <div className="grid px-5 py-3 gap-4" style={{ gridTemplateColumns: tpl, borderBottom: `1px solid ${c.border}`, background: c.mutedBg }}>
+            {headers.map((h, i) => (
+              <div key={i} className="text-[11px] font-bold uppercase tracking-wider" style={{ fontFamily: FONT, color: c.muted }}>{h}</div>
+            ))}
+          </div>
+          <div className="overflow-y-auto flex-1">
+            {visible.map((d, i, arr) => (
+              <div key={d.id} className="grid px-5 py-3.5 items-center gap-4 transition-colors"
+                style={{ gridTemplateColumns: tpl, borderBottom: i !== arr.length - 1 ? `1px solid ${c.border}` : "none" }}
+                onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+                onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                onContextMenu={cfg.enableContextMenu ? e => { e.preventDefault(); setFileCtxMenu({ x: e.clientX, y: e.clientY, docId: d.id }); } : undefined}>
+                {cfg.showPolicyCols ? (
+                  <>
+                    <div className="text-[12px] font-medium" style={{ fontFamily: FONT, color: c.text }}>{d.policyNumber || "—"}</div>
+                    <div className="text-[12px]" style={{ fontFamily: FONT, color: c.muted }}>{d.lob || "—"}</div>
+                    <div className="text-[12px]" style={{ fontFamily: FONT, color: c.muted }}>{d.docType || d.category}</div>
+                    <div className="flex items-center gap-2.5 min-w-0"><DocIcon d={d} /><NameCell d={d} /></div>
+                    <div className="text-[12px]" style={{ fontFamily: FONT, color: c.muted }}>{new Date(d.uploadDate).toLocaleDateString()}</div>
+                  </>
+                ) : (
+                  <>
+                    <div className="text-[12px]" style={{ fontFamily: FONT, color: c.muted }}>{new Date(d.uploadDate).toLocaleDateString()}</div>
+                    <div className="flex items-center gap-2.5 min-w-0"><DocIcon d={d} /><NameCell d={d} /></div>
+                  </>
+                )}
+                <RowActions d={d} />
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    };
+
+    /* ── All Documents view (flat list with category chip) ── */
+    const renderAll = () => (
+      <div className="rounded-xl overflow-hidden flex flex-col flex-1 min-h-0" style={{ background: c.cardBg, border: `1px solid ${c.border}` }}>
+        <div className="overflow-y-auto flex-1">
+          {visible.map((d, i, arr) => (
+            <div key={d.id} className="flex items-center gap-3 px-5 py-3 transition-colors"
+              style={{ borderBottom: i !== arr.length - 1 ? `1px solid ${c.border}` : "none" }}
+              onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+              onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+              onContextMenu={cfg.enableContextMenu ? e => { e.preventDefault(); setFileCtxMenu({ x: e.clientX, y: e.clientY, docId: d.id }); } : undefined}>
+              <DocIcon d={d} />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <NameCell d={d} />
+                  <span className="flex-shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded" style={{ fontFamily: FONT, color: "#A614C3", background: "rgba(168,85,247,0.10)" }}>{d.category}</span>
+                  {archivedDocIds.has(d.id) && !deletedDocIds.has(d.id) && (
+                    <span className="flex-shrink-0 text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded" style={{ fontFamily: FONT, color: c.muted, background: c.hoverBg }}>Archived</span>
+                  )}
+                </div>
+                <div className="text-[11px]" style={{ fontFamily: FONT, color: c.muted }}>{new Date(d.uploadDate).toLocaleDateString()}{d.policyNumber ? ` · ${d.policyNumber}` : ""}</div>
+              </div>
+              <RowActions d={d} />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+
+    /* ── By Type view (grouped sections) ── */
+    const renderByType = () => {
+      const groups: Record<string, Document[]> = {};
+      for (const d of visible) {
+        (groups[d.category] ||= []).push(d);
+      }
+      const cats = Object.keys(groups);
+      return (
+        <div className="overflow-y-auto flex-1">
+          {cats.map(cat => (
+            <div key={cat} className="rounded-xl mb-3" style={{ background: c.cardBg, border: `1px solid ${c.border}` }}>
+              <div className="flex items-center gap-2 px-5 py-2.5" style={{ borderBottom: `1px solid ${c.border}` }}>
+                <FolderOpen className="w-4 h-4" style={{ color: "#A855F7" }} />
+                <span className="text-[13px] font-bold" style={{ fontFamily: FONT, color: c.text }}>{cat}</span>
+                <span className="text-[12px]" style={{ fontFamily: FONT, color: c.muted }}>({groups[cat].length})</span>
+              </div>
+              {groups[cat].map((d, i, arr) => (
+                <div key={d.id} className="flex items-center gap-3 px-5 py-2.5 transition-colors"
+                  style={{ borderBottom: i !== arr.length - 1 ? `1px solid ${c.border}` : "none" }}
+                  onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+                  onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                  onContextMenu={cfg.enableContextMenu ? e => { e.preventDefault(); setFileCtxMenu({ x: e.clientX, y: e.clientY, docId: d.id }); } : undefined}>
+                  <DocIcon d={d} />
+                  <div className="flex-1 min-w-0">
+                    <NameCell d={d} />
+                    <div className="text-[11px]" style={{ fontFamily: FONT, color: c.muted }}>{new Date(d.uploadDate).toLocaleDateString()}{d.policyNumber ? ` · ${d.policyNumber}` : ""}</div>
+                  </div>
+                  <RowActions d={d} />
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      );
+    };
+
+    const SyncBanner = cfg.syncSource && !cfg.showArchived && !cfg.showTrashed ? (
+      <div className="flex items-center gap-2 px-5 py-2 mb-3 rounded-lg text-[12px] flex-shrink-0"
+        style={{ fontFamily: FONT, color: c.muted, background: c.cardBg, border: `1px solid ${c.border}` }}>
+        <RefreshCw className="w-3.5 h-3.5" style={{ color: "#A855F7" }} />
+        <span>Synced from <strong style={{ background: "linear-gradient(88.54deg,#5C2ED4 0.1%,#A614C3 63.88%) text", WebkitTextFillColor: "transparent" }}>{cfg.syncSource}</strong> · 5 min ago</span>
+        <button className="ml-auto font-semibold transition-opacity hover:opacity-80"
+          style={{ background: "linear-gradient(88.54deg,#5C2ED4 0.1%,#A614C3 63.88%) text", WebkitTextFillColor: "transparent" }}>
+          Sync now
+        </button>
+      </div>
+    ) : null;
+
+    const previewVisible = !!previewDoc && cfg.docPredicate(previewDoc);
+    const PreviewPane = previewVisible ? (
+      <div className="rounded-xl flex flex-col min-h-0 transition-all"
+        style={{ flex: previewExpanded ? "1 1 100%" : "1 1 60%", background: c.cardBg, border: `1px solid ${c.border}` }}>
+        <div className="flex items-center justify-between px-5 py-3 flex-shrink-0" style={{ borderBottom: `1px solid ${c.border}` }}>
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+              style={{ background: previewDoc!.type === "PDF" ? "rgba(239,68,68,0.10)" : "rgba(34,197,94,0.10)" }}>
+              {previewDoc!.type === "PDF"
+                ? <FileText className="w-4 h-4" style={{ color: "#EF4444" }} />
+                : <FileArchive className="w-4 h-4" style={{ color: "#22C55E" }} />}
+            </div>
+            <div className="min-w-0">
+              <div className="text-[13px] font-semibold truncate" style={{ fontFamily: FONT, color: c.text }}>{previewDoc!.name}</div>
+              <div className="text-[11px]" style={{ fontFamily: FONT, color: c.muted }}>
+                {new Date(previewDoc!.uploadDate).toLocaleDateString()} · {previewDoc!.type} · {previewDoc!.size}{previewDoc!.policyNumber ? ` · ${previewDoc!.policyNumber}` : ""}
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-1 flex-shrink-0">
+            <button title="Download" className="p-1.5 rounded transition-colors" style={{ color: c.muted }}
+              onMouseEnter={e => { e.currentTarget.style.background = c.hoverBg; e.currentTarget.style.color = c.text; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = c.muted; }}>
+              <Download className="w-4 h-4" />
+            </button>
+            <button title={previewExpanded ? "Collapse" : "Expand"} onClick={() => setPreviewExpanded(p => !p)} className="p-1.5 rounded transition-colors"
+              style={{ color: previewExpanded ? "#A855F7" : c.muted }}
+              onMouseEnter={e => { if (!previewExpanded) { e.currentTarget.style.background = c.hoverBg; e.currentTarget.style.color = c.text; } }}
+              onMouseLeave={e => { if (!previewExpanded) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = c.muted; } }}>
+              {previewExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+            </button>
+            <button title="Close" onClick={() => { setPreviewDoc(null); setPreviewExpanded(false); }} className="p-1.5 rounded transition-colors" style={{ color: c.muted }}
+              onMouseEnter={e => { e.currentTarget.style.background = c.hoverBg; e.currentTarget.style.color = c.text; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = c.muted; }}>
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+        {/* Faux preview body — mock rendering since we don't have real files. */}
+        <div className="flex-1 overflow-auto p-6" style={{ background: isDark ? "rgba(0,0,0,0.18)" : "#F3F4F6" }}>
+          <div className="mx-auto rounded-md shadow-sm p-10"
+            style={{ background: "#FFFFFF", maxWidth: 560, minHeight: "100%", border: `1px solid ${isDark ? "rgba(255,255,255,0.10)" : "#E5E7EB"}` }}>
+            <div className="text-[18px] font-bold mb-1" style={{ fontFamily: FONT, color: "#1F2937" }}>{previewDoc!.name}</div>
+            <div className="text-[11px] uppercase tracking-wider mb-6" style={{ fontFamily: FONT, color: "#6B7280", letterSpacing: "0.06em" }}>{previewDoc!.category}{previewDoc!.lob ? ` · ${previewDoc!.lob}` : ""}</div>
+            <div className="space-y-2.5">
+              {Array.from({ length: 14 }).map((_, i) => (
+                <div key={i} className="rounded" style={{ height: 8, background: "#E5E7EB", width: `${65 + ((i * 17) % 30)}%` }} />
+              ))}
+            </div>
+            <div className="mt-8 pt-6 text-[11px]" style={{ fontFamily: FONT, color: "#9CA3AF", borderTop: "1px solid #F3F4F6" }}>
+              Preview is a stub. In production, this pane would render the actual document via PDF/image viewer.
+            </div>
+          </div>
+        </div>
+      </div>
+    ) : null;
+
+    return (
+      <div className="flex flex-1 min-h-0 gap-4">
+        {!(previewVisible && previewExpanded) && (
+          <div className="flex flex-col min-h-0 transition-all"
+            style={{ flex: previewVisible ? "0 0 42%" : "1 1 100%", minWidth: 0 }}>
+            {Toolbar}
+            <div className="flex-shrink-0 mb-3" style={{ height: 1, background: c.border }} />
+            {SyncBanner}
+            {(cfg.showArchived || cfg.showTrashed) ? renderAll() : (
+              cfg.view === "table" ? renderTable() : cfg.view === "byType" ? renderByType() : renderAll()
+            )}
+          </div>
+        )}
+        {PreviewPane}
+      </div>
+    );
+  };
+
   return (
     <div className="flex flex-col flex-1 min-h-0" style={{ fontFamily: FONT }} onClick={() => setOpenMenuId(null)}>
       {sectionTitle}
@@ -1327,14 +1882,44 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
             <input id={id} value={editFields[key] || ""} onChange={e => setEditFields(f => ({ ...f, [key]: e.target.value }))} placeholder={placeholder} style={inpSty} className="outline-none" />
           </div>
         );
-        const editSelect = (label: string, key: string, options: string[]) => (
-          <div style={{ position: "relative" }}>
-            <label style={lblSty}>{label}:</label>
-            <select value={editFields[key] || options[0]} onChange={e => setEditFields(f => ({ ...f, [key]: e.target.value }))} style={{ ...inpSty, appearance: "none" as const }} className="outline-none cursor-pointer">
-              {options.map(o => <option key={o}>{o}</option>)}
-            </select>
-            <ChevronDown className="absolute right-3 w-3.5 h-3.5 pointer-events-none" style={{ color: c.muted, bottom: 10 }} />
-          </div>
+        const editSelect = (label: string, key: string, options: string[]) => {
+          const current = editFields[key] || options[0];
+          const open = editSelectOpen === key;
+          return (
+            <div style={{ position: "relative" }} onClick={e => e.stopPropagation()}>
+              <label style={lblSty}>{label}:</label>
+              <button type="button" onClick={() => setEditSelectOpen(open ? null : key)}
+                className="w-full flex items-center justify-between outline-none"
+                style={{ ...inpSty, cursor: "pointer" }}>
+                <span style={{ color: current ? c.text : c.muted }}>{current}</span>
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${open ? "rotate-180" : ""}`} style={{ color: c.muted }} />
+              </button>
+              {open && (
+                <div className="absolute left-0 right-0 top-full mt-1 z-20 rounded-lg overflow-hidden"
+                  style={{ background: c.cardBg, border: `1px solid ${c.border}`, boxShadow: "0 8px 24px rgba(0,0,0,0.12)" }}>
+                  {options.map(o => {
+                    const active = current === o;
+                    return (
+                      <button key={o} type="button" onClick={() => { setEditFields(f => ({ ...f, [key]: o })); setEditSelectOpen(null); }}
+                        className="w-full text-left px-3 py-2 text-[13px] flex items-center justify-between transition-colors"
+                        style={{ fontFamily: FONT, color: active ? "#A614C3" : c.text, background: active ? "rgba(168,85,247,0.08)" : "transparent" }}
+                        onMouseEnter={e => { if (!active) e.currentTarget.style.background = c.hoverBg; }}
+                        onMouseLeave={e => { if (!active) e.currentTarget.style.background = "transparent"; }}>
+                        <span>{o}</span>
+                        {active && <svg width="10" height="8" viewBox="0 0 9 7" fill="none"><path d="M1 3.5L3.5 6L8 1" stroke="#A614C3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        };
+        // Derive the effective contacts list: override (post-save) > seeded > one-off legacy fallback.
+        const effectiveContacts: ClientContact[] = (contactsOverrides[selected.id]) || selected.contacts || (
+          selected.inspectionFirstName && selected.inspectionLastName
+            ? [{ id: `${selected.id}-legacy-insp`, type: "inspection", firstName: selected.inspectionFirstName, lastName: selected.inspectionLastName, phone: selected.phone, email: selected.email }]
+            : []
         );
         const startEditInfo = () => {
           setEditFields({
@@ -1345,6 +1930,7 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
             grossSales: "", payroll: "", owners: "", employees: "",
             firstName: selected.firstName || "", lastName: selected.lastName || "",
           });
+          setContactsDraft(effectiveContacts.map(c => ({ ...c })));
           setEditingInfo(true);
         };
         const startEditAddr = () => {
@@ -1377,21 +1963,16 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
 
             {!editingInfo ? (
               /* ── View Mode ── */
+              <>
               <div className="grid gap-x-8 gap-y-5" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
                 {selected.type !== "Individual" ? (<>
                   {viewField("Company Name", selected.companyName)}
                   {viewField("DBA Name or Operating Name", selected.dbaName)}
                   {viewField("Agency Type", selected.type, true)}
-                  {viewField("Contact Name", selected.contactFirstName && selected.contactLastName ? `${selected.contactFirstName} ${selected.contactLastName}` : undefined)}
-                  {viewField("Inspection Name", selected.inspectionFirstName && selected.inspectionLastName ? `${selected.inspectionFirstName} ${selected.inspectionLastName}` : undefined)}
-                  <div />
                 </>) : (<>
                   {viewField("First Name", selected.firstName)}
                   {viewField("Last Name", selected.lastName)}
                   {viewField("Agency Type", selected.type, true)}
-                  {viewField("Contact Name", selected.contactFirstName && selected.contactLastName ? `${selected.contactFirstName} ${selected.contactLastName}` : undefined)}
-                  {viewField("Inspection Name", selected.inspectionFirstName && selected.inspectionLastName ? `${selected.inspectionFirstName} ${selected.inspectionLastName}` : undefined)}
-                  <div />
                 </>)}
                 {viewField("Email", selected.email)}
                 {viewField("Phone Number", selected.phone)}
@@ -1404,6 +1985,52 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
                 {viewField("# Owners", selected.owners)}
                 {viewField("# Employees", selected.employees)}
               </div>
+              {/* Contacts (ACORD: inspection / accounting / claims) */}
+              <div className="mt-6 pt-5" style={{ borderTop: `1px solid ${c.border}` }}>
+                <div className="text-[12px] font-semibold mb-3" style={{ fontFamily: FONT, color: c.muted }}>Contacts</div>
+                {effectiveContacts.length === 0 ? (
+                  <div className="text-[13px]" style={{ fontFamily: FONT, color: c.muted }}>No contacts on file. Click Edit to add one.</div>
+                ) : (
+                  <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
+                    {effectiveContacts.map(ct => {
+                      const palette = CONTACT_TYPE_PALETTE[ct.type];
+                      const initials = `${ct.firstName?.[0] ?? ""}${ct.lastName?.[0] ?? ""}`.toUpperCase() || "—";
+                      return (
+                        <div key={ct.id} className="rounded-xl p-4 transition-all"
+                          style={{ background: c.cardBg, border: `1px solid ${c.border}`, position: "relative", overflow: "hidden" }}
+                          onMouseEnter={e => { e.currentTarget.style.borderColor = palette.color; e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.boxShadow = `0 4px 12px ${palette.bg}`; }}
+                          onMouseLeave={e => { e.currentTarget.style.borderColor = c.border; e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "none"; }}>
+                          {/* Left accent bar */}
+                          <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: palette.color }} />
+                          <div className="flex items-center gap-2.5 mb-2.5">
+                            <div className="flex items-center justify-center flex-shrink-0 rounded-full"
+                              style={{ width: 30, height: 30, background: palette.bg, color: palette.color, fontFamily: FONT, fontSize: 11, fontWeight: 700, letterSpacing: "0.02em" }}>
+                              {initials}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="text-[10px] font-bold uppercase tracking-wider truncate" style={{ fontFamily: FONT, color: palette.color, letterSpacing: "0.08em" }}>{ct.type}</div>
+                              <div className="text-[13px] font-semibold truncate" style={{ fontFamily: FONT, color: c.text }}>{ct.firstName} {ct.lastName}</div>
+                            </div>
+                          </div>
+                          {ct.phone && (
+                            <div className="flex items-center gap-1.5 text-[12px] mb-1" style={{ fontFamily: FONT, color: c.muted }}>
+                              <Phone className="w-3 h-3 flex-shrink-0" />
+                              <span className="truncate">{ct.phone}</span>
+                            </div>
+                          )}
+                          {ct.email && (
+                            <div className="flex items-center gap-1.5 text-[12px]" style={{ fontFamily: FONT, color: c.muted }}>
+                              <Mail className="w-3 h-3 flex-shrink-0" />
+                              <a href={`mailto:${ct.email}`} className="truncate hover:underline" onClick={e => e.stopPropagation()}>{ct.email}</a>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+              </>
             ) : (
               /* ── Edit Mode ── */
               <>
@@ -1412,16 +2039,10 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
                     {editField("Company Name", "companyName")}
                     {editField("DBA Name or Operating Name", "dbaName")}
                     {editSelect("Entity", "agencyType", ["Individual", "Corporation", "LLC", "Partnership"])}
-                    {editField("Contact Name", "contactName", undefined, "edit-contact-name-input")}
-                    {editField("Inspection Name", "inspectionName")}
-                    <div />
                   </>) : (<>
                     {editField("First Name", "firstName")}
                     {editField("Last Name", "lastName")}
                     {editSelect("Entity", "agencyType", ["Individual", "Corporation", "LLC", "Partnership"])}
-                    {editField("Contact Name", "contactName", undefined, "edit-contact-name-input")}
-                    {editField("Inspection Name", "inspectionName")}
-                    <div />
                   </>)}
                   {editField("Email", "email")}
                   {editField("Phone Number", "phone")}
@@ -1434,10 +2055,73 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
                   {editField("# Owners", "owners", "3")}
                   {editField("# Employees", "employees", "$1000")}
                 </div>
+                {/* Editable contacts list */}
+                <div className="mt-6 pt-5" style={{ borderTop: `1px solid ${c.border}` }}>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="text-[12px] font-semibold" style={{ fontFamily: FONT, color: c.muted }}>Contacts</div>
+                    <span className="text-[11px]" style={{ fontFamily: FONT, color: c.muted }}>{contactsDraft.length} contact{contactsDraft.length === 1 ? "" : "s"}</span>
+                  </div>
+                  {contactsDraft.length === 0 && (
+                    <div className="text-[12px] mb-3 px-3 py-2 rounded-lg" style={{ fontFamily: FONT, color: c.muted, background: c.mutedBg, border: `1px dashed ${c.border}` }}>
+                      No contacts yet. Add one below.
+                    </div>
+                  )}
+                  <div className="space-y-3">
+                    {contactsDraft.map((ct, idx) => (
+                      <div key={ct.id} className="rounded-lg p-3" style={{ background: c.cardBg, border: `1px solid ${c.border}` }}>
+                        <div className="grid gap-3 items-start" style={{ gridTemplateColumns: "120px 1fr 1fr 1fr 1fr 32px" }}>
+                          <select value={ct.type}
+                            onChange={e => setContactsDraft(prev => prev.map((p,i) => i===idx ? { ...p, type: e.target.value as ClientContactType } : p))}
+                            className="px-2 py-1.5 rounded-md outline-none text-[12px] font-semibold uppercase"
+                            style={{ fontFamily: FONT, background: "rgba(168,85,247,0.10)", border: `1px solid ${c.border}`, color: "#A614C3" }}>
+                            <option value="inspection">Inspection</option>
+                            <option value="accounting">Accounting</option>
+                            <option value="claims">Claims</option>
+                          </select>
+                          <input value={ct.firstName} placeholder="First name"
+                            onChange={e => setContactsDraft(prev => prev.map((p,i) => i===idx ? { ...p, firstName: e.target.value } : p))}
+                            className="px-2 py-1.5 rounded-md outline-none text-[12px]"
+                            style={{ fontFamily: FONT, background: c.cardBg, border: `1px solid ${c.border}`, color: c.text }} />
+                          <input value={ct.lastName} placeholder="Last name"
+                            onChange={e => setContactsDraft(prev => prev.map((p,i) => i===idx ? { ...p, lastName: e.target.value } : p))}
+                            className="px-2 py-1.5 rounded-md outline-none text-[12px]"
+                            style={{ fontFamily: FONT, background: c.cardBg, border: `1px solid ${c.border}`, color: c.text }} />
+                          <input value={ct.phone || ""} placeholder="Phone"
+                            onChange={e => setContactsDraft(prev => prev.map((p,i) => i===idx ? { ...p, phone: e.target.value } : p))}
+                            className="px-2 py-1.5 rounded-md outline-none text-[12px]"
+                            style={{ fontFamily: FONT, background: c.cardBg, border: `1px solid ${c.border}`, color: c.text }} />
+                          <input value={ct.email || ""} placeholder="Email"
+                            onChange={e => setContactsDraft(prev => prev.map((p,i) => i===idx ? { ...p, email: e.target.value } : p))}
+                            className="px-2 py-1.5 rounded-md outline-none text-[12px]"
+                            style={{ fontFamily: FONT, background: c.cardBg, border: `1px solid ${c.border}`, color: c.text }} />
+                          <button title="Remove contact"
+                            onClick={() => setContactsDraft(prev => prev.filter((_,i) => i !== idx))}
+                            className="flex items-center justify-center w-8 h-8 rounded-md transition-colors"
+                            style={{ color: c.muted }}
+                            onMouseEnter={e => { e.currentTarget.style.background = "rgba(239,68,68,0.10)"; e.currentTarget.style.color = "#EF4444"; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = c.muted; }}>
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <button onClick={() => setContactsDraft(prev => [...prev, { id: `new-${Date.now()}`, type: "inspection", firstName: "", lastName: "", phone: "", email: "" }])}
+                    className="mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-colors"
+                    style={{ fontFamily: FONT, border: `1px dashed ${c.border}`, color: c.text, background: "transparent" }}
+                    onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+                    onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                    <Plus className="w-3.5 h-3.5" />Add another contact
+                  </button>
+                </div>
                 <div className="flex items-center justify-between mt-6 pt-4" style={{ borderTop: `1px solid ${c.border}` }}>
                   <button onClick={() => setEditingInfo(false)} className="px-4 py-[7px] rounded-lg text-[12px] font-normal"
-                    style={{ fontFamily: FONT, border: `1px solid #E5E7EB`, color: c.text, background: "linear-gradient(to bottom, rgba(255,255,255,0.10), rgba(192,192,192,0.10), rgba(172,172,172,0.10))" }}>Cancel</button>
-                  <button onClick={() => setEditingInfo(false)} className="px-5 py-[7px] rounded-lg text-[12px] font-semibold text-white"
+                    style={{ fontFamily: FONT, border: `1px solid #E5E7EB`, color: c.text, background: "#FFFFFF" }}>Cancel</button>
+                  <button onClick={() => {
+                      setContactsOverrides(prev => ({ ...prev, [selected.id]: contactsDraft.filter(ct => ct.firstName.trim() || ct.lastName.trim()) }));
+                      setEditingInfo(false);
+                    }}
+                    className="px-5 py-[7px] rounded-lg text-[12px] font-semibold text-white"
                     style={{ fontFamily: FONT, background: c.accentGrad }}>Save Changes</button>
                 </div>
               </>
@@ -1522,8 +2206,8 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
                   <label className="flex items-center gap-2 mb-3 cursor-pointer select-none" style={{ fontFamily: FONT, fontSize: 12, color: c.text }}>
                     <div onClick={() => setEditFields(f => ({ ...f, sameAddr: f.sameAddr === "true" ? "false" : "true" }))}
                       className="w-[16px] h-[16px] rounded flex items-center justify-center flex-shrink-0"
-                      style={{ background: c.inputBg, border: `1.5px solid ${c.border}` }}>
-                      {editFields.sameAddr === "true" && <svg width="9" height="7" viewBox="0 0 9 7" fill="none"><path d="M1 3.5L3 5.5L8 1" stroke="#73C9B7" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                      style={{ background: editFields.sameAddr === "true" ? "linear-gradient(88.54deg, #5C2ED4 0.1%, #A614C3 63.88%)" : c.inputBg, border: editFields.sameAddr === "true" ? "none" : `1.5px solid ${c.border}` }}>
+                      {editFields.sameAddr === "true" && <svg width="9" height="7" viewBox="0 0 9 7" fill="none"><path d="M1 3.5L3 5.5L8 1" stroke="#FFFFFF" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>}
                     </div>
                     Same as Agency Address
                   </label>
@@ -1571,7 +2255,7 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
 
                 <div className="flex items-center justify-between pt-4" style={{ borderTop: `1px solid ${c.border}` }}>
                   <button onClick={() => setEditingAddr(false)} className="px-4 py-[7px] rounded-lg text-[12px] font-normal"
-                    style={{ fontFamily: FONT, border: `1px solid #E5E7EB`, color: c.text, background: "linear-gradient(to bottom, rgba(255,255,255,0.10), rgba(192,192,192,0.10), rgba(172,172,172,0.10))" }}>Cancel</button>
+                    style={{ fontFamily: FONT, border: `1px solid #E5E7EB`, color: c.text, background: "#FFFFFF" }}>Cancel</button>
                   <button onClick={() => setEditingAddr(false)} className="px-5 py-[7px] rounded-lg text-[12px] font-semibold text-white"
                     style={{ fontFamily: FONT, background: c.accentGrad }}>Save Changes</button>
                 </div>
@@ -1601,28 +2285,73 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
               <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none" style={{ color: c.muted }} />
             </div>
             <div className="flex items-center gap-1 ml-1" style={{ borderLeft: `1px solid ${c.border}`, paddingLeft: 10 }}>
-              <button className="p-2 rounded-lg transition-colors" style={{ color: "#A614C3" }}
+              <button title="Reset filters" onClick={() => { setQpStatusFilter("All Statuses"); setApplicantFilter(new Set()); setProducerFilter(new Set()); setQpSortKey("createdDate"); setQpSortDir("desc"); }}
+                className="p-2 rounded-lg transition-colors" style={{ color: "#A614C3" }}
                 onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)} onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
                 <RefreshCw className="w-4 h-4" /></button>
-              <button className="p-2 rounded-lg transition-colors" style={{ color: "#A614C3" }}
-                onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)} onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-                <LayoutGrid className="w-4 h-4" /></button>
-              <button className="p-2 rounded-lg transition-colors" style={{ color: "#A614C3" }}
+              <div className="relative" onClick={e => e.stopPropagation()}>
+                <button title="View columns" onClick={() => setQpViewOpen(o => !o)}
+                  className="p-2 rounded-lg transition-colors"
+                  style={{ color: "#A614C3", background: qpViewOpen ? c.hoverBg : "transparent" }}
+                  onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+                  onMouseLeave={e => (e.currentTarget.style.background = qpViewOpen ? c.hoverBg : "transparent")}>
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="5" height="5" x="2" y="2" rx="1"/><rect width="5" height="5" x="9.5" y="2" rx="1"/><rect width="5" height="5" x="17" y="2" rx="1"/><rect width="5" height="5" x="2" y="9.5" rx="1"/><rect width="5" height="5" x="9.5" y="9.5" rx="1"/><rect width="5" height="5" x="17" y="9.5" rx="1"/><rect width="5" height="5" x="2" y="17" rx="1"/><rect width="5" height="5" x="9.5" y="17" rx="1"/><rect width="5" height="5" x="17" y="17" rx="1"/></svg>
+                </button>
+                {qpViewOpen && (
+                  <div className="absolute right-0 top-full mt-1 z-30 w-[220px] rounded-xl shadow-xl overflow-hidden"
+                    style={{ background: c.cardBg, border: `1px solid ${c.border}` }}>
+                    <div className="px-4 py-2.5 text-[11px] uppercase tracking-wider font-semibold"
+                      style={{ fontFamily: FONT, color: c.muted, borderBottom: `1px solid ${c.border}`, letterSpacing: "0.06em" }}>
+                      Show Columns
+                    </div>
+                    <div className="py-1.5 max-h-[280px] overflow-y-auto">
+                      {QP_COLUMNS.map(col => {
+                        const visible = !qpHiddenCols.has(col.key);
+                        return (
+                          <label key={col.key} className="flex items-center gap-2.5 px-4 py-2 cursor-pointer transition-colors"
+                            onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+                            onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                            onClick={() => setQpHiddenCols(prev => { const s = new Set(prev); s.has(col.key) ? s.delete(col.key) : s.add(col.key); return s; })}>
+                            <div className="flex items-center justify-center w-4 h-4 rounded flex-shrink-0"
+                              style={{ border: `1.5px solid ${c.borderStrong}`, background: c.cardBg }}>
+                              {visible && <svg width="9" height="7" viewBox="0 0 9 7" fill="none"><path d="M1 3.5L3.5 6L8 1" stroke="#A614C3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                            </div>
+                            <span className="text-[12px]" style={{ fontFamily: FONT, color: c.text }}>{col.label}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                    <button onClick={() => setQpHiddenCols(new Set())}
+                      className="w-full flex items-center justify-center gap-2 py-3 text-[12px] font-semibold transition-colors"
+                      style={{ fontFamily: FONT, color: "#A614C3", borderTop: `1px solid ${c.border}` }}
+                      onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+                      onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                      <RefreshCw className="w-3.5 h-3.5" />Show All
+                    </button>
+                  </div>
+                )}
+              </div>
+              <button title="Export" className="p-2 rounded-lg transition-colors" style={{ color: "#A614C3" }}
                 onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)} onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
                 <Download className="w-4 h-4" /></button>
             </div>
           </div>
           <div className="rounded-xl overflow-hidden flex flex-col flex-1 min-h-0" style={{ background: c.cardBg, border: `1px solid ${c.border}` }}>
-            <div className="grid px-5 py-3 gap-4" style={{ gridTemplateColumns:"1.1fr 1.6fr 1.2fr 1fr 1.1fr 1.1fr 1.2fr 1.2fr", borderBottom:`1px solid ${c.border}`, background:c.mutedBg }}>
+            <div className="grid px-5 py-3 gap-4" style={{ gridTemplateColumns:qpGridTemplate, borderBottom:`1px solid ${c.border}`, background:c.mutedBg }}>
               {/* Created */}
+              {!qpHiddenCols.has("created") && (
               <button onClick={()=>{if(qpSortKey==="createdDate")setQpSortDir(d=>d==="asc"?"desc":"asc");else{setQpSortKey("createdDate");setQpSortDir("asc");}}} className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider cursor-pointer select-none text-left" style={{fontFamily:FONT,color:c.muted}}>
                 Created<span className="inline-flex ml-0.5"><svg width="14" height="9" viewBox="0 0 14 9" fill="none"><path d="M4 8V1M4 1L2 3M4 1L6 3" stroke={qpSortKey==="createdDate"&&qpSortDir==="asc"?(isDark?"#fff":"#374151"):c.sub} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/><path d="M10 1V8M10 8L8 6M10 8L12 6" stroke={qpSortKey==="createdDate"&&qpSortDir==="desc"?(isDark?"#fff":"#374151"):c.sub} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg></span>
               </button>
+              )}
               {/* Policy Number (sortable) */}
+              {!qpHiddenCols.has("policyNumber") && (
               <button onClick={()=>{if(qpSortKey==="policyNumber")setQpSortDir(d=>d==="asc"?"desc":"asc");else{setQpSortKey("policyNumber");setQpSortDir("asc");}}} className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider cursor-pointer select-none text-left" style={{fontFamily:FONT,color:c.muted}}>
                 Policy Number<span className="inline-flex ml-0.5"><svg width="14" height="9" viewBox="0 0 14 9" fill="none"><path d="M4 8V1M4 1L2 3M4 1L6 3" stroke={qpSortKey==="policyNumber"&&qpSortDir==="asc"?(isDark?"#fff":"#374151"):c.sub} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/><path d="M10 1V8M10 8L8 6M10 8L12 6" stroke={qpSortKey==="policyNumber"&&qpSortDir==="desc"?(isDark?"#fff":"#374151"):c.sub} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg></span>
               </button>
+              )}
               {/* Applicant filter */}
+              {!qpHiddenCols.has("applicant") && (
               <div className="relative">
                 <button onClick={()=>{closeAllQpDropdowns();setApplicantOpen(o=>!o);}} className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider cursor-pointer select-none" style={{fontFamily:FONT,color:applicantFilter.size>0?"#A614C3":c.muted}}>
                   Applicant<span className="inline-flex ml-1"><svg width="7" height="5" viewBox="0 0 7 5" fill="none"><path d="M3.5 5L0.5 0H6.5L3.5 5Z" fill={applicantFilter.size>0?"#A614C3":c.sub}/></svg></span>
@@ -1653,15 +2382,21 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
                   </div>
                 </>)}
               </div>
+              )}
               {/* DBA (sortable) */}
+              {!qpHiddenCols.has("dba") && (
               <button onClick={()=>{if(qpSortKey==="dba")setQpSortDir(d=>d==="asc"?"desc":"asc");else{setQpSortKey("dba");setQpSortDir("asc");}}} className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider cursor-pointer select-none text-left" style={{fontFamily:FONT,color:c.muted}}>
                 DBA<span className="inline-flex ml-0.5"><svg width="14" height="9" viewBox="0 0 14 9" fill="none"><path d="M4 8V1M4 1L2 3M4 1L6 3" stroke={qpSortKey==="dba"&&qpSortDir==="asc"?(isDark?"#fff":"#374151"):c.sub} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/><path d="M10 1V8M10 8L8 6M10 8L12 6" stroke={qpSortKey==="dba"&&qpSortDir==="desc"?(isDark?"#fff":"#374151"):c.sub} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg></span>
               </button>
+              )}
               {/* Effective (sortable) */}
+              {!qpHiddenCols.has("effective") && (
               <button onClick={()=>{if(qpSortKey==="effectiveDate")setQpSortDir(d=>d==="asc"?"desc":"asc");else{setQpSortKey("effectiveDate");setQpSortDir("asc");}}} className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider cursor-pointer select-none text-left" style={{fontFamily:FONT,color:c.muted}}>
                 Effective<span className="inline-flex ml-0.5"><svg width="14" height="9" viewBox="0 0 14 9" fill="none"><path d="M4 8V1M4 1L2 3M4 1L6 3" stroke={qpSortKey==="effectiveDate"&&qpSortDir==="asc"?(isDark?"#fff":"#374151"):c.sub} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/><path d="M10 1V8M10 8L8 6M10 8L12 6" stroke={qpSortKey==="effectiveDate"&&qpSortDir==="desc"?(isDark?"#fff":"#374151"):c.sub} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg></span>
               </button>
+              )}
               {/* LOB filter */}
+              {!qpHiddenCols.has("lob") && (
               <div className="relative">
                 <button onClick={()=>{closeAllQpDropdowns();setLobOpen(o=>!o);}} className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider cursor-pointer select-none" style={{fontFamily:FONT,color:lobFilter!=="All LOBs"?"#A614C3":c.muted}}>
                   LOB<span className="inline-flex ml-1"><svg width="7" height="5" viewBox="0 0 7 5" fill="none"><path d="M3.5 5L0.5 0H6.5L3.5 5Z" fill={lobFilter!=="All LOBs"?"#A614C3":c.sub}/></svg></span>
@@ -1678,7 +2413,9 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
                   </div>
                 </>)}
               </div>
+              )}
               {/* Status filter */}
+              {!qpHiddenCols.has("status") && (
               <div className="relative">
                 <button onClick={()=>{closeAllQpDropdowns();setQpStatusOpen(o=>!o);}} className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider cursor-pointer select-none" style={{fontFamily:FONT,color:qpStatusFilter!=="All Statuses"?"#A614C3":c.muted}}>
                   Status<span className="inline-flex ml-1"><svg width="7" height="5" viewBox="0 0 7 5" fill="none"><path d="M3.5 5L0.5 0H6.5L3.5 5Z" fill={qpStatusFilter!=="All Statuses"?"#A614C3":c.sub}/></svg></span>
@@ -1695,7 +2432,9 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
                   </div>
                 </>)}
               </div>
+              )}
               {/* Producer filter */}
+              {!qpHiddenCols.has("producer") && (
               <div className="relative">
                 <button onClick={()=>{closeAllQpDropdowns();setProducerOpen(o=>!o);}} className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider cursor-pointer select-none" style={{fontFamily:FONT,color:producerFilter.size>0?"#A614C3":c.muted}}>
                   Producer<span className="inline-flex ml-1"><svg width="7" height="5" viewBox="0 0 7 5" fill="none"><path d="M3.5 5L0.5 0H6.5L3.5 5Z" fill={producerFilter.size>0?"#A614C3":c.sub}/></svg></span>
@@ -1726,6 +2465,7 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
                   </div>
                 </>)}
               </div>
+              )}
             </div>
             <div className="overflow-y-auto flex-1">
               {clientPolicies.map((p,i,arr) => {
@@ -1733,16 +2473,16 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
                 const isHighlighted = highlightFilter === "renewals" && isRenewal;
                 return (
                 <div key={p.id} className="grid px-5 py-3.5 items-center gap-4 transition-colors cursor-pointer"
-                  style={{ gridTemplateColumns:"1.1fr 1.6fr 1.2fr 1fr 1.1fr 1.1fr 1.2fr 1.2fr", borderBottom:i!==arr.length-1?`1px solid ${c.border}`:"none", background: isHighlighted ? "rgba(116,195,183,0.08)" : "transparent", borderLeft: isHighlighted ? "3px solid #74C3B7" : "3px solid transparent" }}
+                  style={{ gridTemplateColumns:qpGridTemplate, borderBottom:i!==arr.length-1?`1px solid ${c.border}`:"none", background: isHighlighted ? "rgba(116,195,183,0.08)" : "transparent", borderLeft: isHighlighted ? "3px solid #74C3B7" : "3px solid transparent" }}
                   onMouseEnter={e=>(e.currentTarget.style.background=isHighlighted?"rgba(116,195,183,0.14)":c.hoverBg)} onMouseLeave={e=>(e.currentTarget.style.background=isHighlighted?"rgba(116,195,183,0.08)":"transparent")}>
-                  <div className="text-[12px]" style={{ fontFamily:FONT, color:c.text }}>{new Date(p.createdDate).toLocaleDateString()}</div>
-                  <div className="text-[12px] font-semibold" style={{ fontFamily:FONT, color: isDark ? "#4ECDC4" : "#A614C3" }}>{p.policyNumber}</div>
-                  <div className="text-[12px]" style={{ fontFamily:FONT, color:c.text }}>{p.applicant}</div>
-                  <div className="text-[12px]" style={{ fontFamily:FONT, color:c.text }}>{p.dba || "—"}</div>
-                  <div className="text-[12px]" style={{ fontFamily:FONT, color:c.text }}>{new Date(p.effectiveDate).toLocaleDateString()}</div>
-                  <div className="text-[12px]" style={{ fontFamily:FONT, color:c.text }}>{p.lob}</div>
-                  <div className="text-[12px]" style={{ fontFamily:FONT, color:c.text }}>{p.status}</div>
-                  <div className="text-[12px]" style={{ fontFamily:FONT, color:c.text }}>{p.producer}</div>
+                  {!qpHiddenCols.has("created")      && <div className="text-[12px]" style={{ fontFamily:FONT, color:c.text }}>{new Date(p.createdDate).toLocaleDateString()}</div>}
+                  {!qpHiddenCols.has("policyNumber") && <div className="text-[12px] font-semibold" style={{ fontFamily:FONT, color: isDark ? "#4ECDC4" : "#A614C3" }}>{p.policyNumber}</div>}
+                  {!qpHiddenCols.has("applicant")    && <div className="text-[12px]" style={{ fontFamily:FONT, color:c.text }}>{p.applicant}</div>}
+                  {!qpHiddenCols.has("dba")          && <div className="text-[12px]" style={{ fontFamily:FONT, color:c.text }}>{p.dba || "—"}</div>}
+                  {!qpHiddenCols.has("effective")    && <div className="text-[12px]" style={{ fontFamily:FONT, color:c.text }}>{new Date(p.effectiveDate).toLocaleDateString()}</div>}
+                  {!qpHiddenCols.has("lob")          && <div className="text-[12px]" style={{ fontFamily:FONT, color:c.text }}>{p.lob}</div>}
+                  {!qpHiddenCols.has("status")       && <div className="text-[12px]" style={{ fontFamily:FONT, color:c.text }}>{p.status}</div>}
+                  {!qpHiddenCols.has("producer")     && <div className="text-[12px]" style={{ fontFamily:FONT, color:c.text }}>{p.producer}</div>}
                 </div>
                 );
               })}
@@ -1771,31 +2511,75 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
               <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none" style={{ color: c.muted }} />
             </div>
             <div className="flex items-center gap-1 ml-1" style={{ borderLeft: `1px solid ${c.border}`, paddingLeft: 10 }}>
-              <button className="p-2 rounded-lg transition-colors" style={{ color: "#A614C3" }}
+              <button title="Reset filters" onClick={() => { setQpStatusFilter("All Statuses"); setApplicantFilter(new Set()); setProducerFilter(new Set()); setQpSortKey("createdDate"); setQpSortDir("desc"); }}
+                className="p-2 rounded-lg transition-colors" style={{ color: "#A614C3" }}
                 onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)} onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
                 <RefreshCw className="w-4 h-4" />
               </button>
-              <button className="p-2 rounded-lg transition-colors" style={{ color: "#A614C3" }}
-                onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)} onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-                <LayoutGrid className="w-4 h-4" />
-              </button>
-              <button className="p-2 rounded-lg transition-colors" style={{ color: "#A614C3" }}
+              <div className="relative" onClick={e => e.stopPropagation()}>
+                <button title="View columns" onClick={() => setQpViewOpen(o => !o)}
+                  className="p-2 rounded-lg transition-colors"
+                  style={{ color: "#A614C3", background: qpViewOpen ? c.hoverBg : "transparent" }}
+                  onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+                  onMouseLeave={e => (e.currentTarget.style.background = qpViewOpen ? c.hoverBg : "transparent")}>
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="5" height="5" x="2" y="2" rx="1"/><rect width="5" height="5" x="9.5" y="2" rx="1"/><rect width="5" height="5" x="17" y="2" rx="1"/><rect width="5" height="5" x="2" y="9.5" rx="1"/><rect width="5" height="5" x="9.5" y="9.5" rx="1"/><rect width="5" height="5" x="17" y="9.5" rx="1"/><rect width="5" height="5" x="2" y="17" rx="1"/><rect width="5" height="5" x="9.5" y="17" rx="1"/><rect width="5" height="5" x="17" y="17" rx="1"/></svg>
+                </button>
+                {qpViewOpen && (
+                  <div className="absolute right-0 top-full mt-1 z-30 w-[220px] rounded-xl shadow-xl overflow-hidden"
+                    style={{ background: c.cardBg, border: `1px solid ${c.border}` }}>
+                    <div className="px-4 py-2.5 text-[11px] uppercase tracking-wider font-semibold"
+                      style={{ fontFamily: FONT, color: c.muted, borderBottom: `1px solid ${c.border}`, letterSpacing: "0.06em" }}>
+                      Show Columns
+                    </div>
+                    <div className="py-1.5 max-h-[280px] overflow-y-auto">
+                      {QP_COLUMNS.map(col => {
+                        const visible = !qpHiddenCols.has(col.key);
+                        return (
+                          <label key={col.key} className="flex items-center gap-2.5 px-4 py-2 cursor-pointer transition-colors"
+                            onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+                            onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                            onClick={() => setQpHiddenCols(prev => { const s = new Set(prev); s.has(col.key) ? s.delete(col.key) : s.add(col.key); return s; })}>
+                            <div className="flex items-center justify-center w-4 h-4 rounded flex-shrink-0"
+                              style={{ border: `1.5px solid ${c.borderStrong}`, background: c.cardBg }}>
+                              {visible && <svg width="9" height="7" viewBox="0 0 9 7" fill="none"><path d="M1 3.5L3.5 6L8 1" stroke="#A614C3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                            </div>
+                            <span className="text-[12px]" style={{ fontFamily: FONT, color: c.text }}>{col.label}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                    <button onClick={() => setQpHiddenCols(new Set())}
+                      className="w-full flex items-center justify-center gap-2 py-3 text-[12px] font-semibold transition-colors"
+                      style={{ fontFamily: FONT, color: "#A614C3", borderTop: `1px solid ${c.border}` }}
+                      onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+                      onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                      <RefreshCw className="w-3.5 h-3.5" />Show All
+                    </button>
+                  </div>
+                )}
+              </div>
+              <button title="Export" className="p-2 rounded-lg transition-colors" style={{ color: "#A614C3" }}
                 onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)} onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
                 <Download className="w-4 h-4" />
               </button>
             </div>
           </div>
           <div className="rounded-xl overflow-hidden flex flex-col flex-1 min-h-0" style={{ background: c.cardBg, border: `1px solid ${c.border}` }}>
-            <div className="grid px-5 py-3 gap-4" style={{ gridTemplateColumns:"1.1fr 1.6fr 1.2fr 1fr 1.1fr 1.1fr 1.2fr 1.2fr", borderBottom:`1px solid ${c.border}`, background:c.mutedBg }}>
+            <div className="grid px-5 py-3 gap-4" style={{ gridTemplateColumns:qpGridTemplate, borderBottom:`1px solid ${c.border}`, background:c.mutedBg }}>
               {/* Created */}
+              {!qpHiddenCols.has("created") && (
               <button onClick={()=>{if(qpSortKey==="createdDate")setQpSortDir(d=>d==="asc"?"desc":"asc");else{setQpSortKey("createdDate");setQpSortDir("asc");}}} className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider cursor-pointer select-none text-left" style={{fontFamily:FONT,color:c.muted}}>
                 Created<span className="inline-flex ml-0.5"><svg width="14" height="9" viewBox="0 0 14 9" fill="none"><path d="M4 8V1M4 1L2 3M4 1L6 3" stroke={qpSortKey==="createdDate"&&qpSortDir==="asc"?(isDark?"#fff":"#374151"):c.sub} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/><path d="M10 1V8M10 8L8 6M10 8L12 6" stroke={qpSortKey==="createdDate"&&qpSortDir==="desc"?(isDark?"#fff":"#374151"):c.sub} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg></span>
               </button>
+              )}
               {/* Submission ID */}
+              {!qpHiddenCols.has("policyNumber") && (
               <button onClick={()=>{if(qpSortKey==="submissionId")setQpSortDir(d=>d==="asc"?"desc":"asc");else{setQpSortKey("submissionId");setQpSortDir("asc");}}} className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider cursor-pointer select-none text-left" style={{fontFamily:FONT,color:c.muted}}>
                 Submission ID<span className="inline-flex ml-0.5"><svg width="14" height="9" viewBox="0 0 14 9" fill="none"><path d="M4 8V1M4 1L2 3M4 1L6 3" stroke={qpSortKey==="submissionId"&&qpSortDir==="asc"?(isDark?"#fff":"#374151"):c.sub} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/><path d="M10 1V8M10 8L8 6M10 8L12 6" stroke={qpSortKey==="submissionId"&&qpSortDir==="desc"?(isDark?"#fff":"#374151"):c.sub} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg></span>
               </button>
+              )}
               {/* Applicant filter */}
+              {!qpHiddenCols.has("applicant") && (
               <div className="relative">
                 <button onClick={()=>{closeAllQpDropdowns();setApplicantOpen(o=>!o);}} className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider cursor-pointer select-none" style={{fontFamily:FONT,color:applicantFilter.size>0?"#A614C3":c.muted}}>
                   Applicant<span className="inline-flex ml-1"><svg width="7" height="5" viewBox="0 0 7 5" fill="none"><path d="M3.5 5L0.5 0H6.5L3.5 5Z" fill={applicantFilter.size>0?"#A614C3":c.sub}/></svg></span>
@@ -1826,15 +2610,21 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
                   </div>
                 </>)}
               </div>
+              )}
               {/* DBA */}
+              {!qpHiddenCols.has("dba") && (
               <button onClick={()=>{if(qpSortKey==="dba")setQpSortDir(d=>d==="asc"?"desc":"asc");else{setQpSortKey("dba");setQpSortDir("asc");}}} className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider cursor-pointer select-none text-left" style={{fontFamily:FONT,color:c.muted}}>
                 DBA<span className="inline-flex ml-0.5"><svg width="14" height="9" viewBox="0 0 14 9" fill="none"><path d="M4 8V1M4 1L2 3M4 1L6 3" stroke={qpSortKey==="dba"&&qpSortDir==="asc"?(isDark?"#fff":"#374151"):c.sub} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/><path d="M10 1V8M10 8L8 6M10 8L12 6" stroke={qpSortKey==="dba"&&qpSortDir==="desc"?(isDark?"#fff":"#374151"):c.sub} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg></span>
               </button>
+              )}
               {/* Effective */}
+              {!qpHiddenCols.has("effective") && (
               <button onClick={()=>{if(qpSortKey==="effectiveDate")setQpSortDir(d=>d==="asc"?"desc":"asc");else{setQpSortKey("effectiveDate");setQpSortDir("asc");}}} className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider cursor-pointer select-none text-left" style={{fontFamily:FONT,color:c.muted}}>
                 Effective<span className="inline-flex ml-0.5"><svg width="14" height="9" viewBox="0 0 14 9" fill="none"><path d="M4 8V1M4 1L2 3M4 1L6 3" stroke={qpSortKey==="effectiveDate"&&qpSortDir==="asc"?(isDark?"#fff":"#374151"):c.sub} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/><path d="M10 1V8M10 8L8 6M10 8L12 6" stroke={qpSortKey==="effectiveDate"&&qpSortDir==="desc"?(isDark?"#fff":"#374151"):c.sub} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg></span>
               </button>
+              )}
               {/* LOB filter */}
+              {!qpHiddenCols.has("lob") && (
               <div className="relative">
                 <button onClick={()=>{closeAllQpDropdowns();setLobOpen(o=>!o);}} className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider cursor-pointer select-none" style={{fontFamily:FONT,color:lobFilter!=="All LOBs"?"#A614C3":c.muted}}>
                   LOB<span className="inline-flex ml-1"><svg width="7" height="5" viewBox="0 0 7 5" fill="none"><path d="M3.5 5L0.5 0H6.5L3.5 5Z" fill={lobFilter!=="All LOBs"?"#A614C3":c.sub}/></svg></span>
@@ -1851,7 +2641,9 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
                   </div>
                 </>)}
               </div>
+              )}
               {/* Status filter */}
+              {!qpHiddenCols.has("status") && (
               <div className="relative">
                 <button onClick={()=>{closeAllQpDropdowns();setQpStatusOpen(o=>!o);}} className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider cursor-pointer select-none" style={{fontFamily:FONT,color:qpStatusFilter!=="All Statuses"?"#A614C3":c.muted}}>
                   Status<span className="inline-flex ml-1"><svg width="7" height="5" viewBox="0 0 7 5" fill="none"><path d="M3.5 5L0.5 0H6.5L3.5 5Z" fill={qpStatusFilter!=="All Statuses"?"#A614C3":c.sub}/></svg></span>
@@ -1868,7 +2660,9 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
                   </div>
                 </>)}
               </div>
+              )}
               {/* Producer filter */}
+              {!qpHiddenCols.has("producer") && (
               <div className="relative">
                 <button onClick={()=>{closeAllQpDropdowns();setProducerOpen(o=>!o);}} className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider cursor-pointer select-none" style={{fontFamily:FONT,color:producerFilter.size>0?"#A614C3":c.muted}}>
                   Producer<span className="inline-flex ml-1"><svg width="7" height="5" viewBox="0 0 7 5" fill="none"><path d="M3.5 5L0.5 0H6.5L3.5 5Z" fill={producerFilter.size>0?"#A614C3":c.sub}/></svg></span>
@@ -1899,6 +2693,7 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
                   </div>
                 </>)}
               </div>
+              )}
             </div>
             <div className="overflow-y-auto flex-1">
               {clientQuotes.map((q,i,arr) => {
@@ -1906,16 +2701,16 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
                 const isHighlighted = highlightFilter === "incomplete-quotes" && q.status === "Incomplete";
                 return (
                 <div key={q.id} className="grid px-5 py-3.5 items-center gap-4 transition-colors cursor-pointer"
-                  style={{ gridTemplateColumns:"1.1fr 1.6fr 1.2fr 1fr 1.1fr 1.1fr 1.2fr 1.2fr", borderBottom:i!==arr.length-1?`1px solid ${c.border}`:"none", background: isHighlighted ? "rgba(245,158,11,0.06)" : "transparent", borderLeft: isHighlighted ? "3px solid #F59E0B" : "3px solid transparent" }}
+                  style={{ gridTemplateColumns:qpGridTemplate, borderBottom:i!==arr.length-1?`1px solid ${c.border}`:"none", background: isHighlighted ? "rgba(245,158,11,0.06)" : "transparent", borderLeft: isHighlighted ? "3px solid #F59E0B" : "3px solid transparent" }}
                   onMouseEnter={e=>(e.currentTarget.style.background=isHighlighted?"rgba(245,158,11,0.10)":c.hoverBg)} onMouseLeave={e=>(e.currentTarget.style.background=isHighlighted?"rgba(245,158,11,0.06)":"transparent")}>
-                  <div className="text-[12px]" style={{ fontFamily:FONT, color:c.text }}>{new Date(q.createdDate).toLocaleDateString()}</div>
-                  <div className="text-[12px] font-semibold" style={{ fontFamily:FONT, color: isDark ? "#4ECDC4" : "#A614C3" }}>{q.quoteId}</div>
-                  <div className="text-[12px]" style={{ fontFamily:FONT, color:c.text }}>{q.applicant}</div>
-                  <div className="text-[12px]" style={{ fontFamily:FONT, color:c.text }}>{q.dba || "—"}</div>
-                  <div className="text-[12px]" style={{ fontFamily:FONT, color:c.text }}>{q.effectiveDate ? new Date(q.effectiveDate).toLocaleDateString() : "—"}</div>
-                  <div className="text-[12px]" style={{ fontFamily:FONT, color:c.text }}>{q.lob}</div>
-                  <div className="text-[12px]" style={{ fontFamily:FONT, color:c.text }}>{q.status}</div>
-                  <div className="text-[12px]" style={{ fontFamily:FONT, color:c.text }}>{q.producer}</div>
+                  {!qpHiddenCols.has("created")      && <div className="text-[12px]" style={{ fontFamily:FONT, color:c.text }}>{new Date(q.createdDate).toLocaleDateString()}</div>}
+                  {!qpHiddenCols.has("policyNumber") && <div className="text-[12px] font-semibold" style={{ fontFamily:FONT, color: isDark ? "#4ECDC4" : "#A614C3" }}>{q.quoteId}</div>}
+                  {!qpHiddenCols.has("applicant")    && <div className="text-[12px]" style={{ fontFamily:FONT, color:c.text }}>{q.applicant}</div>}
+                  {!qpHiddenCols.has("dba")          && <div className="text-[12px]" style={{ fontFamily:FONT, color:c.text }}>{q.dba || "—"}</div>}
+                  {!qpHiddenCols.has("effective")    && <div className="text-[12px]" style={{ fontFamily:FONT, color:c.text }}>{q.effectiveDate ? new Date(q.effectiveDate).toLocaleDateString() : "—"}</div>}
+                  {!qpHiddenCols.has("lob")          && <div className="text-[12px]" style={{ fontFamily:FONT, color:c.text }}>{q.lob}</div>}
+                  {!qpHiddenCols.has("status")       && <div className="text-[12px]" style={{ fontFamily:FONT, color:c.text }}>{q.status}</div>}
+                  {!qpHiddenCols.has("producer")     && <div className="text-[12px]" style={{ fontFamily:FONT, color:c.text }}>{q.producer}</div>}
                 </div>
                 );
               })}
@@ -1924,117 +2719,71 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
         </div>
       )}
 
-      {/* ── POLICY DOCUMENTS (auto-extracted, read-only) ── */}
-      {detailTab === "policy-documents" && (
-        <div className="flex flex-col flex-1 min-h-0">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="flex" style={{ background: c.cardBg, border: `1px solid ${isDark ? "rgba(255,255,255,0.10)" : "#E5E7EB"}`, borderRadius: 10, overflow: "hidden", width: 320 }}>
-              <input placeholder="Search policy documents..." value={detailSearch} onChange={e => setDetailSearch(e.target.value)}
-                className="flex-1 outline-none"
-                style={{ fontFamily: FONT, background: "transparent", color: c.text, padding: "8px 14px", fontSize: 13, border: "none" }} />
-              <button className="flex items-center gap-1.5 px-4 text-[12px] font-semibold text-white flex-shrink-0"
-                style={{ fontFamily: FONT, background: btnGrad }}>
-                <Search className="w-3.5 h-3.5" />Search
-              </button>
-            </div>
-          </div>
-          <div className="rounded-xl overflow-hidden flex flex-col flex-1 min-h-0" style={{ background:c.cardBg, border:`1px solid ${c.border}` }}>
-            <div className="grid px-5 py-3 gap-4" style={{ gridTemplateColumns:"2.5fr 1.2fr 1fr 1.5fr 1fr 40px", borderBottom:`1px solid ${c.border}`, background:c.mutedBg }}>
-              {["Document Name","Policy","Type","Sync Date","Size",""].map((h,i) => (
-                <div key={i} className="text-[11px] font-bold uppercase tracking-wider" style={{ fontFamily:FONT, color:c.muted }}>{h}</div>
-              ))}
-            </div>
-            <div className="overflow-y-auto flex-1">
-              {clientDocs.filter(d => d.category === "Policy" || d.category === "Endorsement" || d.category === "Certificate").length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full min-h-[220px]">
-                  <FileText className="w-7 h-7 mb-3" style={{ color: c.muted }} />
-                  <span className="text-[13px] font-medium" style={{ fontFamily: FONT, color: c.text }}>No policy documents yet</span>
-                  <span className="text-[11px] mt-1" style={{ fontFamily: FONT, color: c.muted }}>Documents will appear here automatically when policies are issued</span>
-                </div>
-              ) : clientDocs.filter(d => d.category === "Policy" || d.category === "Endorsement" || d.category === "Certificate").map((d,i,arr) => (
-                <div key={d.id} className="grid px-5 py-3.5 items-center gap-4 transition-colors"
-                  style={{ gridTemplateColumns:"2.5fr 1.2fr 1fr 1.5fr 1fr 40px", borderBottom:i!==arr.length-1?`1px solid ${c.border}`:"none" }}
-                  onMouseEnter={e=>(e.currentTarget.style.background=c.hoverBg)} onMouseLeave={e=>(e.currentTarget.style.background="transparent")}>
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: "rgba(239,68,68,0.1)" }}>
-                      <FileText className="w-4 h-4" style={{ color: "#EF4444" }} />
-                    </div>
-                    <span className="text-[13px] font-medium" style={{ fontFamily:FONT, color:c.text }}>{d.name}</span>
-                  </div>
-                  <div className="text-[12px] px-2 py-0.5 rounded-lg" style={{ fontFamily:FONT, color: isDark ? "#4ECDC4" : "#A614C3", background:"rgba(168,85,247,0.08)", display:"inline-block", width:"fit-content" }}>{d.category}</div>
-                  <div className="text-[12px]" style={{ fontFamily:FONT, color:c.muted }}>{d.type}</div>
-                  <div className="text-[12px]" style={{ fontFamily:FONT, color:c.muted }}>{new Date(d.uploadDate).toLocaleDateString()}</div>
-                  <div className="text-[12px]" style={{ fontFamily:FONT, color:c.muted }}>{d.size}</div>
-                  <ActionMenu isDark={isDark} items={["Download","View"]} menuId={`pdoc-${d.id}`} openMenuId={openMenuId} setOpenMenuId={setOpenMenuId} />
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* ── POLICY DOCUMENTS (auto-extracted from issued policies) ── */}
+      {detailTab === "policy-documents" && renderDocsTab({
+        docPredicate: d => d.category === "Policy" || d.category === "Endorsement" || d.category === "Certificate",
+        categoryOptions: ["Policy", "Endorsement", "Certificate"],
+        emptyTitle: "No policy documents yet",
+        emptyHint: "Documents will appear here automatically when policies are issued.",
+        enableContextMenu: false,
+        showPolicyCols: true,
+        syncSource: "AMS360",
+        view: pdView, setView: setPdView,
+        showArchived: pdShowArchived, setShowArchived: setPdShowArchived,
+        showTrashed: pdShowTrashed, setShowTrashed: setPdShowTrashed,
+        filterCat: pdFilterCat, setFilterCat: setPdFilterCat,
+        sortDir: pdSortDir, setSortDir: setPdSortDir,
+        search: pdSearch, setSearch: setPdSearch,
+        searchOpen: pdSearchOpen, setSearchOpen: setPdSearchOpen,
+        filterOpen: pdFilterOpen, setFilterOpen: setPdFilterOpen,
+        sortOpen: pdSortOpen, setSortOpen: setPdSortOpen,
+        uploadOpen: pdUploadOpen, setUploadOpen: setPdUploadOpen,
+      })}
 
-      {/* ── FILE CABINET (user-uploaded docs) ── */}
-      {detailTab === "file-cabinet" && (
-        <div className="flex flex-col flex-1 min-h-0">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="flex" style={{ background: c.cardBg, border: `1px solid ${isDark ? "rgba(255,255,255,0.10)" : "#E5E7EB"}`, borderRadius: 10, overflow: "hidden", width: 320 }}>
-              <input placeholder="Search file cabinet..." value={detailSearch} onChange={e => setDetailSearch(e.target.value)}
-                className="flex-1 outline-none"
-                style={{ fontFamily: FONT, background: "transparent", color: c.text, padding: "8px 14px", fontSize: 13, border: "none" }} />
-              <button className="flex items-center gap-1.5 px-4 text-[12px] font-semibold text-white flex-shrink-0"
-                style={{ fontFamily: FONT, background: btnGrad }}>
-                <Search className="w-3.5 h-3.5" />Search
-              </button>
-            </div>
-            <button className="flex items-center gap-2 px-[17px] py-[9px] rounded-lg text-[12px] font-semibold text-white transition-all"
-              style={{ fontFamily:FONT, background: btnGrad }}
-              onMouseEnter={e => (e.currentTarget.style.filter = "brightness(1.12)")}
-              onMouseLeave={e => (e.currentTarget.style.filter = "none")}>
-              <Upload className="w-4 h-4" />Upload Document
-            </button>
+      {/* ── FILE CABINET (user-uploaded misc docs) ── */}
+      {detailTab === "file-cabinet" && renderDocsTab({
+        docPredicate: d => d.category !== "Policy" && d.category !== "Endorsement" && d.category !== "Certificate",
+        categoryOptions: ["Loss Run", "Schedule", "Authorization", "Tax", "Other"],
+        emptyTitle: "File cabinet is empty",
+        emptyHint: "Upload loss runs, schedules, W-9 forms, BOR letters, or other client documents.",
+        enableContextMenu: true,
+        showPolicyCols: false,
+        view: fcView, setView: setFcView,
+        showArchived: fcShowArchived, setShowArchived: setFcShowArchived,
+        showTrashed: fcShowTrashed, setShowTrashed: setFcShowTrashed,
+        filterCat: fcFilterCat, setFilterCat: setFcFilterCat,
+        sortDir: fcSortDir, setSortDir: setFcSortDir,
+        search: fcSearch, setSearch: setFcSearch,
+        searchOpen: fcSearchOpen, setSearchOpen: setFcSearchOpen,
+        filterOpen: fcFilterOpen, setFilterOpen: setFcFilterOpen,
+        sortOpen: fcSortOpen, setSortOpen: setFcSortOpen,
+        uploadOpen: fcUploadOpen, setUploadOpen: setFcUploadOpen,
+      })}
+      {/* Right-click context menu (File Cabinet only) */}
+      {fileCtxMenu && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setFileCtxMenu(null)} onContextMenu={e => { e.preventDefault(); setFileCtxMenu(null); }} />
+          <div className="fixed z-50 rounded-lg shadow-xl py-1 min-w-[160px]"
+            style={{ left: fileCtxMenu.x, top: fileCtxMenu.y, background: c.cardBg, border: `1px solid ${c.border}`, fontFamily: FONT }}>
+            {(() => {
+              const doc = allClientDocs.find(d => d.id === fileCtxMenu.docId);
+              const items: { label: string; icon: React.ReactNode; danger?: boolean; onClick: () => void }[] = [
+                { label: "View",   icon: <Eye className="w-3.5 h-3.5" />,  onClick: () => { if (doc) setPreviewDoc(doc); setFileCtxMenu(null); } },
+                { label: "Rename", icon: <Pencil   className="w-3.5 h-3.5" />,  onClick: () => { setRenamingDocId(fileCtxMenu.docId); setRenameValue(doc?.name || ""); setFileCtxMenu(null); } },
+                { label: "Delete", icon: <Trash2   className="w-3.5 h-3.5" />, danger: true, onClick: () => { setDeletedDocIds(prev => { const s = new Set(prev); s.add(fileCtxMenu.docId); return s; }); setFileCtxMenu(null); } },
+              ];
+              return items.map(it => (
+                <button key={it.label} onClick={it.onClick}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-[12px] text-left transition-colors"
+                  style={{ color: it.danger ? "#EF4444" : c.text }}
+                  onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+                  onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                  {it.icon}{it.label}
+                </button>
+              ));
+            })()}
           </div>
-          <div className="rounded-xl overflow-hidden flex flex-col flex-1 min-h-0" style={{ background:c.cardBg, border:`1px solid ${c.border}` }}>
-            <div className="grid px-5 py-3 gap-4" style={{ gridTemplateColumns:"2.5fr 1fr 1fr 1.5fr 1fr 40px", borderBottom:`1px solid ${c.border}`, background:c.mutedBg }}>
-              {["Document Name","Category","Type","Upload Date","Size",""].map((h,i) => (
-                <div key={i} className="text-[11px] font-bold uppercase tracking-wider" style={{ fontFamily:FONT, color:c.muted }}>{h}</div>
-              ))}
-            </div>
-            <div className="overflow-y-auto flex-1"
-              onDragOver={e => { e.preventDefault(); setDocDragOver(true); }}
-              onDragLeave={() => setDocDragOver(false)}
-              onDrop={e => { e.preventDefault(); setDocDragOver(false); }}>
-              {clientDocs.filter(d => d.category !== "Policy" && d.category !== "Endorsement" && d.category !== "Certificate").length === 0 && (
-                <label className="flex flex-col items-center justify-center h-full min-h-[220px] cursor-pointer transition-colors"
-                  style={{ background: docDragOver ? "rgba(168,85,247,0.06)" : "transparent" }}>
-                  <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png" multiple />
-                  <Paperclip className="w-7 h-7 mb-3" style={{ color: "#A614C3" }} />
-                  <span className="text-[13px] font-medium" style={{ fontFamily: FONT, color: c.text }}>Drag &amp; Drop or Click to Browse</span>
-                  <span className="text-[11px] mt-1" style={{ fontFamily: FONT, color: c.muted }}>PDF, JPG, PNG · Max 10MB</span>
-                </label>
-              )}
-              {clientDocs.filter(d => d.category !== "Policy" && d.category !== "Endorsement" && d.category !== "Certificate").map((d,i,arr) => (
-                <div key={d.id} className="grid px-5 py-3.5 items-center gap-4 transition-colors"
-                  style={{ gridTemplateColumns:"2.5fr 1fr 1fr 1.5fr 1fr 40px", borderBottom:i!==arr.length-1?`1px solid ${c.border}`:"none" }}
-                  onMouseEnter={e=>(e.currentTarget.style.background=c.hoverBg)} onMouseLeave={e=>(e.currentTarget.style.background="transparent")}>
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                      style={{ background: d.type === "PDF" ? "rgba(239,68,68,0.1)" : "rgba(34,197,94,0.1)" }}>
-                      {d.type === "PDF"
-                        ? <FileText className="w-4 h-4" style={{ color: "#EF4444" }} />
-                        : <FileArchive className="w-4 h-4" style={{ color: "#22C55E" }} />}
-                    </div>
-                    <span className="text-[13px] font-medium" style={{ fontFamily:FONT, color:c.text }}>{d.name}</span>
-                  </div>
-                  <div className="text-[12px] px-2 py-0.5 rounded-lg" style={{ fontFamily:FONT, color:c.teal, background:"rgba(116,195,183,0.10)", display:"inline-block", width:"fit-content" }}>{d.category}</div>
-                  <div className="text-[12px]" style={{ fontFamily:FONT, color:c.muted }}>{d.type}</div>
-                  <div className="text-[12px]" style={{ fontFamily:FONT, color:c.muted }}>{new Date(d.uploadDate).toLocaleDateString()}</div>
-                  <div className="text-[12px]" style={{ fontFamily:FONT, color:c.muted }}>{d.size}</div>
-                  <ActionMenu isDark={isDark} items={["Download","View","Delete"]} menuId={`doc-${d.id}`} openMenuId={openMenuId} setOpenMenuId={setOpenMenuId} />
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+        </>
       )}
 
       {/* ── ACTIVITY ── */}
@@ -2174,7 +2923,7 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
                   <div className="flex justify-end gap-3">
                     <button onClick={() => setAddActivityOpen(false)}
                       className="px-[17px] py-[9px] rounded-lg text-[12px] font-normal transition-colors"
-                      style={{ fontFamily:FONT, border:`1px solid #E5E7EB`, color: c.text, background:"linear-gradient(to bottom, rgba(255,255,255,0.10), rgba(192,192,192,0.10), rgba(172,172,172,0.10))" }}>Cancel</button>
+                      style={{ fontFamily:FONT, border:`1px solid #E5E7EB`, color: c.text, background:"#FFFFFF" }}>Cancel</button>
                     <button onClick={() => {
                       if (!newActivityAction.trim() || !selected) return;
                       const now = new Date();
@@ -2304,7 +3053,7 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
                           className="w-full text-left px-3 py-1.5 text-[12px] flex items-center justify-between transition-colors"
                           style={{ fontFamily: FONT, color: noteFilterType === t ? "#A614C3" : c.text, background: noteFilterType === t ? "rgba(168,85,247,0.08)" : "transparent" }}>
                           {t === "All" ? "All Types" : t}
-                          {noteFilterType === t && <span style={{ color: "#A614C3" }}>✓</span>}
+                          {noteFilterType === t && <svg width="10" height="8" viewBox="0 0 9 7" fill="none"><path d="M1 3.5L3.5 6L8 1" stroke="#A614C3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
                         </button>
                       ))}
                       <div style={{ height: 1, background: c.border, margin: "6px 0" }} />
@@ -2313,13 +3062,12 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
                         ["All", null],
                         ["Private", Lock],
                         ["Shared", Users],
-                        ["Public", Globe],
                       ] as const).map(([v, Ic]) => (
                         <button key={v} onClick={() => { setVisibilityFilter(v as typeof visibilityFilter); }}
                           className="w-full text-left px-3 py-1.5 text-[12px] flex items-center justify-between transition-colors"
                           style={{ fontFamily: FONT, color: visibilityFilter === v ? "#A614C3" : c.text, background: visibilityFilter === v ? "rgba(168,85,247,0.08)" : "transparent" }}>
                           <span className="flex items-center gap-2">{Ic && <Ic className="w-3 h-3" />}{v === "All" ? "All Visibility" : v}</span>
-                          {visibilityFilter === v && <span style={{ color: "#A614C3" }}>✓</span>}
+                          {visibilityFilter === v && <svg width="10" height="8" viewBox="0 0 9 7" fill="none"><path d="M1 3.5L3.5 6L8 1" stroke="#A614C3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
                         </button>
                       ))}
                       <div style={{ height: 1, background: c.border, margin: "4px 0" }} />
@@ -2327,13 +3075,13 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
                         className="w-full text-left px-3 py-1.5 text-[12px] flex items-center justify-between"
                         style={{ fontFamily: FONT, color: showArchived ? "#F59E0B" : c.text, background: showArchived ? "rgba(245,158,11,0.08)" : "transparent" }}>
                         <span className="flex items-center gap-1.5"><Archive className="w-3 h-3" />Archived</span>
-                        {showArchived && <span style={{ color: "#F59E0B" }}>✓</span>}
+                        {showArchived && <svg width="10" height="8" viewBox="0 0 9 7" fill="none"><path d="M1 3.5L3.5 6L8 1" stroke="#F59E0B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
                       </button>
                       <button onClick={() => { setShowTrashed(true); setShowArchived(false); setNoteFilterOpen(false); setSelectedNote(null); setNoteExpanded(false); }}
                         className="w-full text-left px-3 py-1.5 text-[12px] flex items-center justify-between"
                         style={{ fontFamily: FONT, color: showTrashed ? "#EF4444" : c.text, background: showTrashed ? "rgba(239,68,68,0.08)" : "transparent" }}>
                         <span className="flex items-center gap-1.5"><Trash2 className="w-3 h-3" />Trash</span>
-                        {showTrashed && <span style={{ color: "#EF4444" }}>✓</span>}
+                        {showTrashed && <svg width="10" height="8" viewBox="0 0 9 7" fill="none"><path d="M1 3.5L3.5 6L8 1" stroke="#EF4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
                       </button>
                     </div>
                   )}
@@ -2354,7 +3102,7 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
                         <button key={d} onClick={() => { setNoteSortDir(d); setNoteSortOpen(false); }}
                           className="w-full text-left px-3 py-2 text-[12px] flex items-center justify-between"
                           style={{ fontFamily: FONT, color: noteSortDir === d ? "#A614C3" : c.text, background: noteSortDir === d ? "rgba(168,85,247,0.08)" : "transparent" }}>
-                          {label}{noteSortDir === d && <span style={{ color: "#A614C3" }}>✓</span>}
+                          <span>{label}</span>{noteSortDir === d && <svg width="10" height="8" viewBox="0 0 9 7" fill="none"><path d="M1 3.5L3.5 6L8 1" stroke="#A614C3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
                         </button>
                       ))}
                     </div>
@@ -2768,7 +3516,7 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
           {selectedNote && !noteExpanded && (
             <div className="flex flex-col flex-1 min-h-0 rounded-2xl overflow-hidden transition-all"
               style={{ background: c.cardBg, border: `1px solid ${c.border}` }}
-              onClick={e => { e.stopPropagation(); setNoteMoreOpen(false); setNoteShareOpen(false); }}>
+              onClick={e => { e.stopPropagation(); setNoteMoreOpen(false); }}>
 
               {/* ── Shared top-bar + body (reused in both inline & expanded) ── */}
               {(() => {
@@ -2787,12 +3535,6 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
                       {showTrashed && <span className="text-[10px] px-1.5 py-0.5 rounded flex-shrink-0" style={{ background: "rgba(239,68,68,0.10)", color: "#EF4444", fontFamily: FONT }}>Trash</span>}
                     </div>
                     <div className="flex items-center gap-0.5 flex-shrink-0">
-                      {/* Share */}
-                      {!showTrashed && <button onClick={e => { e.stopPropagation(); setNoteShareOpen(p => !p); setNoteMoreOpen(false); }}
-                        className="p-1.5 rounded-md transition-colors" title="Share"
-                        style={{ color: noteShareOpen ? "#A855F7" : c.muted, background: noteShareOpen ? "rgba(168,85,247,0.10)" : "transparent" }}>
-                        <Users className="w-3.5 h-3.5" />
-                      </button>}
                       {/* Pin */}
                       {!showTrashed && <button onClick={e => { e.stopPropagation(); setPinnedNoteIds(prev => { const s = new Set(prev); s.has(selectedNote.id) ? s.delete(selectedNote.id) : s.add(selectedNote.id); return s; }); }}
                         className="p-1.5 rounded-md transition-colors" title={pinnedNoteIds.has(selectedNote.id) ? "Unpin" : "Pin note"}
@@ -2816,7 +3558,7 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
                       </button>
                       {/* ··· More */}
                       <div className="relative" onClick={e => e.stopPropagation()}>
-                        <button onClick={() => { setNoteMoreOpen(p => !p); setNoteShareOpen(false); }}
+                        <button onClick={() => { setNoteMoreOpen(p => !p); }}
                           className="p-1.5 rounded-md transition-colors" style={{ color: c.muted }}>
                           <MoreVertical className="w-3.5 h-3.5" />
                         </button>
@@ -2877,7 +3619,7 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
                           onMouseEnter={e => (e.currentTarget.style.filter = "brightness(1.12)")}
                           onMouseLeave={e => (e.currentTarget.style.filter = "none")}>Save</button>
                       )}
-                      <button onClick={() => { setSelectedNote(null); setNoteExpanded(false); setNoteMoreOpen(false); setNoteShareOpen(false); }}
+                      <button onClick={() => { setSelectedNote(null); setNoteExpanded(false); setNoteMoreOpen(false); }}
                         className="p-1.5 rounded-md transition-colors" style={{ color: c.muted }}
                         onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)} onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
                         <X className="w-4 h-4" />
@@ -2890,9 +3632,6 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
                     {/* Toast */}
                     {copyToast && <div className="absolute top-3 right-4 z-50 px-3 py-1.5 rounded-lg text-[12px] font-medium text-white shadow-lg" style={{ background: btnGrad, fontFamily: FONT }}>{copyToast}</div>}
 
-                    {/* Share panel */}
-                    {noteShareOpen && renderSharePanel()}
-
                     {/* Lock banner (other user locked) */}
                     {noteLocked && isLockedByOther && (
                       <div className="mb-4 flex items-center justify-between px-4 py-3 rounded-xl" style={{ background: "rgba(168,85,247,0.07)", border: "1px solid rgba(168,85,247,0.20)" }}>
@@ -2900,11 +3639,6 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
                           <Lock className="w-4 h-4" style={{ color: "#A855F7" }} />
                           <span className="text-[12px]" style={{ fontFamily: FONT, color: c.text }}>Locked by <strong>{lockedBy}</strong></span>
                         </div>
-                        <button onClick={() => { setCopyToast(`Access requested from ${lockedBy.split(" ")[0]}`); setTimeout(() => setCopyToast(""), 3000); }}
-                          className="px-3 py-1 rounded-lg text-[11px] font-semibold transition-all"
-                          style={{ fontFamily: FONT, background: "rgba(168,85,247,0.12)", color: "#A855F7", border: "1px solid rgba(168,85,247,0.25)" }}>
-                          Request Access
-                        </button>
                       </div>
                     )}
 
@@ -2923,7 +3657,7 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
                         { icon: <Lock className="w-3.5 h-3.5" />, label: "Visibility", value: (
                           <div className="flex flex-col gap-2 min-w-0">
                             <div className="flex flex-wrap gap-1.5">
-                              {([["Private",Lock,"Only you can see this note"],["Shared",Users,"Shared with specific teammates"],["Public",Globe,"Visible to everyone in your team"]] as const).map(([v,Ic,tip]) => (
+                              {([["Private",Lock,"Only you can see this note"],["Shared",Users,"Visible to everyone in your team"]] as const).map(([v,Ic,tip]) => (
                                 <button key={v} title={tip} onClick={() => (!noteLocked&&!showTrashed)&&setEditingNoteVisibility(v)}
                                   className="px-2.5 py-0.5 rounded-md text-[11px] font-medium transition-all flex items-center gap-1.5"
                                   style={{ fontFamily:FONT, background:editingNoteVisibility===v?"rgba(168,85,247,0.10)":"transparent", color:editingNoteVisibility===v?"#A855F7":c.muted, border:`1px solid ${editingNoteVisibility===v?"rgba(168,85,247,0.35)":c.border}`, cursor:(noteLocked||showTrashed)?"default":"pointer" }}>
@@ -2933,17 +3667,7 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
                             </div>
                             <div className="text-[11px] flex items-center gap-1.5 flex-wrap" style={{ fontFamily:FONT, color: c.muted }}>
                               {editingNoteVisibility === "Private" && <span>Only you can see this note</span>}
-                              {editingNoteVisibility === "Public"  && <span>Visible to everyone in your team</span>}
-                              {editingNoteVisibility === "Shared"  && (<>
-                                <div className="flex -space-x-1">
-                                  {TEAMMATES.filter(t => t.name !== CURRENT_USER).slice(0,3).map(t => (
-                                    <div key={t.name} className="w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold" style={{ ...avatarStyle, border: `1.5px solid ${c.cardBg}` }}><span style={avatarTextStyle}>{initials(t.name)}</span></div>
-                                  ))}
-                                </div>
-                                <span>You + {TEAMMATES.length - 1} teammates</span>
-                                <span>·</span>
-                                <button onClick={e => { e.stopPropagation(); setNoteShareOpen(true); }} className="font-medium transition-colors" style={{ color: "#A855F7" }}>Manage</button>
-                              </>)}
+                              {editingNoteVisibility === "Shared" && <span>Visible to everyone in the team</span>}
                             </div>
                           </div>
                         ) },
@@ -2983,7 +3707,7 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
           {/* ── EXPANDED: fixed full-height side panel ── */}
           {selectedNote && noteExpanded && (
             <div className="fixed inset-y-0 right-0 z-50 flex" style={{ width: "58vw" }}
-              onClick={e => { e.stopPropagation(); setNoteMoreOpen(false); setNoteShareOpen(false); }}>
+              onClick={e => { e.stopPropagation(); setNoteMoreOpen(false); }}>
               {/* Backdrop strip */}
               <div className="flex-1 cursor-pointer" onClick={() => setNoteExpanded(false)}
                 style={{ background: "rgba(0,0,0,0.25)" }} />
@@ -3012,7 +3736,6 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
                         {pinnedNoteIds.has(selectedNote.id) && <Pin className="w-3 h-3" style={{ color: "#F59E0B" }} />}
                       </div>
                       <div className="flex items-center gap-1">
-                        <button onClick={e => { e.stopPropagation(); setNoteShareOpen(p => !p); }} className="p-1.5 rounded-md" style={{ color: noteShareOpen ? "#A855F7" : c.muted }}><Users className="w-3.5 h-3.5" /></button>
                         <button onClick={e => { e.stopPropagation(); setPinnedNoteIds(prev => { const s = new Set(prev); s.has(selectedNote.id) ? s.delete(selectedNote.id) : s.add(selectedNote.id); return s; }); }} className="p-1.5 rounded-md" style={{ color: pinnedNoteIds.has(selectedNote.id) ? "#F59E0B" : c.muted }}><Pin className="w-3.5 h-3.5" /></button>
                         <button onClick={e => { e.stopPropagation(); if (!(noteLocked && isLockedByOther)) { setNoteLocked(p => !p); if (!noteLocked) setLockedBy(CURRENT_USER); } }} className="p-1.5 rounded-md" style={{ color: noteLocked ? "#A855F7" : c.muted }}>{noteLocked ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}</button>
                         <button onClick={() => setNoteExpanded(false)} className="p-1.5 rounded-md" style={{ color: "#A855F7" }} title="Collapse"><Minimize2 className="w-3.5 h-3.5" /></button>
@@ -3035,11 +3758,9 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
                     {/* Body */}
                     <div className="flex-1 overflow-y-auto px-16 py-8 relative">
                       {copyToast && <div className="absolute top-4 right-6 z-50 px-3 py-1.5 rounded-lg text-[12px] font-medium text-white shadow-lg" style={{ background: btnGrad, fontFamily: FONT }}>{copyToast}</div>}
-                      {noteShareOpen && renderSharePanel()}
                       {noteLocked && isLockedByOther && (
                         <div className="mb-5 flex items-center justify-between px-4 py-3 rounded-xl" style={{ background:"rgba(168,85,247,0.07)", border:"1px solid rgba(168,85,247,0.20)" }}>
                           <div className="flex items-center gap-2"><Lock className="w-4 h-4" style={{ color:"#A855F7" }}/><span className="text-[12px]" style={{ fontFamily:FONT, color:c.text }}>Locked by <strong>{lockedBy}</strong></span></div>
-                          <button onClick={() => { setCopyToast(`Access requested from ${lockedBy.split(" ")[0]}`); setTimeout(()=>setCopyToast(""),3000); }} className="px-3 py-1 rounded-lg text-[11px] font-semibold" style={{ fontFamily:FONT, background:"rgba(168,85,247,0.12)", color:"#A855F7", border:"1px solid rgba(168,85,247,0.25)" }}>Request Access</button>
                         </div>
                       )}
                       <input value={editingNoteTitle} onChange={e => setEditingNoteTitle(e.target.value)} readOnly={noteLocked}
@@ -3053,7 +3774,7 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
                           {icon:<Lock className="w-3.5 h-3.5"/>, label:"Visibility", value:(
                             <div className="flex flex-col gap-2 min-w-0">
                               <div className="flex flex-wrap gap-1.5">
-                                {([["Private",Lock,"Only you can see this note"],["Shared",Users,"Shared with specific teammates"],["Public",Globe,"Visible to everyone in your team"]] as const).map(([v,Ic,tip]) => (
+                                {([["Private",Lock,"Only you can see this note"],["Shared",Users,"Visible to everyone in your team"]] as const).map(([v,Ic,tip]) => (
                                   <button key={v} title={tip} onClick={() => !noteLocked && setEditingNoteVisibility(v)}
                                     className="px-2.5 py-0.5 rounded-md text-[11px] font-medium transition-all flex items-center gap-1.5"
                                     style={{ fontFamily:FONT, background:editingNoteVisibility===v?"rgba(168,85,247,0.10)":"transparent", color:editingNoteVisibility===v?"#A855F7":c.muted, border:`1px solid ${editingNoteVisibility===v?"rgba(168,85,247,0.35)":c.border}`, cursor:noteLocked?"default":"pointer" }}>
@@ -3061,19 +3782,6 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
                                   </button>
                                 ))}
                               </div>
-                              {editingNoteVisibility === "Shared" && (
-                                <div className="text-[11px] flex items-center gap-1.5 flex-wrap" style={{ fontFamily:FONT, color: c.muted }}>
-                                  <div className="flex -space-x-1">
-                                    {TEAMMATES.filter(t => t.name !== CURRENT_USER).slice(0,3).map(t => (
-                                      <div key={t.name} className="w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold" style={{ ...avatarStyle, border: `1.5px solid ${c.cardBg}` }}><span style={avatarTextStyle}>{initials(t.name)}</span></div>
-                                    ))}
-                                  </div>
-                                  <span>You + {TEAMMATES.length - 1} teammates</span>
-                                  <span>·</span>
-                                  <button onClick={e => { e.stopPropagation(); setNoteShareOpen(true); }}
-                                    className="font-medium transition-colors" style={{ color: "#A855F7" }}>Manage</button>
-                                </div>
-                              )}
                             </div>
                           )},
                           {icon:<Users className="w-3.5 h-3.5"/>, label:"Client", value:<span className="text-[12px]" style={{fontFamily:FONT,color:c.text}}>{selected?getClientName(selected):"—"}</span>},
@@ -3153,7 +3861,7 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
             <div className="flex items-center justify-between gap-2 px-6 py-4" style={{ borderTop: `1px solid ${c.border}` }}>
               <button onClick={() => setContactCardEditing(false)}
                 className="px-[17px] py-[9px] rounded-lg text-[12px] font-normal transition-colors"
-                style={{ fontFamily: FONT, border: `1px solid #E5E7EB`, color: c.text, background: "linear-gradient(to bottom, rgba(255,255,255,0.10), rgba(192,192,192,0.10), rgba(172,172,172,0.10))" }}>
+                style={{ fontFamily: FONT, border: `1px solid #E5E7EB`, color: c.text, background: "#FFFFFF" }}>
                 Cancel
               </button>
               <button onClick={() => setContactCardEditing(false)}
@@ -3194,7 +3902,7 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
             <div className="flex items-center justify-between gap-2 px-6 py-4" style={{ borderTop: `1px solid ${c.border}` }}>
               <button onClick={() => { pendingEditAction?.(); setEditWarningOpen(false); setPendingEditAction(null); }}
                 className="px-[17px] py-[9px] rounded-lg text-[12px] font-normal transition-colors"
-                style={{ fontFamily: FONT, border: `1px solid #E5E7EB`, color: c.text, background: "linear-gradient(to bottom, rgba(255,255,255,0.10), rgba(192,192,192,0.10), rgba(172,172,172,0.10))" }}>
+                style={{ fontFamily: FONT, border: `1px solid #E5E7EB`, color: c.text, background: "#FFFFFF" }}>
                 Continue Editing
               </button>
               <button onClick={() => { setEditWarningOpen(false); setPendingEditAction(null); /* TODO: navigate to endorsement flow */ }}
@@ -3226,7 +3934,7 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
             <div className="flex gap-3 justify-end">
               <button onClick={() => setDeleteNoteId(null)}
                 className="px-[17px] py-[9px] rounded-lg text-[12px] font-normal transition-colors"
-                style={{ fontFamily:FONT, border:`1px solid #E5E7EB`, color: c.text, background:"linear-gradient(to bottom, rgba(255,255,255,0.10), rgba(192,192,192,0.10), rgba(172,172,172,0.10))" }}>
+                style={{ fontFamily:FONT, border:`1px solid #E5E7EB`, color: c.text, background:"#FFFFFF" }}>
                 Cancel
               </button>
               <button onClick={() => { setNotes(prev => prev.filter(n => n.id !== deleteNoteId)); setDeleteNoteId(null); }}
