@@ -8,7 +8,7 @@ import {
   FileText as QuoteIcon, Shield,
   StickyNote, LayoutGrid, Trash2, Archive, Pin, List, Table2, FolderOpen, FileCheck,
   CheckSquare, Maximize2, Minimize2, Lock, Unlock, Copy, CopyPlus,
-  MoreVertical, UserCircle, UserX, UserMinus, Download, Upload, UserCog, Pencil, Globe, Eye, Headphones, Crown, Mail, Phone, Bell, Bookmark, FilePen, AlertCircle, Filter, Paperclip, Check, Send,
+  MoreVertical, UserCircle, UserX, UserMinus, Download, Upload, UserCog, Pencil, Globe, Eye, Mail, Phone, Bell, Bookmark, FilePen, AlertCircle, Filter, Paperclip, Check, Send,
 } from "lucide-react";
 import { AddressAutocomplete } from "./AddressAutocomplete";
 
@@ -594,7 +594,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
   const [eBizTypeOpen, setEBizTypeOpen] = useState(false);
   const [eReason, setEReason] = useState("");
   const [eReasonOpen, setEReasonOpen] = useState(false);
-  const E_REASON_OPTIONS = ["Closed", "Sold", "Credit Hold", "Missing Info", "Terminated"];
+  const E_REASON_OPTIONS = ["Closed", "Sold", "Credit Hold", "Missing Info", "Suspended", "Terminated"];
 
   const formatPhone = (raw: string) => {
     const digits = raw.replace(/\D/g, "").slice(0, 10);
@@ -728,7 +728,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
   // `position: fixed` and float above the table's scroll container without being clipped.
   type CellSelectState = {
     rowIdx: number;
-    field: "jobTitle";
+    field: "admin" | "jobTitle";
     options: string[];
     triggerRect: { top: number; left: number; width: number; height: number };
   };
@@ -745,15 +745,15 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
   // else is required and gets validated.
   type ParsedUser = {
     firstName: string; lastName: string;
-    jobTitle: string;
+    admin: string; jobTitle: string;
     email: string; phone: string; ext: string;
     address: string;
   };
   // Issue field names map to the ParsedUser keys so the editable table can paint the right cell red.
-  type ImportIssue = { rowIndex: number; severity: "error" | "warning"; field: "firstName" | "lastName" | "email" | "jobTitle" | "phone" | "principal"; message: string };
+  type ImportIssue = { rowIndex: number; severity: "error" | "warning"; field: "firstName" | "lastName" | "email" | "admin" | "jobTitle" | "phone" | "principal"; message: string };
   // Canonical fields we accept in the bulk-upload schema. "ignore" is a sentinel for the mapping
   // step that lets the user explicitly drop unrecognized columns.
-  type CanonicalField = "firstName" | "lastName" | "jobTitle" | "email" | "phone" | "ext" | "address" | "ignore";
+  type CanonicalField = "firstName" | "lastName" | "admin" | "jobTitle" | "email" | "phone" | "ext" | "address" | "ignore";
   // Result of parsing the file before we apply column mapping. We hold on to the raw header strings
   // and the raw row values so the mapping step can show the user what was found.
   type RawParsedFile = { headers: string[]; rows: string[][]; fileName: string };
@@ -829,6 +829,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
     firstName: ["firstname", "first", "fname", "givenname", "given"],
     lastName:  ["lastname", "last", "lname", "surname", "familyname", "family"],
     email:     ["email", "emailaddress", "mail", "emailid"],
+    admin:     ["admin", "isadmin", "adminuser", "administrator"],
     jobTitle:  ["jobtitle", "title", "job", "position", "designation"],
     phone:     ["phone", "phonenumber", "tel", "telephone", "mobile", "mobilephone", "cell", "cellphone", "contact"],
     ext:       ["ext", "extension", "phoneext", "phoneextension"],
@@ -857,6 +858,21 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
   };
 
   /**
+   * Normalize the Admin Yes/No cell. Accepts the obvious spellings of true / false
+   * (yes, y, true, 1 ↔ no, n, false, 0) so a spreadsheet typed by hand still maps.
+   * Anything else falls through as the original trimmed string — validate() will then
+   * flag it so the user can correct it in the editable preview.
+   */
+  const normalizeAdminValue = (raw: string): string => {
+    const trimmed = raw.trim();
+    if (!trimmed) return "";
+    const slug = slugify(trimmed);
+    if (["yes", "y", "true", "1"].includes(slug)) return "Yes";
+    if (["no", "n", "false", "0"].includes(slug)) return "No";
+    return trimmed;
+  };
+
+  /**
    * Phone helpers — strip non-digits for storage, format for display.
    * Accept 10 digits (US) or 11 digits starting with 1. NOTE: a sibling `formatPhone`
    * exists higher up in this component for LIVE input formatting (progressive `(123) 456…`
@@ -881,8 +897,9 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
    * beyond accepting whatever the user provides). Phone is required and must be 10 (or 11 with
    * a leading 1) digits after stripping non-digits.
    *
-   * Job Title uses slug-match — the parse layer already normalizes values to canonical
-   * casing, so what hits validate is either an exact JOB_TITLES entry or unrecognizable.
+   * Admin is required and must be "Yes" or "No"; Job Title uses slug-match. The parse layer
+   * normalizes both to canonical casing, so what hits validate is either an exact allowed
+   * value or unrecognizable (and we surface a clear error in that case).
    *
    * Returns issues with the original spreadsheet row number (1-indexed, +1 for the header).
    */
@@ -910,6 +927,11 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
         } else {
           seenEmails.set(key, idx);
         }
+      }
+      if (!u.admin.trim()) {
+        issues.push({ rowIndex: idx, severity: "error", field: "admin", message: `Row ${sheetRow}: missing Admin (Yes or No).` });
+      } else if (!["Yes", "No"].includes(u.admin.trim())) {
+        issues.push({ rowIndex: idx, severity: "error", field: "admin", message: `Row ${sheetRow}: "${u.admin}" isn't a valid Admin value — use Yes or No.` });
       }
       if (!u.jobTitle.trim()) {
         issues.push({ rowIndex: idx, severity: "error", field: "jobTitle", message: `Row ${sheetRow}: missing Job Title.` });
@@ -1013,13 +1035,14 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
 
   /**
    * Apply a header → canonical-field mapping to the raw parsed file, building ParsedUser rows.
-   * Job Title is slug-matched inline so "Producer" / "producer" / "Producer " all land canonical.
+   * Admin is normalized to "Yes" / "No" (accepting common alternates like Y / true / 1);
+   * Job Title is slug-matched so "Producer" / "producer" / "Producer " all land canonical.
    * Empty rows (no name AND no email) are dropped.
    */
   const buildParsedUsers = (raw: RawParsedFile, mapping: CanonicalField[]): ParsedUser[] => {
     // colIndex[field] = index into the raw header array that maps to that field, or -1 if unmapped.
     const colIndex: Record<Exclude<CanonicalField, "ignore">, number> = {
-      firstName: -1, lastName: -1, jobTitle: -1,
+      firstName: -1, lastName: -1, admin: -1, jobTitle: -1,
       email: -1, phone: -1, ext: -1, address: -1,
     };
     mapping.forEach((field, idx) => {
@@ -1032,6 +1055,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
     return raw.rows.map(row => ({
       firstName: pick(row, "firstName").trim(),
       lastName:  pick(row, "lastName").trim(),
+      admin:     normalizeAdminValue(pick(row, "admin")),
       jobTitle:  normalizeJobTitleValue(pick(row, "jobTitle")),
       email:     pick(row, "email").trim(),
       // Format phones at parse time so a file with raw digits ("5551234567") or assorted
@@ -1152,6 +1176,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
       const users: ParsedUser[] = rawUsers.map(u => ({
         firstName: String(u.firstName ?? ""),
         lastName:  String(u.lastName  ?? ""),
+        admin:     String(u.admin     ?? ""),
         jobTitle:  String(u.jobTitle  ?? ""),
         email:     String(u.email     ?? ""),
         phone:     String(u.phone     ?? ""),
@@ -1186,15 +1211,16 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
   /**
    * Update a single field on a single row in the editable table. Re-runs validation against
    * the whole file (cheap at 500 rows) so cross-row checks like duplicate-email + multiple-
-   * Principal stay accurate after every edit. Job Title cells pass through the normalizer
-   * so a dropdown pick lands as the canonical value even if the user later pastes a
-   * slug-equivalent string.
+   * Principal stay accurate after every edit. Admin / Job Title cells pass through the
+   * normalizer so a dropdown pick lands as the canonical value even if the user later
+   * pastes a slug-equivalent string.
    */
   const updateRow = (rowIdx: number, field: keyof ParsedUser, value: string) => {
     setParsedUsers(prev => {
       const next = prev.map((u, i) => {
         if (i !== rowIdx) return u;
-        // Normalize on the way in for Job Title so the cell snaps to canonical casing.
+        // Normalize on the way in for Admin / Job Title so the cell snaps to canonical casing.
+        if (field === "admin")    return { ...u, admin:    normalizeAdminValue(value) };
         if (field === "jobTitle") return { ...u, jobTitle: normalizeJobTitleValue(value) };
         // Phone gets live-formatted as the user types — `formatPhone` is the same
         // progressive `(XXX) XXX-XXXX` formatter used in the single-user input forms
@@ -1376,8 +1402,6 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
   const [auFirstName,  setAuFirstName]  = useState("");
   const [auLastName,   setAuLastName]   = useState("");
   const [auIsAdmin,    setAuIsAdmin]    = useState(false);
-  const [auAdminLevel, setAuAdminLevel] = useState("");
-  const [auAdminLevelOpen, setAuAdminLevelOpen] = useState(false);
   const [auJobTitle,   setAuJobTitle]   = useState("");
   const [auJobOpen,    setAuJobOpen]    = useState(false);
   const [auStatus,     setAuStatus]     = useState("");
@@ -1411,6 +1435,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
     ws.columns = [
       { header: "First Name", key: "firstName", width: 16 },
       { header: "Last Name",  key: "lastName",  width: 16 },
+      { header: "Admin",      key: "admin",     width: 10 },
       { header: "Job Title",  key: "jobTitle",  width: 18 },
       { header: "Email",      key: "email",     width: 28 },
       { header: "Phone",      key: "phone",     width: 16 },
@@ -1422,37 +1447,43 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
       // Re-export current progress (Download progress button). One row per ParsedUser.
       seedRows.forEach(u => ws.addRow({
         firstName: u.firstName, lastName: u.lastName,
-        jobTitle: u.jobTitle,
+        admin: u.admin, jobTitle: u.jobTitle,
         email: u.email, phone: u.phone, ext: u.ext, address: u.address,
       }));
     } else {
       // Fresh template — one example row so the format is obvious at a glance.
-      ws.addRow({ firstName: "John", lastName: "Doe", jobTitle: "Producer", email: "john@example.com", phone: "(555) 123-4567", ext: "123", address: "123 Main St, Springfield, IL 62701" });
+      ws.addRow({ firstName: "John", lastName: "Doe", admin: "No", jobTitle: "Producer", email: "john@example.com", phone: "(555) 123-4567", ext: "123", address: "123 Main St, Springfield, IL 62701" });
     }
 
-    // Apply data-validation dropdown to Job Title (col C), rows 2..501.
+    // Apply data-validation dropdowns to Admin (col C: Yes/No) and Job Title (col D), rows 2..501.
     // Bumped the range from 200 to 500 to fit the 500-row "large file" use case.
     // exceljs's per-cell assignment is the documented + most reliably serialised path.
     // A FRESH validation object is assigned per cell — sharing the same object can let
     // exceljs drop entries when it dedupes.
+    const adminFormula    = `"Yes,No"`;
     const jobTitleFormula = `"${JOB_TITLES.join(",")}"`;
     for (let r = 2; r <= 501; r++) {
       ws.getCell(`C${r}`).dataValidation = {
+        type: "list",
+        allowBlank: true,
+        formulae: [adminFormula],
+      };
+      ws.getCell(`D${r}`).dataValidation = {
         type: "list",
         allowBlank: true,
         formulae: [jobTitleFormula],
       };
     }
 
-    ws.getCell("C1").note = "Only one Principal is allowed per agency.";
-    ws.getCell("G1").note = "Address is optional. Leave blank if you don't have it.";
+    ws.getCell("D1").note = "Only one Principal is allowed per agency.";
+    ws.getCell("H1").note = "Address is optional. Leave blank if you don't have it.";
 
     ws.addConditionalFormatting({
-      ref: "C2:C501",
+      ref: "D2:D501",
       rules: [
         {
           type: "expression",
-          formulae: [`AND(C2="Principal", COUNTIF($C$2:$C$501,"Principal")>1)`],
+          formulae: [`AND(D2="Principal", COUNTIF($D$2:$D$501,"Principal")>1)`],
           priority: 1,
           style: {
             fill:   { type: "pattern", pattern: "solid", bgColor: { argb: "FFFEE2E2" } },
@@ -2922,16 +2953,23 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
               </div>
               <div>
                 <label style={labelStyle}>Agency Code:</label>
-                <div className="flex gap-2">
-                  <input value={eCode} onChange={e => setECode(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
-                  <button type="button" onClick={() => setECode(generateAgencyCode())}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[12px] font-semibold whitespace-nowrap transition-all"
-                    style={{ ...font, border: `1px solid #A855F7`, background: "transparent" }}
-                    onMouseEnter={e => (e.currentTarget.style.background = "rgba(168,85,247,0.08)")}
-                    onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-                    <RefreshCw className="w-3 h-3" style={{ color: "#7C3AED" }} />
-                    <span style={isDark ? { color: "#FFFFFF" } : { backgroundImage: "linear-gradient(88.54deg, #5C2ED4 0.1%, #A614C3 63.88%)", backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Create Code</span>
-                  </button>
+                {/* Locked on edit — the agency code is an external identifier the agency
+                    relies on. Changing it after the fact would break inbound references
+                    (link sharing, support tickets, partner integrations), so we surface
+                    it as read-only with a lock affordance instead of an editable input. */}
+                <div className="relative">
+                  <input value={eCode} readOnly aria-readonly="true"
+                    title="Agency Code is locked — external systems reference this value."
+                    style={{
+                      ...inputStyle,
+                      width: "100%",
+                      paddingRight: 34,
+                      background: isDark ? "rgba(255,255,255,0.04)" : "#F9FAFB",
+                      color: c.muted,
+                      cursor: "not-allowed",
+                    }} />
+                  <Lock className="w-3.5 h-3.5 absolute pointer-events-none"
+                    style={{ right: 10, top: "50%", transform: "translateY(-50%)", color: c.muted }} />
                 </div>
               </div>
               <div>
@@ -3562,61 +3600,64 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                 </div>
                 <div className="text-[11px]" style={{ ...font, color: c.muted }}>{d.date}</div>
               </div>
-              {!d.trashed && (
-                <>
-                  <button title="View" onClick={() => setPreviewDoc(d)} className="p-1.5 rounded transition-colors"
-                    style={{ color: previewDoc?.id === d.id ? "#A855F7" : c.muted, background: previewDoc?.id === d.id ? "rgba(168,85,247,0.10)" : "transparent" }}
-                    onMouseEnter={e => { if (previewDoc?.id !== d.id) { e.currentTarget.style.background = c.hoverBg; e.currentTarget.style.color = c.text; } }}
-                    onMouseLeave={e => { if (previewDoc?.id !== d.id) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = c.muted; } }}>
-                    <Eye className="w-3.5 h-3.5" />
-                  </button>
-                  <button title="Download" className="p-1.5 rounded transition-colors" style={{ color: c.muted }}
-                    onMouseEnter={e => { e.currentTarget.style.background = c.hoverBg; e.currentTarget.style.color = c.text; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = c.muted; }}>
-                    <Download className="w-3.5 h-3.5" />
-                  </button>
-                </>
-              )}
-              {isAdmin && d.trashed && (
-                <>
-                  <button title="Restore" onClick={() => handleRestore(d)}
+              {/* Action cluster — tight gap so the icons read as one group, not four floating ones. */}
+              <div className="flex items-center gap-1 flex-shrink-0">
+                {!d.trashed && (
+                  <>
+                    <button title="View" onClick={() => setPreviewDoc(d)} className="p-1.5 rounded transition-colors"
+                      style={{ color: previewDoc?.id === d.id ? "#A855F7" : c.muted, background: previewDoc?.id === d.id ? "rgba(168,85,247,0.10)" : "transparent" }}
+                      onMouseEnter={e => { if (previewDoc?.id !== d.id) { e.currentTarget.style.background = c.hoverBg; e.currentTarget.style.color = c.text; } }}
+                      onMouseLeave={e => { if (previewDoc?.id !== d.id) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = c.muted; } }}>
+                      <Eye className="w-3.5 h-3.5" />
+                    </button>
+                    <button title="Download" className="p-1.5 rounded transition-colors" style={{ color: c.muted }}
+                      onMouseEnter={e => { e.currentTarget.style.background = c.hoverBg; e.currentTarget.style.color = c.text; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = c.muted; }}>
+                      <Download className="w-3.5 h-3.5" />
+                    </button>
+                  </>
+                )}
+                {isAdmin && d.trashed && (
+                  <>
+                    <button title="Restore" onClick={() => handleRestore(d)}
+                      className="p-1.5 rounded transition-colors" style={{ color: c.muted }}
+                      onMouseEnter={e => { e.currentTarget.style.background = "rgba(16,185,129,0.10)"; e.currentTarget.style.color = "#10B981"; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = c.muted; }}>
+                      <RefreshCw className="w-3.5 h-3.5" />
+                    </button>
+                    <button title="Delete permanently" onClick={() => requestPurge(d)}
+                      className="p-1.5 rounded transition-colors" style={{ color: c.muted }}
+                      onMouseEnter={e => { e.currentTarget.style.background = "rgba(239,68,68,0.10)"; e.currentTarget.style.color = "#EF4444"; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = c.muted; }}>
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </>
+                )}
+                {isAdmin && d.archived && !d.trashed && (
+                  <button title="Unarchive" onClick={() => handleUnarchive(d)}
                     className="p-1.5 rounded transition-colors" style={{ color: c.muted }}
-                    onMouseEnter={e => { e.currentTarget.style.background = "rgba(16,185,129,0.10)"; e.currentTarget.style.color = "#10B981"; }}
+                    onMouseEnter={e => { e.currentTarget.style.background = c.hoverBg; e.currentTarget.style.color = c.text; }}
                     onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = c.muted; }}>
                     <RefreshCw className="w-3.5 h-3.5" />
                   </button>
-                  <button title="Delete permanently" onClick={() => requestPurge(d)}
+                )}
+                {isAdmin && !d.archived && !d.trashed && (
+                  <button title="Archive" onClick={() => requestArchive(d)}
                     className="p-1.5 rounded transition-colors" style={{ color: c.muted }}
-                    onMouseEnter={e => { e.currentTarget.style.background = "rgba(239,68,68,0.10)"; e.currentTarget.style.color = "#EF4444"; }}
+                    onMouseEnter={e => { e.currentTarget.style.background = c.hoverBg; e.currentTarget.style.color = c.text; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = c.muted; }}>
+                    <Archive className="w-3.5 h-3.5" />
+                  </button>
+                )}
+                {isAdmin && !d.trashed && (
+                  <button title="Move to Trash" onClick={() => requestTrash(d)}
+                    className="p-1.5 rounded transition-colors" style={{ color: c.muted }}
+                    onMouseEnter={e => { e.currentTarget.style.background = "rgba(239,68,68,0.08)"; e.currentTarget.style.color = "#EF4444"; }}
                     onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = c.muted; }}>
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
-                </>
-              )}
-              {isAdmin && d.archived && !d.trashed && (
-                <button title="Unarchive" onClick={() => handleUnarchive(d)}
-                  className="p-1.5 rounded transition-colors" style={{ color: c.muted }}
-                  onMouseEnter={e => { e.currentTarget.style.background = c.hoverBg; e.currentTarget.style.color = c.text; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = c.muted; }}>
-                  <RefreshCw className="w-3.5 h-3.5" />
-                </button>
-              )}
-              {isAdmin && !d.archived && !d.trashed && (
-                <button title="Archive" onClick={() => requestArchive(d)}
-                  className="p-1.5 rounded transition-colors" style={{ color: c.muted }}
-                  onMouseEnter={e => { e.currentTarget.style.background = c.hoverBg; e.currentTarget.style.color = c.text; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = c.muted; }}>
-                  <Archive className="w-3.5 h-3.5" />
-                </button>
-              )}
-              {isAdmin && !d.trashed && (
-                <button title="Move to Trash" onClick={() => requestTrash(d)}
-                  className="p-1.5 rounded transition-colors" style={{ color: c.muted }}
-                  onMouseEnter={e => { e.currentTarget.style.background = "rgba(239,68,68,0.08)"; e.currentTarget.style.color = "#EF4444"; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = c.muted; }}>
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              )}
+                )}
+              </div>
             </div>
           );
 
@@ -3665,7 +3706,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                                 {docFilterCats.size === 0 && <svg width="10" height="8" viewBox="0 0 9 7" fill="none" className="flex-shrink-0"><path d="M1 3.5L3.5 6L8 1" stroke="#A614C3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
                               </button>
                               <div style={{ height: 1, background: c.border }} />
-                              {(["bor","w9","license","agreement","eo","other"] as AgencyDocCategory[]).map(t => {
+                              {(["bor","license","agreement","eo"] as AgencyDocCategory[]).map(t => {
                                 const checked = docFilterCats.has(t);
                                 return (
                                   <button key={t} onClick={() => toggleDocFilterCat(t)}
@@ -3727,7 +3768,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                           All Categories
                           {docFilterCats.size === 0 && <svg width="10" height="8" viewBox="0 0 9 7" fill="none"><path d="M1 3.5L3.5 6L8 1" stroke="#A614C3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
                         </button>
-                        {(["bor","w9","license","agreement","eo","other"] as AgencyDocCategory[]).map(t => {
+                        {(["bor","license","agreement","eo"] as AgencyDocCategory[]).map(t => {
                           const checked = docFilterCats.has(t);
                           return (
                             <button key={t} onClick={() => toggleDocFilterCat(t)}
@@ -3852,7 +3893,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                                 {docUploadModalCatOpen && (
                                   <div className="absolute left-0 right-0 top-full mt-1 z-30 rounded-lg overflow-hidden"
                                     style={{ background: c.cardBg, border: `1px solid ${c.border}`, boxShadow: "0 8px 24px rgba(0,0,0,0.12)" }}>
-                                    {(["bor","w9","license","agreement","eo","other"] as AgencyDocCategory[]).map(cat => {
+                                    {(["bor","license","agreement","eo"] as AgencyDocCategory[]).map(cat => {
                                       const active = docUploadModalCat === cat;
                                       return (
                                         <button key={cat} type="button"
@@ -3871,7 +3912,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                               </div>
                             </div>
                           </div>
-                          <div className="px-6 py-3 flex justify-end gap-2" style={{ borderTop: `1px solid ${c.border}` }}>
+                          <div className="px-6 py-3 flex items-center justify-between gap-2" style={{ borderTop: `1px solid ${c.border}` }}>
                             <button onClick={closeModal}
                               className="px-4 py-2 rounded-lg text-[12px] font-medium transition-all"
                               style={{ border: `1px solid ${c.border}`, color: c.text, background: c.cardBg }}>
@@ -4002,11 +4043,20 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                 )}
 
                 {/* Table view */}
-                {!showDocArchived && !showDocTrashed && docView === "table" && (
+                {!showDocArchived && !showDocTrashed && docView === "table" && (() => {
+                  // Drop the Category column when the preview panel is open — at 38% width
+                  // the colored badge wraps and squeezes Name/Date into unreadable widths.
+                  // Category is recoverable from the preview itself, Name + Date isn't.
+                  const tableCompact = !!previewDoc && !previewExpanded;
+                  const sortableKeys = tableCompact ? (["name","date"] as const) : (["name","category","date"] as const);
+                  const tableGrid = tableCompact
+                    ? "minmax(0,1.6fr) minmax(0,1fr) 130px"
+                    : "minmax(0,1.3fr) minmax(0,1fr) minmax(0,1fr) 140px";
+                  return (
                   <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${c.border}`, background: c.cardBg }}>
                     <div className="grid items-center px-5 py-2 text-[11px] font-semibold uppercase tracking-wider"
-                      style={{ ...font, color: c.muted, background: c.hoverBg, letterSpacing: "0.04em", gridTemplateColumns: "minmax(0,1.3fr) minmax(0,1fr) minmax(0,1fr) minmax(0,0.8fr) 140px" }}>
-                      {(["name","category","date"] as const).map(k => {
+                      style={{ ...font, color: c.muted, background: c.hoverBg, letterSpacing: "0.04em", gridTemplateColumns: tableGrid }}>
+                      {sortableKeys.map(k => {
                         const label = k === "name" ? "Name" : k === "category" ? "Category" : "Date";
                         const active = docSortKey === k;
                         const sub = isDark ? "#6B7280" : "#9CA3AF";
@@ -4032,7 +4082,6 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                           </button>
                         );
                       })}
-                      <span className="text-left">State</span>
                       <span className="text-right">Actions</span>
                     </div>
                     {visibleDocs.length === 0 ? (
@@ -4040,25 +4089,20 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                     ) : (
                       visibleDocs.map(d => (
                         <div key={d.id} className="grid items-center px-5 py-2.5 text-[12px]"
-                          style={{ ...font, color: c.text, borderTop: `1px solid ${c.border}`, gridTemplateColumns: "minmax(0,1.3fr) minmax(0,1fr) minmax(0,1fr) minmax(0,0.8fr) 140px" }}>
+                          style={{ ...font, color: c.text, borderTop: `1px solid ${c.border}`, gridTemplateColumns: tableGrid }}>
                           <span className="flex items-center gap-2 min-w-0">
                             <SelectableFileIcon id={d.id} size="w-3.5 h-3.5" />
                             <span className="truncate">{d.name}</span>
                           </span>
-                          <span>
-                            <span className="inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded"
-                              style={{ fontFamily: FONT, color: isDark ? "#C87BE0" : "#A614C3", background: isDark ? "rgba(168,85,247,0.22)" : "rgba(168,85,247,0.10)" }}>
-                              {CAT_LABEL[d.category]}
+                          {!tableCompact && (
+                            <span>
+                              <span className="inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded"
+                                style={{ fontFamily: FONT, color: isDark ? "#C87BE0" : "#A614C3", background: isDark ? "rgba(168,85,247,0.22)" : "rgba(168,85,247,0.10)" }}>
+                                {CAT_LABEL[d.category]}
+                              </span>
                             </span>
-                          </span>
+                          )}
                           <span style={{ color: c.muted }}>{d.date}</span>
-                          <span>
-                            {d.archived ? (
-                              <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded" style={{ color: "#F59E0B", background: "rgba(245,158,11,0.10)", letterSpacing: "0.04em" }}>{d.category === "w9" ? "Replaced" : "Archived"}</span>
-                            ) : (
-                              <span style={{ color: c.muted }}>—</span>
-                            )}
-                          </span>
                           <span className="flex items-center justify-end gap-1">
                             <button title="View" onClick={() => setPreviewDoc(d)} className="p-1.5 rounded transition-colors"
                               style={{ color: previewDoc?.id === d.id ? "#A855F7" : c.muted, background: previewDoc?.id === d.id ? "rgba(168,85,247,0.10)" : "transparent" }}
@@ -4071,6 +4115,14 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                               onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = c.muted; }}>
                               <Download className="w-3.5 h-3.5" />
                             </button>
+                            {isAdmin && !d.archived && !d.trashed && (
+                              <button title="Archive" onClick={() => requestArchive(d)}
+                                className="p-1.5 rounded transition-colors" style={{ color: c.muted }}
+                                onMouseEnter={e => { e.currentTarget.style.background = c.hoverBg; e.currentTarget.style.color = c.text; }}
+                                onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = c.muted; }}>
+                                <Archive className="w-3.5 h-3.5" />
+                              </button>
+                            )}
                             {isAdmin && (
                               <button title="Move to Trash" onClick={() => requestTrash(d)}
                                 className="p-1.5 rounded transition-colors" style={{ color: c.muted }}
@@ -4084,7 +4136,8 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                       ))
                     )}
                   </div>
-                )}
+                  );
+                })()}
               </div>
             </div>
             {/* Right panel: doc preview */}
@@ -5720,7 +5773,6 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                                     setAuFirstName(parts[0] || "");
                                     setAuLastName(parts.slice(1).join(" "));
                                     setAuIsAdmin(u.isAdmin);
-                                    setAuAdminLevel("");
                                     setAuJobTitle(u.jobTitle);
                                     setAuStatus((inactiveUserIds.has(u.id) || statusInactiveUserIds.has(u.id)) ? "Inactive" : "Active");
                                     setAuPhone(u.phone);
@@ -5905,48 +5957,6 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                   </div>
                 </div>
 
-                {/* Admin Level — only enabled when admin toggle is on */}
-                <div style={{ opacity: auIsAdmin ? 1 : 0.4, transition:"opacity 0.2s", pointerEvents: auIsAdmin ? "auto" : "none" }}>
-                  <Field label="Admin Level">
-                    <div className="relative" onClick={e => e.stopPropagation()}>
-                      {(() => {
-                        const levels: [string, React.ComponentType<{className?:string;style?:React.CSSProperties}>][] = [
-                          ["Read-Only Admin", Eye as never],
-                          ["Agency Support Admin", Headphones as never],
-                          ["Super Admin", Crown as never],
-                        ];
-                        const currentIcon = levels.find(([n])=>n===auAdminLevel)?.[1];
-                        const CI = currentIcon;
-                        return (<>
-                          <button type="button" onClick={() => setAuAdminLevelOpen(p=>!p)}
-                            disabled={!auIsAdmin}
-                            className="w-full flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-[13px] outline-none"
-                            style={{ ...inputStyle, color:auAdminLevel?c.text:c.muted, cursor: auIsAdmin ? "pointer" : "not-allowed", textAlign: "left" }}>
-                            {CI && <CI className="w-4 h-4" style={{ color: c.muted }} />}
-                            <span className="flex-1">{auAdminLevel || "Select Level..."}</span>
-                            <ChevronDown className="w-4 h-4" style={{ color:c.muted }} />
-                          </button>
-                          {auAdminLevelOpen && (
-                            <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-20 rounded-xl shadow-xl py-2"
-                              style={{ background: c.cardBg, border: `1px solid ${c.border}` }}>
-                              {levels.map(([name, Ic]) => (
-                                <button key={name} type="button" onClick={() => { setAuAdminLevel(name); setAuAdminLevelOpen(false); }}
-                                  className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-[13px] transition-colors"
-                                  style={{ fontFamily: FONT, color: c.text, background: auAdminLevel === name ? (isDark ? "rgba(168,85,247,0.08)" : "rgba(168,85,247,0.06)") : "transparent" }}
-                                  onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
-                                  onMouseLeave={e => (e.currentTarget.style.background = auAdminLevel === name ? (isDark ? "rgba(168,85,247,0.08)" : "rgba(168,85,247,0.06)") : "transparent")}>
-                                  <Ic className="w-4 h-4 flex-shrink-0" style={{ color: c.muted }} />
-                                  <span>{name}</span>
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </>);
-                      })()}
-                    </div>
-                  </Field>
-                </div>
-
                 {/* Row: Job Title + Status */}
                 <div className="flex gap-3">
                   <div className="flex-1 relative">
@@ -6038,7 +6048,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                   onMouseEnter={e=>(e.currentTarget.style.background=c.hoverBg)}
                   onMouseLeave={e=>(e.currentTarget.style.background="transparent")}
                   onClick={()=>{ closeModal(); closeAll(); }}>
-                  Cancel Changes
+                  Cancel
                 </button>
                 <button
                   className="text-[13px] font-semibold text-white transition-all"
@@ -6058,7 +6068,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                     closeModal();
                     closeAll();
                   }}>
-                  {isEditMode ? "Save Changes" : "Save"}
+                  {isEditMode ? "Save Changes" : "Send Invite"}
                 </button>
               </div>
 
@@ -6620,8 +6630,8 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                   <table className="text-[11px]" style={{ fontFamily:FONT, borderCollapse:"separate", borderSpacing:0, width:"100%" }}>
                     <thead>
                       <tr style={{ background:isDark?"rgba(255,255,255,0.04)":"#FAFAFB" }}>
-                        {["First Name","Last Name","Job Title","Email","Phone","Ext","Address"].map((h, i) => (
-                          <th key={h} className="text-left px-3 py-2 font-semibold whitespace-nowrap" style={{ color:c.muted, borderBottom:`1px solid ${c.border}`, borderRight: i < 6 ? `1px solid ${c.border}` : "none" }}>
+                        {["First Name","Last Name","Admin","Job Title","Email","Phone","Ext","Address"].map((h, i) => (
+                          <th key={h} className="text-left px-3 py-2 font-semibold whitespace-nowrap" style={{ color:c.muted, borderBottom:`1px solid ${c.border}`, borderRight: i < 7 ? `1px solid ${c.border}` : "none" }}>
                             {h}
                           </th>
                         ))}
@@ -6629,12 +6639,12 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                     </thead>
                     <tbody>
                       {[
-                        { firstName:"John",  lastName:"Doe",   jobTitle:"Producer",  email:"john@example.com", phone:"(555) 123-4567", ext:"101", address:"123 Main St" },
-                        { firstName:"Jane",  lastName:"Smith", jobTitle:"Principal", email:"jane@example.com", phone:"(555) 987-6543", ext:"",    address:"" },
+                        { firstName:"John",  lastName:"Doe",   admin:"No",  jobTitle:"Producer",  email:"john@example.com", phone:"(555) 123-4567", ext:"101", address:"123 Main St" },
+                        { firstName:"Jane",  lastName:"Smith", admin:"Yes", jobTitle:"Principal", email:"jane@example.com", phone:"(555) 987-6543", ext:"",    address:"" },
                       ].map((r, ri) => (
                         <tr key={ri}>
-                          {[r.firstName, r.lastName, r.jobTitle, r.email, r.phone, r.ext, r.address].map((v, ci) => (
-                            <td key={ci} className="px-3 py-2 whitespace-nowrap font-mono" style={{ color: v ? c.text : c.muted, borderRight: ci < 6 ? `1px solid ${c.border}` : "none", borderBottom: `1px solid ${c.border}` }}>
+                          {[r.firstName, r.lastName, r.admin, r.jobTitle, r.email, r.phone, r.ext, r.address].map((v, ci) => (
+                            <td key={ci} className="px-3 py-2 whitespace-nowrap font-mono" style={{ color: v ? c.text : c.muted, borderRight: ci < 7 ? `1px solid ${c.border}` : "none", borderBottom: `1px solid ${c.border}` }}>
                               {v || <span style={{ opacity:0.5 }}>—</span>}
                             </td>
                           ))}
@@ -6646,6 +6656,10 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                 {/* Allowed values list — explicit text format, brand-purple values. User said the
                     listed version was clearer than the "use dropdowns" hand-wave. */}
                 <div className="px-4 py-3 space-y-1" style={{ background:isDark?"rgba(255,255,255,0.02)":"#FAFAFB" }}>
+                  <div className="flex items-baseline gap-2 text-[11px]" style={{ fontFamily:FONT }}>
+                    <span className="flex-shrink-0 w-[60px]" style={{ color:c.muted }}>Admin</span>
+                    <span className="font-mono" style={{ color:"#A614C3" }}>Yes / No</span>
+                  </div>
                   <div className="flex items-baseline gap-2 text-[11px]" style={{ fontFamily:FONT }}>
                     <span className="flex-shrink-0 w-[60px]" style={{ color:c.muted }}>Job Title</span>
                     <span className="font-mono" style={{ color:"#A614C3" }}>{JOB_TITLES.join(" / ")}</span>
@@ -6659,7 +6673,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
               </div>
 
               {/* Template download — single Excel-only button. CSV was dropped because it can't carry
-                  the Job Title dropdown that makes the template foolproof. */}
+                  the Admin / Job Title dropdowns that make the template foolproof. */}
               <button type="button" onClick={() => downloadExcelTemplate()}
                 className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-[13px] font-semibold text-white transition-all"
                 style={{ fontFamily:FONT, background: btnGrad, boxShadow:"0 2px 10px rgba(166,20,195,0.20)" }}
@@ -6750,6 +6764,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                   { value: "firstName", label: "First Name" },
                   { value: "lastName",  label: "Last Name" },
                   { value: "email",     label: "Email" },
+                  { value: "admin",     label: "Admin (Yes/No)" },
                   { value: "jobTitle",  label: "Job Title" },
                   { value: "phone",     label: "Phone" },
                   { value: "ext",       label: "Ext" },
@@ -6906,11 +6921,12 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                 };
                 // Column definitions for the editable table. `width` is a hint for the layout;
                 // the table is fixed-width so columns stay aligned during scroll.
-                type ColKey = "firstName" | "lastName" | "jobTitle" | "email" | "phone" | "ext" | "address";
+                type ColKey = "firstName" | "lastName" | "admin" | "jobTitle" | "email" | "phone" | "ext" | "address";
                 type Col = { key: ColKey; label: string; required: boolean; width: number; kind: "text" | "select"; options?: readonly string[] };
                 const columns: Col[] = [
                   { key: "firstName", label: "First Name", required: true,  width: 120, kind: "text" },
                   { key: "lastName",  label: "Last Name",  required: true,  width: 120, kind: "text" },
+                  { key: "admin",     label: "Admin",      required: true,  width: 90,  kind: "select", options: ["Yes", "No"] as const },
                   { key: "jobTitle",  label: "Job Title",  required: true,  width: 145, kind: "select", options: JOB_TITLES },
                   { key: "email",     label: "Email",      required: true,  width: 200, kind: "text" },
                   { key: "phone",     label: "Phone",      required: true,  width: 130, kind: "text" },
@@ -7140,7 +7156,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                                           const rect = e.currentTarget.getBoundingClientRect();
                                           setCellSelect({
                                             rowIdx: i,
-                                            field: col.key as "jobTitle",
+                                            field: col.key as "admin" | "jobTitle",
                                             options: col.options as string[],
                                             triggerRect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height },
                                           });
@@ -7443,7 +7459,7 @@ function AddAgencyForm({ isDark, onSaveForLater, onDiscard, initialDraft, c, btn
   const [bizTypeOpen, setBizTypeOpen] = useState(false);
   const [reason, setReason] = useState("");
   const [reasonOpen, setReasonOpen] = useState(false);
-  const REASON_OPTIONS = ["Closed", "Sold", "Credit Hold", "Missing Info", "Terminated"];
+  const REASON_OPTIONS = ["Closed", "Sold", "Credit Hold", "Missing Info", "Suspended", "Terminated"];
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitted, setSubmitted] = useState(false);
   // Save for Later: when the user clicks the button with missing required fields,
