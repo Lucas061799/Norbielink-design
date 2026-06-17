@@ -2364,7 +2364,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                       );
                     })}
                   </div>
-                  <div className="flex gap-3 justify-end">
+                  <div className="flex gap-3 items-center justify-between">
                     <button onClick={() => { setDocUpdateModal(null); setDocModalUploads({}); }}
                       className="px-4 py-2 rounded-lg text-[12px] font-medium transition-all"
                       style={{ border: `1px solid ${c.borderStrong}`, color: c.text, background: "transparent" }}
@@ -3355,6 +3355,9 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                   const licChanged = eLicNo !== agency.licenseNo;
                   if (w9Changed || licChanged) {
                     // Block save — modal will require new docs to be uploaded before allowing it.
+                    // The uploaded W-9 lands in agencyDocs with category "w9", but because that
+                    // category is in HIDDEN_AGENCY_DOC_CATEGORIES it never surfaces in the agency
+                    // docs UI — kept in mock data only, per the soft-hide product decision.
                     setDocModalUploads({});
                     setDocUpdateModal({ w9: w9Changed, license: licChanged });
                     return;
@@ -3390,7 +3393,12 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
             : showDocArchived
               ? archivedDocs
               : agencyDocs.filter(d => !d.trashed && !d.archived);
+          // Soft-hidden categories — kept in the type + CAT_LABEL + mock data per the
+          // product decision to retain the underlying schema, but never surfaced in the
+          // agency-facing docs UI. Filter applies to every list view + By Type grouping.
+          const HIDDEN_AGENCY_DOC_CATEGORIES = new Set<AgencyDocCategory>(["w9", "other"]);
           const visibleDocs = baseDocs
+            .filter(d => !HIDDEN_AGENCY_DOC_CATEGORIES.has(d.category))
             .filter(d => docFilterCats.size === 0 || docFilterCats.has(d.category))
             .filter(d => !docSearch || d.name.toLowerCase().includes(docSearch.toLowerCase()) || CAT_LABEL[d.category].toLowerCase().includes(docSearch.toLowerCase()))
             .sort((a, b) => {
@@ -4001,7 +4009,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                 {/* By Type view — grouped by category so each type is visually separated. */}
                 {!showDocArchived && !showDocTrashed && docView === "byType" && (() => {
                   // Render order: regular categories → E&O Certificate → Other (catch-all at the end).
-                  const ORDER: AgencyDocCategory[] = ["bor","w9","license","agreement","eo","other"];
+                  const ORDER: AgencyDocCategory[] = ["bor","license","agreement","eo"];
                   const renderGroup = (cat: AgencyDocCategory) => {
                     const docs = visibleDocs.filter(d => d.category === cat);
                     if (docs.length === 0) return null;
