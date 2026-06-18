@@ -172,7 +172,7 @@ export default function Website({ isDark = false }: WebsiteProps) {
                   description: (
                     <>
                       <span style={{ fontFamily: "monospace", color: "#A614C3", fontWeight: 600 }}>{code}</span>
-                      {" "}looks like an <span style={{ fontWeight: 600 }}>Agency Code</span>. Try your <span style={{ fontWeight: 600 }}>Email</span> or <span style={{ fontWeight: 600 }}>User ID</span>.
+                      {" "}looks like an <span style={{ fontWeight: 600 }}>Agency Code</span>. Try your <span style={{ fontWeight: 600 }}>User ID</span> instead.
                     </>
                   ),
                 });
@@ -277,6 +277,7 @@ function LoginView({ c, font, inputStyle, labelStyle, primaryBtnStyle, btnGrad, 
   const [remember, setRemember] = useState(false);
   const [showPw, setShowPw] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
+  const [userIdTipOpen, setUserIdTipOpen] = useState(false);
   // Demo: always allow Continue. Production would require identifier + password.
   const enabled = true;
 
@@ -305,18 +306,52 @@ function LoginView({ c, font, inputStyle, labelStyle, primaryBtnStyle, btnGrad, 
             label suffix would be redundant. The two pieces complement each other:
               label → what NOT to use
               placeholder → what TO use */}
-        {/* Inline label — "User ID" + a small AlertCircle icon + a quiet hint, separated by
-            the icon (no em-dash needed). Icon in brand purple draws the eye just enough to
-            register the warning without dominating. */}
-        {/* All three pieces (icon, "User ID", hint text) bottom-aligned. Outer label uses
-            `alignItems: flex-end` to line up "User ID"'s bottom with the hint span's bottom.
-            Inner hint span also uses `flex-end` so the icon and the text bottom-align too —
-            and the icon's `translateY` is removed (it would push the icon BELOW the bottom). */}
-        <label style={{ ...labelStyle, display: "flex", alignItems: "flex-end", gap: 6, flexWrap: "wrap", lineHeight: 1 }}>
+        {/* "User ID" label + a HelpCircle that reveals the full "what is a User ID" tooltip
+            on hover/focus. The detail (format example, email fallback, agency-code caveat)
+            is too long to live inline next to the label — gating it behind the icon keeps
+            the label calm while still surfacing the explanation to anyone unsure. */}
+        <label style={{ ...labelStyle, display: "flex", alignItems: "center", gap: 6, lineHeight: 1 }}>
           <span style={{ lineHeight: 1 }}>User ID</span>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontWeight: 500, fontSize: 11.5, color: "#6B7280", lineHeight: 1 }}>
-            <AlertCircle style={{ width: 11, height: 11, color: "#A614C3", flexShrink: 0, display: "block", transform: "translateY(-1px)" }} strokeWidth={2} />
-            <span style={{ lineHeight: 1 }}><span style={{ fontWeight: 700 }}>Agency Code</span> can&apos;t sign you in</span>
+          <span
+            style={{ position: "relative", display: "inline-flex", cursor: "help" }}
+            onMouseEnter={() => setUserIdTipOpen(true)}
+            onMouseLeave={() => setUserIdTipOpen(false)}
+            onFocus={() => setUserIdTipOpen(true)}
+            onBlur={() => setUserIdTipOpen(false)}
+            tabIndex={0}
+            aria-describedby="user-id-tooltip"
+          >
+            <HelpCircle style={{ width: 13, height: 13, color: c.muted, display: "block" }} strokeWidth={2} />
+            {userIdTipOpen && (
+              <div
+                id="user-id-tooltip"
+                role="tooltip"
+                style={{
+                  position: "absolute",
+                  top: "calc(100% + 8px)",
+                  left: -8,
+                  width: 280,
+                  padding: "12px 14px",
+                  background: c.cardBg,
+                  color: c.text,
+                  fontSize: 12,
+                  lineHeight: "17px",
+                  fontWeight: 400,
+                  border: `1px solid ${c.border}`,
+                  borderRadius: 12,
+                  boxShadow: "0 12px 30px rgba(0,0,0,0.12)",
+                  zIndex: 10,
+                  pointerEvents: "none",
+                  fontFamily: FONT,
+                }}
+              >
+                Not sure of your User ID? It&apos;s usually your first name, last name,
+                and numbers (e.g.,{" "}
+                <span style={{ fontFamily: "monospace", color: "#A614C3", fontWeight: 600 }}>johnsmith00110</span>),
+                though some users log in with their email address. Please note that your{" "}
+                <span style={{ fontWeight: 600, color: "#A614C3" }}>agency code</span> will not work as a User ID.
+              </div>
+            )}
           </span>
         </label>
         <input type="text" value={identifier} onChange={e => setIdentifier(e.target.value)}
@@ -325,7 +360,7 @@ function LoginView({ c, font, inputStyle, labelStyle, primaryBtnStyle, btnGrad, 
             // avoids firing the toast while they're still typing their actual identifier.
             if (looksLikeAgencyCode(identifier)) onAgencyCodeDetected(identifier.trim());
           }}
-          placeholder="Enter your Email or User ID"
+          placeholder="Enter your User ID"
           style={inputStyle} />
         {/* No persistent hint here — most users don't have an agency code at all, so a
             preemptive "agency code isn't a login" line would be both presumptuous and noisy
