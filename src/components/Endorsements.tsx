@@ -290,9 +290,17 @@ export default function Endorsements({ isDark }: { isDark: boolean }) {
       <div className="flex-1 min-h-0 overflow-y-auto" style={{ paddingBottom: 48 }}>
         {view === "search" && (
           <div className="flex flex-col gap-6">
-          <div className="rounded-2xl"
-            style={{ background: c.cardBg, border: `1px solid ${c.border}`, boxShadow: isDark ? "none" : "0 1px 3px rgba(15,23,42,0.04)" }}>
-            <div style={{ height: 4, background: "linear-gradient(90deg,#5C2ED4 0%,#A614C3 65%)", borderRadius: 9999, margin: "8px 16px 0" }} />
+          <div className="rounded-2xl overflow-hidden"
+            style={{
+              background: c.cardBg,
+              borderLeft: `1px solid ${c.border}`,
+              borderRight: `1px solid ${c.border}`,
+              borderBottom: `1px solid ${c.border}`,
+              boxShadow: isDark ? "none" : "0 1px 3px rgba(15,23,42,0.04)",
+            }}>
+            {/* Top stroke = the brand gradient itself, not a separate pill inset.
+                overflow-hidden lets the rounded corners clip the bar to the card shape. */}
+            <div style={{ height: 4, background: "linear-gradient(90deg,#5C2ED4 0%,#A614C3 65%)" }} />
             <div className="px-8 py-8">
               <div className="text-[15px] font-semibold mb-1" style={{ color: c.text }}>Find a policy to endorse</div>
               <div className="text-[13px] mb-6" style={{ color: c.muted }}>Search by policy number, submission ID, or insured name.</div>
