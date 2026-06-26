@@ -766,6 +766,7 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
   const [dateRange, setDateRange] = useState("All Time");
   const [dateOpen, setDateOpen]   = useState(false);
   const [viewOpen, setViewOpen]   = useState(false);
+  const [pageSizeOpen, setPageSizeOpen] = useState(false);
   const [hiddenCols, setHiddenCols] = useState<Set<string>>(new Set());
   const CLIENT_COLS: Array<{ key: string; label: string }> = [
     { key: "name",          label: "Client Name"   },
@@ -776,7 +777,7 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
     { key: "activePolicies",label: "Policies"      },
     { key: "lastActivity",  label: "Last Activity" },
   ];
-  const closeAllToolbarDropdowns = () => { setDateOpen(false); setViewOpen(false); };
+  const closeAllToolbarDropdowns = () => { setDateOpen(false); setViewOpen(false); setPageSizeOpen(false); };
 
   // Export preview modal state. Mirrors the Policies Export modal's scope + columns +
   // preview pattern; kept narrower (CSV only, no multi-format split button) since the
@@ -1209,7 +1210,7 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
         })()}
 
         {/* Toolbar */}
-        <div className="flex items-center gap-3 mb-5 flex-wrap" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center gap-3 pb-4 mb-3 flex-shrink-0 flex-wrap" onClick={e => e.stopPropagation()}>
           {/* Date scope dropdown — filters clients by `lastActivity` falling within the
               selected window (relative to today). "All Time" disables the filter. */}
           <div className="relative flex-shrink-0">
@@ -1295,32 +1296,24 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
             )}
           </div>
 
-          {/* Search — leading icon, fixed-ish width (not flex-1). Submits live. */}
+          {/* Search — leading icon, 360px so the full "Search clients by name, email, or phone…"
+              placeholder fits without truncating. (Policies/Quotes get away with 300px because
+              their placeholder is shorter.) */}
           <div className="flex items-center"
-            style={{ width: 460, maxWidth: "100%", background: c.cardBg, border: `1px solid ${c.border}`, borderRadius: 10, overflow: "hidden", transition: "background 0.15s, border-color 0.15s" }}>
+            style={{ width: 360, maxWidth: "100%", background: c.cardBg, border: `1px solid ${c.border}`, borderRadius: 10, overflow: "hidden", transition: "background 0.15s, border-color 0.15s" }}>
             <Search className="w-3.5 h-3.5 flex-shrink-0 ml-3" style={{ color: c.muted }} />
             <input placeholder="Search clients by name, email, or phone..."
               value={search} onChange={e => { setSearch(e.target.value); setPage(1); }}
               className="flex-1 outline-none min-w-0"
-              style={{ fontFamily: FONT, background: "transparent", color: c.text, padding: "8px 12px", fontSize: 13, border: "none" }} />
+              style={{ fontFamily: FONT, background: "transparent", color: c.text, padding: "6.5px 12px", fontSize: 12, border: "none" }} />
           </div>
 
-          {/* Right-side action cluster: Export | Refresh */}
+          {/* Right-side action cluster: Refresh | Export — matches Policies / Quotes order
+              (Refresh first, Export second) so the toolbar reads identically across the three
+              list pages. */}
           <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
-            {/* Export — opens a preview modal (scope / columns / preview / Download CSV). */}
-            <button
-              onClick={() => setExportOpen(true)}
-              title="Export clients"
-              className="flex items-center gap-1.5 text-[12px] font-medium px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer"
-              style={{ fontFamily: FONT, background: c.cardBg, border: `1px solid ${c.border}`, color: c.text }}
-              onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
-              onMouseLeave={e => (e.currentTarget.style.background = c.cardBg)}>
-              <Download className="w-3.5 h-3.5" style={{ color: c.muted }} />
-              Export
-            </button>
-
-            {/* Refresh — cosmetic spinner in the mock. Add Client lives in the KPI strip
-                as the primary-action gradient tile, so there's no duplicate CTA here. */}
+            {/* Refresh — spinner + clears every applied filter. Add Client lives in the KPI
+                strip as the primary-action gradient tile, so there's no duplicate CTA here. */}
             <button
               onClick={handleRefresh}
               disabled={refreshing}
@@ -1331,6 +1324,18 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
               onMouseLeave={e => (e.currentTarget.style.background = c.cardBg)}>
               <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} style={{ color: c.muted }} />
               {refreshing ? "Refreshing…" : "Refresh"}
+            </button>
+
+            {/* Export — opens a preview modal (scope / columns / preview / Download CSV). */}
+            <button
+              onClick={() => setExportOpen(true)}
+              title="Export clients"
+              className="flex items-center gap-1.5 text-[12px] font-medium px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer"
+              style={{ fontFamily: FONT, background: c.cardBg, border: `1px solid ${c.border}`, color: c.text }}
+              onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+              onMouseLeave={e => (e.currentTarget.style.background = c.cardBg)}>
+              <Download className="w-3.5 h-3.5" style={{ color: c.muted }} />
+              Export
             </button>
           </div>
         </div>
@@ -1366,7 +1371,25 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
             borderTopLeftRadius: 16,
             borderTopRightRadius: 16,
           }}>
-            <div />
+            {/* Star column header — clickable filter: tap once to limit table to
+                starred clients, tap again (or any KPI card) to clear. Mirrors the
+                row star icon so the column reads as "the starred clients column". */}
+            {(() => {
+              const starActive = filterStatus === "Starred";
+              return (
+                <button
+                  onClick={() => { setFilterStatus(starActive ? "All" : "Starred"); setPage(1); }}
+                  title={starActive ? "Show all clients" : "Show only starred clients"}
+                  className="flex items-center cursor-pointer"
+                  style={{ background: "none", border: "none", padding: 0, justifySelf: "start" }}>
+                  <Star className="w-4 h-4 transition-colors"
+                    style={{
+                      fill: starActive ? "#F59E0B" : "none",
+                      color: starActive ? "#F59E0B" : c.muted,
+                    }} />
+                </button>
+              );
+            })()}
             {!hiddenCols.has("name")           && th("Client Name", "name")}
             {!hiddenCols.has("type")           && th("Entity", "type")}
             {!hiddenCols.has("contact")        && th("Contact")}
@@ -1464,15 +1487,45 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
                 {rangeStart} – {rangeEnd} of {sorted.length} {sorted.length === 1 ? "client" : "clients"}
               </span>
               <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                {/* Page-size selector — custom popover (matches Policies / Quotes) instead
+                    of a native <select>, so the chip width + chevron + active-row Check icon
+                    line up with the rest of the toolbar's dropdowns. */}
                 <div className="relative">
-                  <select value={itemsPerPage} onChange={e => { setItemsPerPage(Number(e.target.value)); setPage(1); }}
-                    className="appearance-none pl-2.5 pr-7 py-1.5 rounded-lg outline-none cursor-pointer text-[11.5px] font-medium"
-                    style={{ fontFamily: FONT, background: c.cardBg, border: `1px solid ${c.border}`, color: c.text }}>
-                    <option value={10}>1 – 10</option>
-                    <option value={20}>1 – 20</option>
-                    <option value={50}>1 – 50</option>
-                  </select>
-                  <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none" style={{ color: c.muted, opacity: 0.6 }} />
+                  <button
+                    onClick={() => { closeAllToolbarDropdowns(); setPageSizeOpen(o => !o); }}
+                    className="flex items-center gap-1.5 pl-2.5 pr-2 py-1.5 rounded-lg cursor-pointer transition-colors text-[11.5px] font-medium"
+                    style={{ fontFamily: FONT, background: c.cardBg, border: `1px solid ${c.border}`, color: c.text }}
+                    onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+                    onMouseLeave={e => (e.currentTarget.style.background = c.cardBg)}>
+                    1 – {itemsPerPage}
+                    <ChevronDown className="w-3 h-3 transition-transform duration-200" style={{ opacity: 0.6, transform: pageSizeOpen ? "rotate(180deg)" : "rotate(0deg)" }} />
+                  </button>
+                  {pageSizeOpen && (
+                    <div
+                      className="absolute right-0 z-30 rounded-lg overflow-hidden py-1 min-w-[110px]"
+                      style={{
+                        bottom: "calc(100% + 6px)",
+                        background: c.cardBg,
+                        border: `1px solid ${c.border}`,
+                        boxShadow: "0 12px 28px rgba(15,23,42,0.10), 0 4px 8px rgba(15,23,42,0.04)",
+                      }}>
+                      {[10, 20, 50].map(n => {
+                        const active = itemsPerPage === n;
+                        return (
+                          <button
+                            key={n}
+                            onClick={() => { setItemsPerPage(n); setPage(1); setPageSizeOpen(false); }}
+                            className="w-full px-2.5 py-1.5 text-left text-[11.5px] flex items-center gap-2 cursor-pointer transition-colors"
+                            style={{ color: active ? "#A614C3" : c.text, fontWeight: active ? 600 : 500, background: "transparent" }}
+                            onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+                            onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                            <Check className="w-3 h-3 flex-shrink-0" style={{ opacity: active ? 1 : 0, color: "#A614C3" }} />
+                            <span className="whitespace-nowrap">1 – {n}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
                 <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={atFirst}
                   className="text-[11.5px] font-medium px-3 py-1.5 rounded-lg transition-colors"
