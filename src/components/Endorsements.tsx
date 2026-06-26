@@ -290,7 +290,7 @@ export default function Endorsements({ isDark }: { isDark: boolean }) {
       <div className="flex-1 min-h-0 overflow-y-auto" style={{ paddingBottom: 48 }}>
         {view === "search" && (
           <div className="flex flex-col gap-6">
-          <div className="rounded-2xl overflow-hidden"
+          <div className="rounded-2xl"
             style={{
               background: c.cardBg,
               borderLeft: `1px solid ${c.border}`,
@@ -298,9 +298,10 @@ export default function Endorsements({ isDark }: { isDark: boolean }) {
               borderBottom: `1px solid ${c.border}`,
               boxShadow: isDark ? "none" : "0 1px 3px rgba(15,23,42,0.04)",
             }}>
-            {/* Top stroke = the brand gradient itself, not a separate pill inset.
-                overflow-hidden lets the rounded corners clip the bar to the card shape. */}
-            <div style={{ height: 4, background: "linear-gradient(90deg,#5C2ED4 0%,#A614C3 65%)" }} />
+            {/* Top stroke = the brand gradient itself. We can't use parent overflow-hidden
+                to clip the bar (it would also clip in-card dropdowns), so the gradient div
+                carries its own top-corner radius to match the card's rounded-2xl (16px). */}
+            <div style={{ height: 4, background: "linear-gradient(90deg,#5C2ED4 0%,#A614C3 65%)", borderTopLeftRadius: 16, borderTopRightRadius: 16 }} />
             <div className="px-8 py-8">
               <div className="text-[15px] font-semibold mb-1" style={{ color: c.text }}>Find a policy to endorse</div>
               <div className="text-[13px] mb-6" style={{ color: c.muted }}>Search by policy number, submission ID, or insured name.</div>
@@ -439,18 +440,21 @@ export default function Endorsements({ isDark }: { isDark: boolean }) {
 
         {view === "form" && (
           <div className="flex flex-col gap-5" onClick={e => e.stopPropagation()}>
-            {/* No-match info banner */}
-            <div className="rounded-2xl"
+            {/* No-match info banner. overflow-hidden is safe here (no nested dropdowns)
+                and lets the parent's rounded-2xl clip the gradient stroke to a true 16px
+                corner — borderTopLeft/RightRadius on a 4px-tall div gets clamped by the
+                browser to ~2px, so we lean on parent clipping instead. */}
+            <div className="rounded-2xl overflow-hidden"
               style={{
                 background: isDark
                   ? `linear-gradient(180deg, rgba(166,20,195,0.08) 0%, ${c.cardBg} 60%)`
                   : `linear-gradient(180deg, #FBF5FE 0%, ${c.cardBg} 70%)`,
-                border: `1px solid ${isDark ? "rgba(166,20,195,0.22)" : "rgba(166,20,195,0.14)"}`,
-                boxShadow: isDark
-                  ? "0 8px 24px -12px rgba(166,20,195,0.35)"
-                  : "0 1px 3px rgba(15,23,42,0.04), 0 8px 24px -16px rgba(166,20,195,0.22)",
+                borderLeft: `1px solid ${isDark ? "rgba(166,20,195,0.22)" : "rgba(166,20,195,0.14)"}`,
+                borderRight: `1px solid ${isDark ? "rgba(166,20,195,0.22)" : "rgba(166,20,195,0.14)"}`,
+                borderBottom: `1px solid ${isDark ? "rgba(166,20,195,0.22)" : "rgba(166,20,195,0.14)"}`,
+                boxShadow: isDark ? "none" : "0 1px 3px rgba(15,23,42,0.04)",
               }}>
-              <div style={{ height: 4, background: btnGrad, borderRadius: 9999, margin: "8px 16px 0" }} />
+              <div style={{ height: 4, background: btnGrad }} />
               <div className="flex items-start gap-3 px-7 py-6">
                 <div className="flex-shrink-0 flex items-center justify-center"
                   style={{
