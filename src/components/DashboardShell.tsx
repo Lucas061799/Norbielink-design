@@ -32,11 +32,17 @@ export default function DashboardShell({ children, pageTitle }: DashboardShellPr
       case "Clients":
         return <Clients isDark={darkMode} />;
       case "Agencies":
-        return <Agencies isDark={darkMode} />;
+        // `key` is intentionally distinct from the Admin case so React mounts a
+        // FRESH Agencies instance per segment. Without the key, both cases render
+        // <Agencies> at the same tree position and React reuses the instance —
+        // which leaks state (bookRolled, inactiveUserIds, etc.) from one
+        // perspective to the other (internal staff mutations would show up in
+        // the agency's own client portal).
+        return <Agencies key="agencies-internal" isDark={darkMode} />;
       case "Admin":
         // External-client view: same Agency detail surface, scoped to the user's
-        // own (mock) agency and rendered read-only.
-        return <Agencies isDark={darkMode} clientMode />;
+        // own (mock) agency. Distinct `key` from the Agencies case — see above.
+        return <Agencies key="agencies-client" isDark={darkMode} clientMode />;
       case "Quotes":
         return <Quotes isDark={darkMode} />;
       case "Policies":

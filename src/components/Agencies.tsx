@@ -1642,13 +1642,17 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
     </div>
   );
 
+  // Notes are an internal staff scratchpad about an agency; hidden from the agency's
+  // own client view (viewMode="client") since they have no business reading staff notes.
   const detailTabs: [DetailTab, string, React.ReactElement][] = [
     ["overview",  "Overview",  <Building2  className="w-[15px] h-[15px]" />],
     ["quotes",    "Quotes",    <QuoteIcon  className="w-[15px] h-[15px]" />],
     ["policies",  "Policies",  <Shield     className="w-[15px] h-[15px]" />],
     ["users",     "Users",     <Users      className="w-[15px] h-[15px]" />],
     ["documents", "Documents", <FolderOpen className="w-[15px] h-[15px]" />],
-    ["notes",     "Notes",     <CopyPlus   className="w-[15px] h-[15px]" />],
+    ...(viewMode === "internal"
+      ? [["notes", "Notes", <CopyPlus className="w-[15px] h-[15px]" />] as [DetailTab, string, React.ReactElement]]
+      : []),
   ];
 
   /* ── helpers ── */
