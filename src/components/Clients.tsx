@@ -1398,7 +1398,14 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
             {!hiddenCols.has("contact")        && th("Contact")}
             {!hiddenCols.has("assignedAgent")  && th("Agent", "assignedAgent")}
             {!hiddenCols.has("status")         && th("Status", "status")}
-            {!hiddenCols.has("activePolicies") && th("Policies", "activePolicies", "center")}
+            {/* `paddingRight: 40` shifts the centered POLICIES content 20px LEFT of the
+                column's geometric center — cumulative 25px LEFT of the STATUS/LAST
+                geometric midpoint, per the visual call. */}
+            {!hiddenCols.has("activePolicies") && (
+              <div style={{ width: "100%", paddingRight: 40 }}>
+                {th("Policies", "activePolicies", "center")}
+              </div>
+            )}
             {!hiddenCols.has("lastActivity")   && th("Last Activity", "lastActivity")}
             {th("Action")}
           </div>
@@ -1458,9 +1465,10 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
               {!hiddenCols.has("status") && (
                 <div><StatusBadge status={cl.status} isDark={isDark} /></div>
               )}
-              {/* Policies — centered under the header */}
+              {/* Policies — same paddingRight as the header so the value stays vertically
+                  aligned with the caption above. */}
               {!hiddenCols.has("activePolicies") && (
-                <div className="text-[13px] font-semibold text-center" style={{ fontFamily: FONT, color: c.text }}>
+                <div className="text-[13px] font-semibold text-center" style={{ fontFamily: FONT, color: c.text, paddingRight: 40 }}>
                   {cl.activePolicies}
                 </div>
               )}
