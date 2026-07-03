@@ -3006,7 +3006,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                         className="flex items-center gap-1.5 rounded-lg text-[12px] font-semibold whitespace-nowrap justify-center transition-all"
                         style={{ ...font, width: 120, height: 40, boxSizing: "border-box",
                           border: active ? "1px solid transparent" : `1px solid ${c.border}`,
-                          background: active ? undefined : c.cardBg,
+                          backgroundColor: active ? undefined : c.cardBg,
                           backgroundImage: active
                             ? `linear-gradient(88.54deg, rgba(92,46,212,0.06) 0.1%, rgba(166,20,195,0.06) 63.88%), linear-gradient(${c.cardBg}, ${c.cardBg}), linear-gradient(88.54deg, #5C2ED4 0.1%, #A614C3 63.88%)`
                             : undefined,
@@ -3289,7 +3289,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                           className="flex items-center gap-1.5 rounded-lg text-[12px] font-semibold whitespace-nowrap justify-center transition-all"
                           style={{ ...font, width: 120, height: 40, boxSizing: "border-box",
                             border: active ? "1.65px solid transparent" : `1.65px solid ${c.border}`,
-                            background: active ? undefined : c.cardBg,
+                            backgroundColor: active ? undefined : c.cardBg,
                             backgroundImage: active
                               ? `linear-gradient(88.54deg, rgba(92,46,212,0.06) 0.1%, rgba(166,20,195,0.06) 63.88%), linear-gradient(${c.cardBg}, ${c.cardBg}), linear-gradient(88.54deg, #5C2ED4 0.1%, #A614C3 63.88%)`
                               : undefined,
@@ -7858,7 +7858,7 @@ function AddAgencyForm({ isDark, onSaveForLater, onDiscard, initialDraft, c, btn
                       className="flex items-center gap-1.5 rounded-lg text-[12px] font-semibold whitespace-nowrap justify-center transition-all"
                       style={{ ...font, width: 120, height: 40, boxSizing: "border-box",
                         border: active ? "1px solid transparent" : `1px solid ${c.border}`,
-                        background: active ? undefined : c.cardBg,
+                        backgroundColor: active ? undefined : c.cardBg,
                         backgroundImage: active
                           ? `linear-gradient(88.54deg, rgba(92,46,212,0.06) 0.1%, rgba(166,20,195,0.06) 63.88%), linear-gradient(${c.cardBg}, ${c.cardBg}), linear-gradient(88.54deg, #5C2ED4 0.1%, #A614C3 63.88%)`
                           : undefined,
@@ -8106,7 +8106,7 @@ function AddAgencyForm({ isDark, onSaveForLater, onDiscard, initialDraft, c, btn
                         className="flex items-center gap-1.5 rounded-lg text-[12px] font-semibold whitespace-nowrap justify-center transition-all"
                         style={{ ...font, width: 120, height: 40, boxSizing: "border-box",
                           border: active ? "1.65px solid transparent" : `1.65px solid ${c.border}`,
-                          background: active ? undefined : c.cardBg,
+                          backgroundColor: active ? undefined : c.cardBg,
                           backgroundImage: active
                             ? `linear-gradient(88.54deg, rgba(92,46,212,0.06) 0.1%, rgba(166,20,195,0.06) 63.88%), linear-gradient(${c.cardBg}, ${c.cardBg}), linear-gradient(88.54deg, #5C2ED4 0.1%, #A614C3 63.88%)`
                             : undefined,
@@ -8321,6 +8321,11 @@ function AddAgencyForm({ isDark, onSaveForLater, onDiscard, initialDraft, c, btn
 export default function Agencies({ isDark, clientMode = false }: { isDark: boolean; clientMode?: boolean }) {
   const [search, setSearch]           = useState("");
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("All");
+  // Per-tab card-selection state — used to visually pin the active stat card
+  // on the Users / Affiliations tabs. Not yet wired to actual table filtering
+  // (no matching filter state in the mock); click just toggles the visual.
+  const [usersStatKey, setUsersStatKey] = useState<"All" | "Active" | "Inactive" | "Admins">("All");
+  const [affStatKey,   setAffStatKey]   = useState<"All" | "New" | "Appointed" | "Unappointed">("All");
   const [sortKey, setSortKey]         = useState<SortKey>(null);
   const [sortDir, setSortDir]         = useState<SortDir>("asc");
   const [page, setPage]               = useState(1);
@@ -8533,7 +8538,6 @@ export default function Agencies({ isDark, clientMode = false }: { isDark: boole
   const totalPagesUsers = Math.max(1, Math.ceil(filteredUsersCount / perPage));
   const totalPages = tab === "users" ? totalPagesUsers : totalPagesAgencies;
   const paginated  = filtered.slice((page - 1) * perPage, page * perPage);
-  const starred    = allAgencies.filter(a => a.isStarred);
 
   const toggleStar = (id: string) => {
     setStars(prev => {
@@ -8892,34 +8896,6 @@ export default function Agencies({ isDark, clientMode = false }: { isDark: boole
         </span>
   );
 
-  const filterPill = (label: FilterStatus) => {
-    const active = filterStatus === label;
-    const inactiveBg = isDark ? "rgba(255,255,255,0.04)" : "transparent";
-    const inactiveHoverBg = isDark ? "rgba(255,255,255,0.08)" : "#F5F5F5";
-    return (
-      <button key={label} onClick={() => { setFilterStatus(label); setPage(1); }}
-        className="flex-shrink-0 transition-all"
-        style={{ fontFamily: FONT, background: active
-          ? (isDark ? "linear-gradient(88.54deg,#A855F7 0.1%,#D946EF 63.88%)" : "linear-gradient(88.54deg,#5C2ED4 0.1%,#A614C3 63.88%)")
-          : inactiveBg, padding: active ? 1 : 0, borderRadius: 12, border: active ? "none" : `1px solid ${c.border}` }}
-        onMouseEnter={e => { if (!active) { e.currentTarget.style.background = inactiveHoverBg; } }}
-        onMouseLeave={e => { if (!active) e.currentTarget.style.background = inactiveBg; }}>
-        <span className="flex items-center gap-1.5 text-[13px] font-semibold" style={{ fontFamily: FONT, background: active
-            ? (isDark
-              ? `linear-gradient(88.54deg, rgba(168,85,247,0.20) 0.1%, rgba(217,70,239,0.20) 63.88%), #0F1120`
-              : `linear-gradient(88.54deg, rgba(92,46,212,0.05) 0.1%, rgba(166,20,195,0.05) 63.88%), #ffffff`)
-            : "transparent", borderRadius: 11, padding: "5px 15px" }}>
-          {label === "Starred" && <Star className="w-3.5 h-3.5" style={{ fill: "#F59E0B", color: "#F59E0B" }} />}
-          <span style={active
-            ? { backgroundImage: isDark
-                ? "linear-gradient(88.54deg,#A855F7 0.1%,#D946EF 63.88%)"
-                : "linear-gradient(88.54deg,#5C2ED4 0.1%,#A614C3 63.88%)",
-              backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", color: "transparent" }
-            : { color: c.muted }}>{label}</span>
-        </span>
-      </button>
-    );
-  };
 
   /* Section title — same full-width divider style as Clients */
   const sectionTitle = (
@@ -9465,28 +9441,28 @@ export default function Agencies({ isDark, clientMode = false }: { isDark: boole
       {/* Section title */}
       {sectionTitle}
 
-      {/* Search + buttons */}
-      <div className="flex items-center gap-2 mb-7">
-        <div className="flex flex-1 max-w-[360px] transition-all"
-          style={{ background: c.cardBg, border: `1px solid ${isDark ? "rgba(255,255,255,0.10)" : "#E5E7EB"}`, borderRadius: 10, overflow: "hidden" }}>
+      {/* Toolbar row — search on the left, Drafts + Add Agency on the right.
+          The inline "Search" button was dropped: the input already live-filters
+          the table, so the extra click was purely decorative. */}
+      <div className="flex items-center gap-3 mb-6">
+        <div className="relative flex flex-1 max-w-[420px]">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none" style={{ color: c.muted }} />
           <input value={search} onChange={e => { setSearch(e.target.value); setPage(1); }}
-            placeholder="By agency, agency code, or user"
-            className="flex-1 outline-none"
-            style={{ fontFamily: FONT, background: "transparent", color: c.text, padding: "8px 14px", fontSize: 13, border: "none" }} />
-          <button className="flex items-center gap-1.5 px-4 text-[12px] font-semibold text-white flex-shrink-0 transition-all"
-            style={{ background: btnGrad, fontFamily: FONT }}
-            onMouseEnter={e => (e.currentTarget.style.filter = "brightness(1.12)")}
-            onMouseLeave={e => (e.currentTarget.style.filter = "none")}>
-            <Search className="w-3.5 h-3.5" />Search
-          </button>
+            placeholder="Search by agency, code, or user..."
+            className="flex-1 outline-none w-full"
+            style={{
+              fontFamily: FONT,
+              background: c.cardBg,
+              border: `1px solid ${c.border}`,
+              borderRadius: 10,
+              color: c.text,
+              padding: "9px 14px 9px 36px",
+              fontSize: 13,
+            }}
+            onFocus={e => (e.currentTarget.style.borderColor = "#A614C3")}
+            onBlur={e => (e.currentTarget.style.borderColor = c.border)} />
         </div>
-        <button onClick={() => { setResumeFromDraft(false); setAddOpen(true); }}
-          className="flex items-center gap-1.5 text-[13px] font-semibold text-white transition-all"
-          style={{ fontFamily: FONT, background: btnGrad, padding:"9px 16px", borderRadius: 10 }}
-          onMouseEnter={e => (e.currentTarget.style.filter = "brightness(1.10)")}
-          onMouseLeave={e => (e.currentTarget.style.filter = "none")}>
-          <Plus className="w-4 h-4" />Add New Agency
-        </button>
+        <div className="flex-1" />
         {/* Drafts entry — visible whenever saved drafts exist; lets users hop back into in-progress agencies */}
         {(() => {
           const hasDrafts = agencyDrafts.length > 0;
@@ -9494,7 +9470,7 @@ export default function Agencies({ isDark, clientMode = false }: { isDark: boole
             <button onClick={() => hasDrafts && setResumeDraftOpen(true)}
               disabled={!hasDrafts}
               title={hasDrafts ? `${agencyDrafts.length} saved draft${agencyDrafts.length === 1 ? "" : "s"}` : "No saved drafts"}
-              className="relative flex items-center gap-1.5 text-[13px] font-semibold transition-colors"
+              className="relative flex items-center gap-1.5 text-[13px] font-semibold transition-colors flex-shrink-0"
               style={{ fontFamily: FONT,
                 padding: "9px 14px",
                 borderRadius: 10,
@@ -9505,7 +9481,6 @@ export default function Agencies({ isDark, clientMode = false }: { isDark: boole
                 opacity: hasDrafts ? 1 : 0.6 }}
               onMouseEnter={e => { if (hasDrafts) e.currentTarget.style.background = c.hoverBg; }}
               onMouseLeave={e => { if (hasDrafts) e.currentTarget.style.background = c.cardBg; }}>
-              {/* Brand-gradient bookmark — inline so we can paint with linearGradient */}
               <svg width="14" height="14" viewBox="0 0 24 24" fill={hasDrafts ? "url(#draftsBookmarkGrad)" : "none"} stroke={hasDrafts ? "url(#draftsBookmarkGrad)" : c.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <defs>
                   <linearGradient id="draftsBookmarkGrad" x1="0%" y1="0%" x2="100%" y2="0%">
@@ -9530,61 +9505,170 @@ export default function Agencies({ isDark, clientMode = false }: { isDark: boole
             </button>
           );
         })()}
+        <button onClick={() => { setResumeFromDraft(false); setAddOpen(true); }}
+          className="flex items-center gap-1.5 text-[13px] font-semibold text-white transition-all flex-shrink-0"
+          style={{ fontFamily: FONT, background: btnGrad, padding:"9px 16px", borderRadius: 10 }}
+          onMouseEnter={e => (e.currentTarget.style.filter = "brightness(1.10)")}
+          onMouseLeave={e => (e.currentTarget.style.filter = "none")}>
+          <Plus className="w-4 h-4" />Add Agency
+        </button>
       </div>
 
-      {/* Filter pills */}
-      <div className="flex items-center gap-2 mb-2 flex-wrap">
-        {filterPill("All")}
-        {filterPill("Appointed")}
-        {filterPill("Unappointed")}
-      </div>
-
-      {/* Starred agencies strip */}
-      {starred.length > 0 && (
-        <div className="mb-5">
-          <div className="flex items-center gap-2 mb-3">
-            <Star className="w-4 h-4 flex-shrink-0" style={{ color: "#F59E0B", fill: "#F59E0B" }} />
-            <span className="text-[13px] font-bold" style={{ fontFamily: FONT, color: c.text }}>
-              Starred Agencies <span className="font-normal" style={{ color: c.muted }}>({starred.length} of 6)</span>
-            </span>
+      {/* Stat cards — replaces the old All / Appointed / Unappointed pill row.
+          Content swaps by tab: agencies/affiliations show agency counts +
+          "Total" clears the status filter; users tab shows Total Users / Active
+          / Inactive / Admins as display-only summaries. "New" and the user-tab
+          cards aren't wired to filters (no matching filter state in the mock).
+          Onboarded-at falls back to lastLogin as a proxy. */}
+      {(() => {
+        const totalCount = allAgencies.length;
+        const now = new Date();
+        const cutoff = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+        const parseLast = (s: string) => {
+          const [m, d, y] = s.split("/").map(Number);
+          return new Date(y, (m ?? 1) - 1, d ?? 1);
+        };
+        const newCount = allAgencies.filter(a => parseLast(a.lastLogin) >= cutoff).length;
+        const appointedCount   = allAgencies.filter(a => a.status === "Appointed").length;
+        const unappointedCount = allAgencies.filter(a => a.status === "Unappointed").length;
+        // User-tab metrics — active / inactive derived from the same
+        // `showInactive` bookkeeping used to gate rows in the users table.
+        const totalUsersAll = mockAgencyUsers.length;
+        const inactiveUsersAll = mockAgencyUsers.filter(u => inactiveUserIds.has(u.id)).length;
+        const activeUsersAll = totalUsersAll - inactiveUsersAll;
+        const adminUsersAll  = mockAgencyUsers.filter(u => u.isAdmin && !inactiveUserIds.has(u.id)).length;
+        // Affiliation-tab metrics — distinct carrier group names across all
+        // agencies; new / appointed / unappointed are the count of DISTINCT
+        // affiliations that appear in at least one agency of that class.
+        const allAffiliationNames = Array.from(new Set(allAgencies.flatMap(a => a.affiliations)));
+        const totalAffiliations = allAffiliationNames.length;
+        const newAffiliations = Array.from(new Set(
+          allAgencies.filter(a => parseLast(a.lastLogin) >= cutoff).flatMap(a => a.affiliations)
+        )).length;
+        const appointedAffiliations = Array.from(new Set(
+          allAgencies.filter(a => a.status === "Appointed").flatMap(a => a.affiliations)
+        )).length;
+        const unappointedAffiliations = Array.from(new Set(
+          allAgencies.filter(a => a.status === "Unappointed").flatMap(a => a.affiliations)
+        )).length;
+        const cards: { key: FilterStatus | "New" | "Active" | "Inactive" | "Admins"; label: string; value: number; hint: string }[] = tab === "users"
+          ? [
+              { key: "All",      label: "Total Users", value: totalUsersAll,    hint: "Across all agencies" },
+              { key: "Active",   label: "Active",      value: activeUsersAll,   hint: "Currently active" },
+              { key: "Inactive", label: "Inactive",    value: inactiveUsersAll, hint: "Disabled or removed" },
+              { key: "Admins",   label: "Admins",      value: adminUsersAll,    hint: "Agency administrators" },
+            ]
+          : tab === "affiliations"
+          ? [
+              { key: "All",         label: "Total Affiliations", value: totalAffiliations,       hint: "Distinct carrier groups" },
+              { key: "New",         label: "New",                value: newAffiliations,         hint: "Onboarded in last 12 months" },
+              { key: "Appointed",   label: "Appointed",          value: appointedAffiliations,   hint: "Members appointed today" },
+              { key: "Unappointed", label: "Unappointed",        value: unappointedAffiliations, hint: "Members not yet appointed" },
+            ]
+          : [
+              { key: "All",         label: "Total Agencies", value: totalCount,       hint: "All in book" },
+              { key: "New",         label: "New",            value: newCount,         hint: "Onboarded in last 12 months" },
+              { key: "Appointed",   label: "Appointed",      value: appointedCount,   hint: "Currently appointed" },
+              { key: "Unappointed", label: "Unappointed",    value: unappointedCount, hint: "Not yet appointed" },
+            ];
+        return (
+          <div className="grid gap-3 mb-6" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
+            {cards.map(card => {
+              // All three tabs are clickable now. `activeKey` reads whichever
+              // per-tab state is holding the current selection, and the click
+              // handler writes to that same state.
+              const activeKey = tab === "users" ? usersStatKey
+                               : tab === "affiliations" ? affStatKey
+                               : filterStatus;
+              const clickable = card.key !== "New";
+              // "All" acts as a neutral "reset" — clickable, but never shows
+              // the active gradient border regardless of which tab.
+              const active = clickable && card.key !== "All" && activeKey === card.key;
+              return (
+                <button
+                  key={card.label}
+                  onClick={() => {
+                    if (!clickable) return;
+                    if (tab === "users")             setUsersStatKey(card.key as typeof usersStatKey);
+                    else if (tab === "affiliations") setAffStatKey(card.key as typeof affStatKey);
+                    else                             setFilterStatus(card.key as FilterStatus);
+                    setPage(1);
+                  }}
+                  disabled={!clickable}
+                  className="flex items-center justify-between gap-3 rounded-xl px-4 py-3 text-left transition-all"
+                  style={active ? {
+                    // Gradient border via double-background trick — set only one
+                    // background property to avoid the shorthand-vs-longhand
+                    // warning React throws when we toggle back to a plain color.
+                    background: `linear-gradient(${c.cardBg}, ${c.cardBg}) padding-box, linear-gradient(to right, #5C2ED4 0%, #A614C3 65%) border-box`,
+                    border: "1px solid transparent",
+                    boxShadow: "none",
+                    cursor: "pointer",
+                    fontFamily: FONT,
+                  } : {
+                    background: c.cardBg,
+                    border: `1px solid ${c.border}`,
+                    boxShadow: "none",
+                    cursor: clickable ? "pointer" : "default",
+                    fontFamily: FONT,
+                  }}
+                  onMouseEnter={e => {
+                    if (clickable && !active) e.currentTarget.style.background = c.hoverBg;
+                  }}
+                  onMouseLeave={e => {
+                    if (clickable && !active) e.currentTarget.style.background = c.cardBg;
+                  }}
+                >
+                  <div className="min-w-0">
+                    <div className="text-[13px] font-semibold" style={{ color: c.text }}>{card.label}</div>
+                    <div className="text-[11px] mt-0.5 truncate" style={{ color: c.muted }}>{card.hint}</div>
+                  </div>
+                  <span className="text-[24px] font-bold leading-none flex-shrink-0" style={{ color: c.text }}>
+                    {card.value}
+                  </span>
+                </button>
+              );
+            })}
           </div>
-          <div className="flex gap-3 flex-wrap">
-            {starred.map(a => (
-              <div key={a.id} onClick={() => setSelectedAgency(getDetail(a))}
-                className="flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-colors"
-                style={{ background: c.cardBg, border: `1px solid ${c.border}`, minWidth: 180 }}
-                onMouseEnter={e => { e.currentTarget.style.background = isDark ? "rgba(255,255,255,0.04)" : "#F9FAFB"; }}
-                onMouseLeave={e => { e.currentTarget.style.background = c.cardBg; }}>
-                <Star className="w-4 h-4 flex-shrink-0" style={{ color: "#F59E0B", fill: "#F59E0B" }} />
-                <div className="min-w-0">
-                  <p className="text-[13px] font-semibold truncate" style={{ fontFamily: FONT, color: c.text }}>{a.name}</p>
-                  <p className="text-[11px]" style={{ fontFamily: FONT, color: c.muted }}>Code: {a.code}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+        );
+      })()}
 
-      {/* Tabs */}
-      <div className="flex items-center gap-0 mb-0 flex-shrink-0" style={{ borderBottom: `1px solid ${c.border}` }}>
-        <div className="flex items-center gap-0">
+      {/* Tabs — segmented-control style. Grey track wraps all three pills;
+          active pill lifts up on a white bg with a subtle shadow (iOS-style
+          segmented control). */}
+      <div className="flex items-center gap-2 mb-0 flex-shrink-0">
+        <div
+          className="flex items-center gap-1 p-1 rounded-lg"
+          style={{
+            background: isDark ? "rgba(255,255,255,0.05)" : "#F3F4F6",
+            border: `1px solid ${isDark ? "rgba(255,255,255,0.06)" : "#E5E7EB"}`,
+          }}
+        >
           {([["agencies", "Agencies", Building2], ["users", "All Users", Users], ["affiliations", "Affiliations", Network]] as [TabKey, string, React.ComponentType<{className?:string;style?:React.CSSProperties}>][]).map(([key, label, Icon]) => {
             const active = tab === key;
             return (
               <button key={key} onClick={() => setTab(key)}
-                className="flex items-center gap-1.5 px-4 py-2.5 text-[13px] font-normal relative transition-colors"
-                style={{ fontFamily: FONT, color: active ? (isDark ? "#fff" : "#A614C3") : c.muted, letterSpacing: "0.01em" }}
+                className="flex items-center gap-1.5 px-3 py-1 rounded-md text-[12.5px] font-medium transition-all"
+                style={{
+                  fontFamily: FONT,
+                  color: active ? (isDark ? "#F9FAFB" : "#1F2937") : c.muted,
+                  background: active
+                    ? (isDark ? "rgba(255,255,255,0.10)" : "#FFFFFF")
+                    : "transparent",
+                  boxShadow: active
+                    ? (isDark ? "0 1px 2px rgba(0,0,0,0.24)" : "0 1px 2px rgba(15,23,42,0.08), 0 0 0 1px rgba(15,23,42,0.04)")
+                    : "none",
+                  letterSpacing: "0.01em",
+                }}
                 onMouseEnter={e => { if (!active) e.currentTarget.style.color = c.text; }}
                 onMouseLeave={e => { if (!active) e.currentTarget.style.color = c.muted; }}>
-                <Icon className="w-[15px] h-[15px]" style={{ color: active ? "#A614C3" : undefined }} />
+                <Icon className="w-[14px] h-[14px]" style={{ color: active ? "#A614C3" : undefined }} />
                 {label}
-                {active && <div className="absolute bottom-0 left-0 right-0 h-[2px]" style={{ background: "linear-gradient(90deg,#5C2ED4 0%,#A614C3 65%)" }} />}
               </button>
             );
           })}
         </div>
-        <div className="flex items-center gap-1" style={{ borderLeft: `1px solid ${c.border}`, paddingLeft: 10, marginLeft: 6 }}>
+        <div className="flex items-center gap-2 ml-auto">
           <button title="Reset filters & columns"
             onClick={() => {
               setSearch("");
@@ -9603,19 +9687,21 @@ export default function Agencies({ isDark, clientMode = false }: { isDark: boole
               setUsersHiddenCols(new Set());
               setAffVisibleCols(new Set(AFF_DEFAULT_VISIBLE));
             }}
-            className="p-2 rounded-lg transition-colors"
-            style={{ color: "#A614C3" }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-colors"
+            style={{ fontFamily: FONT, color: c.text, border: `1px solid ${c.border}`, background: c.cardBg }}
             onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
-            onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-            <RefreshCw className="w-4 h-4" />
+            onMouseLeave={e => (e.currentTarget.style.background = c.cardBg)}>
+            <RefreshCw className="w-3.5 h-3.5" style={{ color: c.muted }} />
+            Reset
           </button>
           <div className="relative" onClick={e => e.stopPropagation()}>
             <button title="View columns" onClick={() => setViewOpen(o => !o)}
-              className="p-2 rounded-lg transition-colors"
-              style={{ color: "#A614C3", background: viewOpen ? c.hoverBg : "transparent" }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-colors"
+              style={{ fontFamily: FONT, color: c.text, border: `1px solid ${c.border}`, background: viewOpen ? c.hoverBg : c.cardBg }}
               onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
-              onMouseLeave={e => (e.currentTarget.style.background = viewOpen ? c.hoverBg : "transparent")}>
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="5" height="5" x="2" y="2" rx="1"/><rect width="5" height="5" x="9.5" y="2" rx="1"/><rect width="5" height="5" x="17" y="2" rx="1"/><rect width="5" height="5" x="2" y="9.5" rx="1"/><rect width="5" height="5" x="9.5" y="9.5" rx="1"/><rect width="5" height="5" x="17" y="9.5" rx="1"/><rect width="5" height="5" x="2" y="17" rx="1"/><rect width="5" height="5" x="9.5" y="17" rx="1"/><rect width="5" height="5" x="17" y="17" rx="1"/></svg>
+              onMouseLeave={e => (e.currentTarget.style.background = viewOpen ? c.hoverBg : c.cardBg)}>
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke={c.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="5" height="5" x="2" y="2" rx="1"/><rect width="5" height="5" x="9.5" y="2" rx="1"/><rect width="5" height="5" x="17" y="2" rx="1"/><rect width="5" height="5" x="2" y="9.5" rx="1"/><rect width="5" height="5" x="9.5" y="9.5" rx="1"/><rect width="5" height="5" x="17" y="9.5" rx="1"/><rect width="5" height="5" x="2" y="17" rx="1"/><rect width="5" height="5" x="9.5" y="17" rx="1"/><rect width="5" height="5" x="17" y="17" rx="1"/></svg>
+              View
             </button>
             {viewOpen && (() => {
               // Unified column-visibility picker. Each tab tracks visibility differently:
@@ -9691,21 +9777,32 @@ export default function Agencies({ isDark, clientMode = false }: { isDark: boole
               }
               setExportDialogOpen(true);
             }}
-            className="p-2 rounded-lg transition-colors"
-            style={{ color: "#A614C3" }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-colors"
+            style={{ fontFamily: FONT, color: c.text, border: `1px solid ${c.border}`, background: c.cardBg }}
             title={tab === "affiliations" ? "Preview & export agencies in this affiliation" : tab === "users" ? "Preview & export users (filtered)" : "Preview & export agencies (filtered)"}
             onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
-            onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-            <Download className="w-4 h-4" />
+            onMouseLeave={e => (e.currentTarget.style.background = c.cardBg)}>
+            <Download className="w-3.5 h-3.5" style={{ color: c.muted }} />
+            Export
           </button>
         </div>
       </div>
 
+      {/* Card wrapper — table + in-card pagination, matches Clients / Quotes /
+          Policies. `mt-4` gives breathing room between the tabs row and the
+          card so the toolbar doesn't feel crammed. */}
+      <div className="flex-1 flex flex-col rounded-2xl overflow-hidden mt-4"
+        style={{
+          background: c.cardBg,
+          border: `1px solid ${c.border}`,
+          boxShadow: isDark ? "none" : "0 1px 3px rgba(15,23,42,0.06)",
+        }}>
+
       {/* Table */}
       {tab === "agencies" && (
-      <div className="flex-1 overflow-auto mt-0" style={{ scrollbarGutter: "stable" }} onClick={() => { setLocationOpen(false); setAffiliationOpen(null); setAgencyNameOpen(false); setActivityFilterOpen(false); setViewOpen(false); }}>
+      <div className="flex-1 overflow-x-hidden overflow-y-auto mt-0" onClick={() => { setLocationOpen(false); setAffiliationOpen(null); setAgencyNameOpen(false); setActivityFilterOpen(false); setViewOpen(false); }}>
         <table className="w-full text-left border-collapse" style={{ tableLayout: "fixed" }}>
-          <thead className="sticky top-0 z-10" style={{ background: isDark ? "#121628" : c.cardBg }}>
+          <thead className="sticky top-0 z-10" style={{ background: isDark ? "rgba(255,255,255,0.03)" : "#FAFAFB" }}>
             <tr style={{ borderBottom: `1px solid ${c.border}` }}>
               {([
                 ["name",       "Agency Name", "15%",  true ],
@@ -9726,7 +9823,7 @@ export default function Agencies({ isDark, clientMode = false }: { isDark: boole
                 <th key={`${key}-${idx}`} onClick={() => sortable && key && key !== "lastLogin" && handleSort(key)}
                   className={`text-[11px] font-bold uppercase tracking-wider py-3 pr-6 select-none whitespace-nowrap ${sortable && key !== "lastLogin" ? "cursor-pointer" : ""} ${(key === "location" || key === "lastLogin" || affIdx !== null) ? "relative" : ""}`}
                   style={{ fontFamily: FONT, color: (key === "name" && sortKey === "name") || (key === "location" && locationFilter.size > 0) || (key === "lastLogin" && activityFilter !== "all") || (affIdx !== null && affiliationFilter.size > 0) ? "#A614C3" : c.muted, width: w,
-                    paddingLeft: idx === 0 ? 52
+                    paddingLeft: idx === 0 ? 20
                       : key === "location" ? 36
                       : affIdx === 1 ? 26
                       : (label?.startsWith("Affiliation")) ? 36
@@ -9736,10 +9833,28 @@ export default function Agencies({ isDark, clientMode = false }: { isDark: boole
                       : undefined,
                     textAlign: (key === "code" || key === "totalUsers" || key === "status") ? "center" : undefined }}>
                   {key === "name" ? (
-                    <>
-                      {label}
-                      <SortIcon col="name" />
-                    </>
+                    <div className="flex items-center gap-9">
+                      {/* Star toggle — filters the table to only starred agencies.
+                          Filled when the filter is active, outlined otherwise.
+                          Uses filterStatus === "Starred" for the toggle. */}
+                      <button
+                        onClick={e => {
+                          e.stopPropagation();
+                          setFilterStatus(filterStatus === "Starred" ? "All" : "Starred");
+                          setPage(1);
+                        }}
+                        title={filterStatus === "Starred" ? "Show all agencies" : "Show starred agencies"}
+                        className="flex-shrink-0 transition-transform cursor-pointer"
+                        onMouseEnter={e => (e.currentTarget.style.transform = "scale(1.15)")}
+                        onMouseLeave={e => (e.currentTarget.style.transform = "scale(1)")}
+                      >
+                        <Star className="w-4 h-4" style={{ color: "#F59E0B", fill: filterStatus === "Starred" ? "#F59E0B" : "none" }} />
+                      </button>
+                      <span className="inline-flex items-center">
+                        {label}
+                        <SortIcon col="name" />
+                      </span>
+                    </div>
                   ) : key === "location" ? (
                     <>
                       <button onClick={e => { e.stopPropagation(); setLocationOpen(o => !o); }}
@@ -9926,7 +10041,7 @@ export default function Agencies({ isDark, clientMode = false }: { isDark: boole
                 onMouseEnter={e => (e.currentTarget.style.background = isDark ? "rgba(255,255,255,0.03)" : "#F9FAFB")}
                 onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
                 {/* Agency Name */}
-                <td className="py-3 pr-6">
+                <td className="py-3 pr-6" style={{ paddingLeft: 20 }}>
                   <div className="flex items-center gap-9">
                     <button onClick={e => { e.stopPropagation(); toggleStar(a.id); setSelectedAgency(null); }}
                       className="flex-shrink-0 transition-all"
@@ -10024,7 +10139,7 @@ export default function Agencies({ isDark, clientMode = false }: { isDark: boole
               .sort((a, b) => a.name.localeCompare(b.name))
           : [];
         return (
-          <div className="flex-1 flex min-h-0 mt-0 rounded-xl overflow-hidden" style={{ border: `1px solid ${c.border}` }}>
+          <div className="flex-1 flex min-h-0 mt-0 overflow-hidden">
             {/* LEFT: affiliation list */}
             <div className="flex flex-col flex-shrink-0" style={{ width: 280, borderRight: `1px solid ${c.border}`, background: isDark ? "rgba(255,255,255,0.02)" : "#FAFAFA" }}>
               <div className="px-4 py-2.5 flex items-center justify-between flex-shrink-0 relative" style={{ borderBottom: `1px solid ${c.border}` }} onClick={e => e.stopPropagation()}>
@@ -10127,7 +10242,7 @@ export default function Agencies({ isDark, clientMode = false }: { isDark: boole
                   </div>
                   <div className="flex-1 overflow-auto" style={{ scrollbarGutter: "stable" }}>
                     <table className="text-left border-collapse" style={{ minWidth: "100%" }}>
-                      <thead className="sticky top-0 z-10" style={{ background: isDark ? "#121628" : c.cardBg }}>
+                      <thead className="sticky top-0 z-10" style={{ background: isDark ? "rgba(255,255,255,0.03)" : "#FAFAFB" }}>
                         <tr style={{ borderBottom: `1px solid ${c.border}` }}>
                           <th className="text-[11px] font-bold uppercase tracking-wider py-3 pr-6 whitespace-nowrap"
                             style={{ fontFamily: FONT, color: c.muted, paddingLeft: 24 }}>Agency Name</th>
@@ -10209,7 +10324,7 @@ export default function Agencies({ isDark, clientMode = false }: { isDark: boole
         };
         const sub = isDark ? "#6B7280" : "#9CA3AF";
         return (
-          <div className="flex-1 overflow-auto mt-0" style={{ scrollbarGutter: "stable" }} onClick={() => { setAllUsersJobOpen(false); setViewOpen(false); }}>
+          <div className="flex-1 overflow-x-hidden overflow-y-auto mt-0" onClick={() => { setAllUsersJobOpen(false); setViewOpen(false); }}>
             {/* Inline hint — shown only when active list has matches AND inactive also has matches.
                 Empty-state (0 active) keeps the orange banner inside the table body. */}
             {inactiveMatchCount > 0 && userRowsAll.length > 0 && (
@@ -10222,7 +10337,7 @@ export default function Agencies({ isDark, clientMode = false }: { isDark: boole
               </div>
             )}
             <table className="w-full text-left border-collapse" style={{ tableLayout: "fixed" }}>
-              <thead className="sticky top-0 z-10" style={{ background: isDark ? "#121628" : c.cardBg }}>
+              <thead className="sticky top-0 z-10" style={{ background: isDark ? "rgba(255,255,255,0.03)" : "#FAFAFB" }}>
                 <tr style={{ borderBottom: `1px solid ${c.border}` }}>
                   {/* NAME (sortable) */}
                   <th className="text-[11px] font-bold uppercase tracking-wider py-3 pr-6 cursor-pointer select-none whitespace-nowrap"
@@ -10395,62 +10510,83 @@ export default function Agencies({ isDark, clientMode = false }: { isDark: boole
         );
       })()}
 
-      {/* Pagination — Agencies & All Users tabs */}
-      {(tab === "agencies" || tab === "users") && (
-      <div className="flex-shrink-0 flex items-center justify-between py-3 mt-auto"
-        style={{ marginLeft: "-48px", marginRight: "-48px", marginBottom: "-48px", paddingLeft: "48px", paddingRight: "48px", paddingBottom: "16px", borderTop: `1px solid ${c.border}`, background: isDark ? "rgba(255,255,255,0.02)" : "#F9FAFB" }}>
-        {/* Per page */}
-        <div className="flex-1 flex items-center gap-2 text-[12px]" style={{ fontFamily: FONT, color: c.muted }}>
-          <span>Show</span>
-          <div className="relative" onClick={e => e.stopPropagation()}>
-            <button onClick={() => setPerPageOpen(p => !p)}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg transition-all"
-              style={{ border: `1px solid ${c.border}`, color: c.text, background: c.cardBg }}>
-              {perPage}
-              <ChevronDown className="w-3 h-3" style={{ color: c.muted }} />
-            </button>
-            {perPageOpen && (
-              <div className="absolute bottom-8 left-0 rounded-xl shadow-xl py-1 z-30 w-20"
-                style={{ background: c.cardBg, border: `1px solid ${c.border}` }}>
-                {[5, 10, 20, 50].map(n => (
-                  <button key={n} onClick={() => { setPerPage(n); setPage(1); setPerPageOpen(false); }}
-                    className="w-full text-left px-3 py-1.5 text-[12px] transition-colors"
-                    style={{ fontFamily: FONT, color: perPage === n ? "#A855F7" : c.text, background: perPage === n ? "rgba(168,85,247,0.08)" : "transparent" }}>
-                    {n}
-                  </button>
-                ))}
+      {/* Pagination — Agencies & All Users tabs. Matches the Clients / Quotes
+          / Policies pattern: left-hand "X – Y of N …" count, right-hand page-
+          size popover + Previous / Next buttons. No grey band, no page-number
+          chips — leaner, and consistent across the app. */}
+      {(tab === "agencies" || tab === "users") && (() => {
+        const totalCount = tab === "users" ? filteredUsersCount : filtered.length;
+        const rangeStart = totalCount === 0 ? 0 : (page - 1) * perPage + 1;
+        const rangeEnd   = Math.min(page * perPage, totalCount);
+        const noun       = tab === "users" ? (totalCount === 1 ? "user" : "users")
+                                            : (totalCount === 1 ? "agency" : "agencies");
+        const atFirst = page === 1;
+        const atLast  = page >= totalPages || totalCount === 0;
+        return (
+          <div className="flex-shrink-0 flex items-center justify-between gap-3 px-5 py-3 flex-wrap mt-auto"
+            style={{ borderTop: `1px solid ${c.border}`, fontFamily: FONT }}>
+            <span className="text-[11.5px]" style={{ color: c.muted }}>
+              {rangeStart} – {rangeEnd} of {totalCount} {noun}
+            </span>
+            <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+              {/* Page-size selector — custom popover matching Clients / Quotes. */}
+              <div className="relative">
+                <button
+                  onClick={() => setPerPageOpen(o => !o)}
+                  className="flex items-center gap-1.5 pl-2.5 pr-2 py-1.5 rounded-lg cursor-pointer transition-colors text-[11.5px] font-medium"
+                  style={{ background: c.cardBg, border: `1px solid ${c.border}`, color: c.text }}
+                  onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+                  onMouseLeave={e => (e.currentTarget.style.background = c.cardBg)}>
+                  1 – {perPage}
+                  <ChevronDown className="w-3 h-3 transition-transform duration-200" style={{ opacity: 0.6, transform: perPageOpen ? "rotate(180deg)" : "rotate(0deg)" }} />
+                </button>
+                {perPageOpen && (
+                  <div
+                    className="absolute right-0 z-30 rounded-lg overflow-hidden py-1 min-w-[110px]"
+                    style={{
+                      bottom: "calc(100% + 6px)",
+                      background: c.cardBg,
+                      border: `1px solid ${c.border}`,
+                      boxShadow: "0 12px 28px rgba(15,23,42,0.10), 0 4px 8px rgba(15,23,42,0.04)",
+                    }}>
+                    {[10, 20, 50].map(n => {
+                      const active = perPage === n;
+                      return (
+                        <button
+                          key={n}
+                          onClick={() => { setPerPage(n); setPage(1); setPerPageOpen(false); }}
+                          className="w-full px-2.5 py-1.5 text-left text-[11.5px] flex items-center gap-2 cursor-pointer transition-colors"
+                          style={{ color: active ? "#A614C3" : c.text, fontWeight: active ? 600 : 500, background: "transparent" }}
+                          onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+                          onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                          <Check className="w-3 h-3 flex-shrink-0" style={{ opacity: active ? 1 : 0, color: "#A614C3" }} />
+                          <span className="whitespace-nowrap">1 – {n}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-            )}
+              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={atFirst}
+                className="text-[11.5px] font-medium px-3 py-1.5 rounded-lg transition-colors"
+                style={{ border: `1px solid ${c.border}`, color: c.text, background: c.cardBg, opacity: atFirst ? 0.5 : 1, cursor: atFirst ? "not-allowed" : "pointer" }}
+                onMouseEnter={e => { if (!atFirst) e.currentTarget.style.background = c.hoverBg; }}
+                onMouseLeave={e => (e.currentTarget.style.background = c.cardBg)}>
+                Previous
+              </button>
+              <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={atLast}
+                className="text-[11.5px] font-medium px-3 py-1.5 rounded-lg transition-colors"
+                style={{ border: `1px solid ${c.border}`, color: c.text, background: c.cardBg, opacity: atLast ? 0.5 : 1, cursor: atLast ? "not-allowed" : "pointer" }}
+                onMouseEnter={e => { if (!atLast) e.currentTarget.style.background = c.hoverBg; }}
+                onMouseLeave={e => (e.currentTarget.style.background = c.cardBg)}>
+                Next
+              </button>
+            </div>
           </div>
-          <span>per page</span>
-        </div>
+        );
+      })()}
 
-        {/* Page nav */}
-        <div className="flex items-center gap-1">
-          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
-            className="w-7 h-7 flex items-center justify-center rounded-lg transition-colors disabled:opacity-30"
-            style={{ color: c.muted }}
-            onMouseEnter={e => { if (page > 1) e.currentTarget.style.background = c.hoverBg; }}
-            onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          <button className="w-7 h-7 flex items-center justify-center rounded-lg text-[12px] font-bold text-white"
-            style={{ fontFamily: FONT, background: "linear-gradient(88.54deg, #5C2ED4 0.1%, #A614C3 63.88%)" }}>
-            {page}
-          </button>
-          <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
-            className="w-7 h-7 flex items-center justify-center rounded-lg transition-colors disabled:opacity-30"
-            style={{ color: c.muted }}
-            onMouseEnter={e => { if (page < totalPages) e.currentTarget.style.background = c.hoverBg; }}
-            onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-            <ChevronRight className="w-4 h-4" />
-          </button>
-        </div>
-        <div className="flex-1 text-right text-[12px]" style={{ fontFamily: FONT, color: c.muted }}>
-          Page {page} of {totalPages}
-        </div>
       </div>
-      )}
     </div>
   );
 }
