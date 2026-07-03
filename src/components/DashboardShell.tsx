@@ -8,6 +8,7 @@ import Agencies from "@/components/Agencies";
 import Quotes from "@/components/Quotes";
 import Policies from "@/components/Policies";
 import Endorsements from "@/components/Endorsements";
+import Marketplace from "@/components/Marketplace";
 import Website from "@/components/Website";
 
 interface DashboardShellProps {
@@ -29,6 +30,8 @@ export default function DashboardShell({ children, pageTitle }: DashboardShellPr
 
   const renderPage = () => {
     switch (activePage) {
+      case "Marketplace":
+        return <Marketplace isDark={darkMode} />;
       case "Clients":
         return <Clients isDark={darkMode} />;
       case "Agencies":
