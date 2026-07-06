@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { Lightbulb, ClipboardCheck, ChevronRight, Sparkles } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
 // 3×3 dot grid — the "apps" affordance shown in the design; lucide's LayoutGrid
 // is 4 squares (2×2), not what we want here.
@@ -46,29 +48,36 @@ const CATEGORIES: { label: string; icon: string; noDark?: boolean }[] = [
   { label: "Truckers GL",                  icon: "Truckers GL" },
 ];
 
+type PromoCategory = "Products" | "Markets" | "Bonds" | "Contests";
+
 // The right column is a curated editorial feed, not a rotating carousel. The
 // first item is the featured "hero" (gradient card); the rest render as a
 // compact "More this week" list so the pattern scales cleanly from 1 to N
-// without pagination dots.
+// without pagination dots. The category tabs above the mini list toggle which
+// non-hero items are visible; the hero itself stays fixed.
 const HIGHLIGHTS: {
+  category: PromoCategory;
   tag: string;
   tagColor: string;
   title: string;
   body: string;
   cta: string;
-  // Hero-specific — only the first entry uses these
+  // Hero-specific — only the first entry uses this gradient
   gradient?: string;
-  // Full promo art in /public/marketplace-promos/. On mini cards it fills the
-  // left tile edge-to-edge; on the hero card it's a full background layer
-  // beneath a dark gradient overlay so the text stays readable.
-  image: string;
-  // Per-card object-position override. The source banners are 900×352 wide,
-  // so the default `right center` crop lands on the illustration for most —
-  // but some illustrations sit slightly left of the banner's right edge and
-  // want the focal point pulled inward.
+  // Full promo art in /public/marketplace-promos/. When present, fills the
+  // mini-card left tile edge-to-edge or sits behind the hero's overlay.
+  // Absent on mock promos, which fall back to `imageGradient` + `thumb`.
+  image?: string;
+  // Per-card object-position override for the mini-tile crop.
   imagePosition?: string;
+  // Placeholder art for promos without real campaign imagery yet. Rendered
+  // as a gradient tile with a centered icon — visually signals "coming soon"
+  // vs. the photo-real banner tiles from live campaigns.
+  imageGradient?: string;
+  thumb?: LucideIcon;
 }[] = [
   {
+    category: "Contests",
     tag: "CONTEST",
     tagColor: "#5C2ED4",
     title: "Write big. Win Foo Fighters in Vegas.",
@@ -78,19 +87,7 @@ const HIGHLIGHTS: {
     image: "/marketplace-promos/foo-fighters.png",
   },
   {
-    tag: "PRODUCT UPDATE",
-    tagColor: "#0EA5A5",
-    title: "Faster Commercial Auto submissions",
-    body: "Single-page flow with step-by-step guidance and VIN auto-populate. Fit check first, quote in minutes.",
-    cta: "Test drive it",
-    image: "/marketplace-promos/commercial-auto.png",
-    // Pull the focal point ~15px inward from the right edge so the
-    // mechanic gorilla sits closer to tile-center. Smaller shift than
-    // the BOP tile because this banner has less padding around the
-    // character; anything past ~18px pushes him too far right.
-    imagePosition: "90% center",
-  },
-  {
+    category: "Bonds",
     tag: "NEW BOND",
     tagColor: "#A614C3",
     title: "California MVD dealer bonds",
@@ -99,6 +96,7 @@ const HIGHLIGHTS: {
     image: "/marketplace-promos/ca-mvd-bonds.png",
   },
   {
+    category: "Markets",
     tag: "NEW MARKET",
     tagColor: "#6366F1",
     title: "Non-Contractor GL & BOP marketplace",
@@ -111,7 +109,28 @@ const HIGHLIGHTS: {
     // left of the banner's right edge, so the crop lands better there.
     imagePosition: "86% center",
   },
+  {
+    category: "Products",
+    tag: "PRODUCT UPDATE",
+    tagColor: "#0EA5A5",
+    title: "Brivado adds 17 contractor classes",
+    body: "General Liability program expands to specialty trades and hard-to-place contractors with flexible limits up to $2M.",
+    cta: "Get a quote",
+    image: "/marketplace-promos/brivado-new-classes.png",
+  },
+  {
+    category: "Contests",
+    tag: "PROMO",
+    tagColor: "#5C2ED4",
+    title: "$50 gift card per WC bind",
+    body: "Bind AmTrust or GUARD Workers' Comp between Jul 1 and Sept 30 to earn $50 gift cards. Unlimited earnings, no size caps.",
+    cta: "Start quoting",
+    image: "/marketplace-promos/wc-gift-cards.png",
+  },
 ];
+
+// Ordered filter tabs. "All" sits first so users land on the widest set.
+const FILTERS: ("All" | PromoCategory)[] = ["All", "Products", "Markets", "Bonds", "Contests"];
 
 export default function Marketplace({ isDark = false }: MarketplaceProps) {
   const text     = isDark ? "#F9FAFB" : "#1F2937";
@@ -122,6 +141,13 @@ export default function Marketplace({ isDark = false }: MarketplaceProps) {
   const cardBg   = isDark ? "#1E2240" : "#FFFFFF";
   const surface  = isDark ? "#191D35" : "#FFFFFF";
   const tileHover = isDark ? "rgba(166,20,195,0.10)" : "rgba(166,20,195,0.06)";
+
+  const [filter, setFilter] = useState<"All" | PromoCategory>("All");
+  // Hero is HIGHLIGHTS[0] and stays fixed regardless of filter. The rest of
+  // the list is what the tabs toggle. "All" bypasses the category check.
+  const visibleMinis = HIGHLIGHTS.slice(1).filter(
+    h => filter === "All" || h.category === filter
+  );
 
   return (
     <div
@@ -198,16 +224,19 @@ export default function Marketplace({ isDark = false }: MarketplaceProps) {
           </button>
         </div>
 
-        {/* LEFT tiles — row 2, column 1. `h-full` + `grid-auto-rows: 1fr` on
-            the inner grid lets the 4 tile rows stretch to fill whatever height
-            the aside claims — so the two sections end at the same bottom edge
-            regardless of how many promo cards land on the right. */}
-        <section style={{ gridColumn: 1, gridRow: 2 }} className="flex flex-col">
+        {/* LEFT tiles — row 2, column 1. Tiles keep their natural
+            (~140px) height regardless of how tall the aside next to them
+            grows; `alignSelf: start` opts this cell out of the grid's
+            default stretch so tiles no longer inflate to match the
+            weekly-highlights column. */}
+        <section
+          style={{ gridColumn: 1, gridRow: 2, alignSelf: "start" }}
+          className="flex flex-col"
+        >
           <div
-            className="grid gap-4 flex-1"
+            className="grid gap-4"
             style={{
               gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
-              gridAutoRows: "1fr",
             }}
           >
             {CATEGORIES.map(cat => {
@@ -310,14 +339,17 @@ export default function Marketplace({ isDark = false }: MarketplaceProps) {
                     objectPosition: "center right",
                   }}
                 />
-                {/* Legibility overlay — heavy on the left where the text sits,
-                    fading to transparent on the right where the art shows through. */}
+                {/* Legibility overlay — solid deep-purple wash across the
+                    text half so the title / body / CTA sit on a stable dark
+                    backdrop, then a smoother mid-fade rather than dropping
+                    to near-transparent (which let the FF stamp bleed through
+                    and clash with the headline). */}
                 <span
                   aria-hidden="true"
                   className="absolute inset-0 pointer-events-none"
                   style={{
                     background:
-                      "linear-gradient(90deg, rgba(58,20,128,0.88) 0%, rgba(90,32,180,0.65) 45%, rgba(166,20,195,0.15) 100%)",
+                      "linear-gradient(90deg, rgba(30,10,80,0.94) 0%, rgba(30,10,80,0.88) 50%, rgba(58,20,128,0.55) 100%)",
                   }}
                 />
 
@@ -365,47 +397,70 @@ export default function Marketplace({ isDark = false }: MarketplaceProps) {
             );
           })()}
 
-          {/* More promotions — mini banner cards. Each promo is a standalone
-              "small ad" with its own promo art, tag, title, short body, and
-              inline CTA — visually distinct from the news-list pattern so it
-              reads as marketing, not editorial. */}
-          {HIGHLIGHTS.length > 1 && (
-            <div className="flex flex-col gap-3">
-              {HIGHLIGHTS.slice(1, 4).map(h => {
-                return (
-                  <a
-                    key={h.title}
-                    href="#"
-                    className="group relative rounded-2xl p-3 flex items-stretch gap-3 transition-all overflow-hidden"
+          {/* Category filter — five pills toggle which slider promos show.
+              The hero above is fixed; only the slider below responds. */}
+          <div className="flex flex-wrap gap-1.5">
+            {FILTERS.map(f => {
+              const active = filter === f;
+              return (
+                <button
+                  key={f}
+                  type="button"
+                  onClick={() => setFilter(f)}
+                  className="text-[11px] font-semibold px-2.5 py-1 rounded-full transition-colors"
+                  style={{
+                    background: active
+                      ? "linear-gradient(90deg,#5C2ED4 0%,#A614C3 100%)"
+                      : "transparent",
+                    color: active ? "#ffffff" : muted,
+                    border: active ? "1px solid transparent" : `1px solid ${border}`,
+                    cursor: "pointer",
+                  }}
+                >
+                  {f}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Vertical list of image-left mini cards. Real promos render first;
+              remaining slots (up to 5 total) fill with dashed "Coming soon"
+              placeholders so the aside height stays roughly constant across
+              filter switches. */}
+          <div className="flex flex-col gap-3">
+            {visibleMinis.map(h => {
+              const Thumb = h.thumb;
+              return (
+                <a
+                  key={h.title}
+                  href="#"
+                  className="group rounded-2xl p-3 flex items-stretch gap-3 transition-all overflow-hidden"
+                  style={{
+                    height: 120,
+                    background: surface,
+                    border: `1px solid ${border}`,
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.transform = "translateY(-1px)";
+                    e.currentTarget.style.background = `linear-gradient(${surface}, ${surface}) padding-box, linear-gradient(to right, #5C2ED4 0%, #A614C3 65%) border-box`;
+                    e.currentTarget.style.border = "1px solid transparent";
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.transform = "none";
+                    e.currentTarget.style.background = surface;
+                    e.currentTarget.style.border = `1px solid ${border}`;
+                  }}
+                >
+                  <span
+                    className="relative flex-shrink-0 rounded-xl overflow-hidden flex items-center justify-center"
                     style={{
-                      background: surface,
-                      border: `1px solid ${border}`,
-                      // Lock the card height so all three mini cards line up
-                      // exactly regardless of body-text length. Without this,
-                      // sub-pixel line wrapping can leave the first card a
-                      // couple pixels off from the others.
-                      height: 120,
+                      width: 96,
+                      background: h.image ? undefined : h.imageGradient,
                     }}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.transform = "translateY(-1px)";
-                      e.currentTarget.style.background = `linear-gradient(${surface}, ${surface}) padding-box, linear-gradient(to right, #5C2ED4 0%, #A614C3 65%) border-box`;
-                      e.currentTarget.style.border = "1px solid transparent";
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.transform = "none";
-                      e.currentTarget.style.background = surface;
-                      e.currentTarget.style.border = `1px solid ${border}`;
-                    }}
+                    aria-hidden="true"
                   >
-                    {/* Full-cover promo art — the campaign hero image fills
-                        the entire left tile edge-to-edge. `items-stretch` on
-                        the parent <a> gives this span the card's full height. */}
-                    <span
-                      className="relative flex-shrink-0 rounded-xl overflow-hidden"
-                      style={{ width: 96 }}
-                      aria-hidden="true"
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                    {h.image ? (
+                      // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={h.image}
                         alt=""
@@ -414,47 +469,46 @@ export default function Marketplace({ isDark = false }: MarketplaceProps) {
                           width: "100%",
                           height: "100%",
                           objectFit: "cover",
-                          // Source banners are 900×352 — cropped to a ~96px
-                          // square, the middle is usually meaningless text.
-                          // Right-anchored crop lands on the illustration.
                           objectPosition: h.imagePosition ?? "right center",
                         }}
                       />
-                    </span>
-                    <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5">
-                      <div>
-                        <div
-                          className="text-[10px] font-bold uppercase mb-0.5"
-                          style={{ color: h.tagColor, letterSpacing: "0.10em" }}
-                        >
-                          {h.tag}
-                        </div>
-                        <div className="text-[13px] font-bold leading-tight mb-1" style={{ color: heading }}>
-                          {h.title}
-                        </div>
-                        <div className="text-[11px] leading-snug" style={{
-                          color: muted,
-                          display: "-webkit-box",
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: "vertical",
-                          overflow: "hidden",
-                        }}>
-                          {h.body}
-                        </div>
-                      </div>
-                      <span
-                        className="mt-1.5 text-[11px] font-semibold inline-flex items-center gap-1 transition-transform group-hover:translate-x-0.5"
-                        style={{ color: h.tagColor }}
+                    ) : Thumb ? (
+                      <Thumb className="w-7 h-7 text-white" strokeWidth={1.75} />
+                    ) : null}
+                  </span>
+                  <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5">
+                    <div>
+                      <div
+                        className="text-[10px] font-bold uppercase mb-0.5"
+                        style={{ color: h.tagColor, letterSpacing: "0.10em" }}
                       >
-                        {h.cta}
-                        <ChevronRight className="w-3 h-3" strokeWidth={2.5} />
-                      </span>
+                        {h.tag}
+                      </div>
+                      <div className="text-[13px] font-bold leading-tight mb-1" style={{ color: heading }}>
+                        {h.title}
+                      </div>
+                      <div className="text-[11px] leading-snug" style={{
+                        color: muted,
+                        display: "-webkit-box",
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: "vertical",
+                        overflow: "hidden",
+                      }}>
+                        {h.body}
+                      </div>
                     </div>
-                  </a>
-                );
-              })}
-            </div>
-          )}
+                    <span
+                      className="mt-1.5 text-[11px] font-semibold inline-flex items-center gap-1 transition-transform group-hover:translate-x-0.5"
+                      style={{ color: h.tagColor }}
+                    >
+                      {h.cta}
+                      <ChevronRight className="w-3 h-3" strokeWidth={2.5} />
+                    </span>
+                  </div>
+                </a>
+              );
+            })}
+          </div>
 
           {/* Quick-link cards — compact horizontal rows */}
           <div className="grid grid-cols-2 gap-3">
@@ -492,6 +546,7 @@ export default function Marketplace({ isDark = false }: MarketplaceProps) {
           </div>
         </aside>
       </div>
+
     </div>
   );
 }
