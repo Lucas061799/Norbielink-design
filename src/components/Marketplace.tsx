@@ -84,6 +84,11 @@ const HIGHLIGHTS: {
     body: "Single-page flow with step-by-step guidance and VIN auto-populate. Fit check first, quote in minutes.",
     cta: "Test drive it",
     image: "/marketplace-promos/commercial-auto.png",
+    // Pull the focal point ~15px inward from the right edge so the
+    // mechanic gorilla sits closer to tile-center. Smaller shift than
+    // the BOP tile because this banner has less padding around the
+    // character; anything past ~18px pushes him too far right.
+    imagePosition: "90% center",
   },
   {
     tag: "NEW BOND",
