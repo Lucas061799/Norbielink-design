@@ -83,7 +83,13 @@
       "Bash(grep -n \"ParsedUser\\\\|Name, Admin, Job Title\\\\|name: \\\\\"Name\\\\\"\\\\|addRow\\({ name\\\\|cellText\\(1\\)\\\\|B2:B201\\\\|C2:C201\\\\|getCell\\(\\\\\"C1\\\\\"\\\\|adminFormula\\\\|jobTitleFormula\" /Users/lucasye/Norbielink/src/components/Agencies.tsx)",
       "Bash(grep -n \"statusSummary\\\\|Start a Quote\\\\|Start a Policy\\\\|All Policies\\\\|Total Policies\\\\|repeat\\(auto-fit, minmax\\\\|handleRefresh\\\\|setRefreshing\\\\|btnGrad\\\\|ml-auto\\\\|order:\\\\|Plus,\\\\|onClick={handleRefresh}\\\\|Section title\\\\|<h1\\\\|^export default function Policies\" /Users/lucasye/Norbielink/src/components/Policies.tsx)",
       "Bash(grep -n \"File columns \\(header row required\\)\\\\|space-y-1.5\\\\\">$\\\\|<span className=\\\\\"flex-shrink-0 w-\\\\[68px\\\\]\\\\\"\" /Users/lucasye/Norbielink/src/components/Agencies.tsx)",
-      "Bash(grep -n \"parsedUsers.map\\(\\(u, i\\) => {\" /Users/lucasye/Norbielink/src/components/Agencies.tsx)"
+      "Bash(grep -n \"parsedUsers.map\\(\\(u, i\\) => {\" /Users/lucasye/Norbielink/src/components/Agencies.tsx)",
+      "Bash(grep -nE \"background: .+, backgroundImage:|background:[^,{]*,[^}]*backgroundImage:\" /Users/lucasye/Norbielink-design/src/components/Agencies.tsx)",
+      "Bash(awk '/style=\\\\{\\\\{/,/\\\\}\\\\}/' /Users/lucasye/Norbielink-design/src/components/Agencies.tsx)",
+      "Bash(awk 'BEGIN{RS=\"}}\"} /background:/ && /backgroundImage:/ {print NR\": \"substr\\($0,1,200\\); print \"---\"}')",
+      "Bash(awk 'BEGIN{RS=\"}}\"} /background:/ && /backgroundImage:/ {print substr\\($0,length\\($0\\)-200\\); print \"===\"}' /Users/lucasye/Norbielink-design/src/components/Sidenav.tsx)",
+      "Bash(awk 'BEGIN{RS=\"}}\"} /background:/ && /backgroundImage:/ {print substr\\($0,length\\($0\\)-200\\); print \"===\"}' /Users/lucasye/Norbielink-design/src/components/Marketplace.tsx)",
+      "Bash(awk 'BEGIN{RS=\"}}\"} /background:/ && /backgroundImage:/ {print substr\\($0,length\\($0\\)-250\\); print \"===\"}' /Users/lucasye/Norbielink-design/src/components/Clients.tsx)"
     ]
   }
 }
