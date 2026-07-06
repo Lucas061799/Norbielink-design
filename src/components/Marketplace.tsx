@@ -81,7 +81,7 @@ const HIGHLIGHTS: {
     tag: "PRODUCT UPDATE",
     tagColor: "#0EA5A5",
     title: "Faster Commercial Auto submissions",
-    body: "Single-page flow with VIN auto-populate. Fit check first, quote in minutes.",
+    body: "Single-page flow with step-by-step guidance and VIN auto-populate. Fit check first, quote in minutes.",
     cta: "Test drive it",
     image: "/marketplace-promos/commercial-auto.png",
   },
@@ -375,6 +375,11 @@ export default function Marketplace({ isDark = false }: MarketplaceProps) {
                     style={{
                       background: surface,
                       border: `1px solid ${border}`,
+                      // Lock the card height so all three mini cards line up
+                      // exactly regardless of body-text length. Without this,
+                      // sub-pixel line wrapping can leave the first card a
+                      // couple pixels off from the others.
+                      height: 120,
                     }}
                     onMouseEnter={e => {
                       e.currentTarget.style.transform = "translateY(-1px)";
