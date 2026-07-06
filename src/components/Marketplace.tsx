@@ -62,12 +62,17 @@ const HIGHLIGHTS: {
   // left tile edge-to-edge; on the hero card it's a full background layer
   // beneath a dark gradient overlay so the text stays readable.
   image: string;
+  // Per-card object-position override. The source banners are 900×352 wide,
+  // so the default `right center` crop lands on the illustration for most —
+  // but some illustrations sit slightly left of the banner's right edge and
+  // want the focal point pulled inward.
+  imagePosition?: string;
 }[] = [
   {
     tag: "CONTEST",
     tagColor: "#5C2ED4",
     title: "Write big. Win Foo Fighters in Vegas.",
-    body: "Top binder in GL, WC, Bonds, or BOP between Mar 1 and Aug 1 wins a suite at Allegiant Stadium — Sept 26.",
+    body: "Top binder in GL, WC, Bonds, or BOP between Mar 1 and Aug 1 wins a suite at Allegiant Stadium on Sept 26.",
     cta: "See contest details",
     gradient: "linear-gradient(135deg,#5C2ED4 0%,#7A2FBE 40%,#A614C3 70%,#C8408E 100%)",
     image: "/marketplace-promos/foo-fighters.png",
@@ -76,15 +81,15 @@ const HIGHLIGHTS: {
     tag: "PRODUCT UPDATE",
     tagColor: "#0EA5A5",
     title: "Faster Commercial Auto submissions",
-    body: "Single-page flow with VIN auto-populate — decide fit first, then quote in minutes.",
+    body: "Single-page flow with VIN auto-populate. Fit check first, quote in minutes.",
     cta: "Test drive it",
     image: "/marketplace-promos/commercial-auto.png",
   },
   {
     tag: "NEW BOND",
-    tagColor: "#E8622A",
+    tagColor: "#A614C3",
     title: "California MVD dealer bonds",
-    body: "$50k used-dealer bond from $400/yr, $10k wholesale from $90/yr — plus verifier and yacht broker bonds.",
+    body: "$50k used-dealer bond from $400/yr, $10k wholesale from $90/yr. Verifier and yacht broker bonds too.",
     cta: "Quote a bond",
     image: "/marketplace-promos/ca-mvd-bonds.png",
   },
@@ -92,9 +97,14 @@ const HIGHLIGHTS: {
     tag: "NEW MARKET",
     tagColor: "#6366F1",
     title: "Non-Contractor GL & BOP marketplace",
-    body: "Quote, bind, and issue GL and BOP online across 100+ classes — accounting, retail, food services, tech, and more.",
+    body: "Quote, bind, and issue GL and BOP online across 100+ classes including accounting, retail, food services, and tech.",
     cta: "Explore marketplace",
     image: "/marketplace-promos/bop-marketplace.png",
+    // ~86% ≈ 25px focal-point shift left of the default `right center`
+    // crop (banner is 900×352 → scales to ~281px in a 96px-wide tile, so
+    // 100% - 25px/185px ≈ 86%). The gorilla illustration sits slightly
+    // left of the banner's right edge, so the crop lands better there.
+    imagePosition: "86% center",
   },
 ];
 
@@ -277,7 +287,6 @@ export default function Marketplace({ isDark = false }: MarketplaceProps) {
                 style={{
                   minHeight: 220,
                   background: hero.gradient,
-                  boxShadow: "0 12px 32px rgba(92,46,212,0.22)",
                 }}
               >
                 {/* Full-cover promo art — sits behind text; `objectPosition:
@@ -369,13 +378,11 @@ export default function Marketplace({ isDark = false }: MarketplaceProps) {
                     }}
                     onMouseEnter={e => {
                       e.currentTarget.style.transform = "translateY(-1px)";
-                      e.currentTarget.style.boxShadow = "0 0 8px rgba(166,20,195,0.35)";
                       e.currentTarget.style.background = `linear-gradient(${surface}, ${surface}) padding-box, linear-gradient(to right, #5C2ED4 0%, #A614C3 65%) border-box`;
                       e.currentTarget.style.border = "1px solid transparent";
                     }}
                     onMouseLeave={e => {
                       e.currentTarget.style.transform = "none";
-                      e.currentTarget.style.boxShadow = "none";
                       e.currentTarget.style.background = surface;
                       e.currentTarget.style.border = `1px solid ${border}`;
                     }}
@@ -400,7 +407,7 @@ export default function Marketplace({ isDark = false }: MarketplaceProps) {
                           // Source banners are 900×352 — cropped to a ~96px
                           // square, the middle is usually meaningless text.
                           // Right-anchored crop lands on the illustration.
-                          objectPosition: "right center",
+                          objectPosition: h.imagePosition ?? "right center",
                         }}
                       />
                     </span>
