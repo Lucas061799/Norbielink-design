@@ -1,7 +1,6 @@
 "use client";
 
-import { Lightbulb, ClipboardCheck, ChevronRight, Sparkles, Briefcase, Zap, Search, MessageSquareText } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import { Lightbulb, ClipboardCheck, ChevronRight, Sparkles } from "lucide-react";
 
 // 3×3 dot grid — the "apps" affordance shown in the design; lucide's LayoutGrid
 // is 4 squares (2×2), not what we want here.
@@ -59,56 +58,43 @@ const HIGHLIGHTS: {
   cta: string;
   // Hero-specific — only the first entry uses these
   gradient?: string;
-  // Placeholder promo art — swap for a real image when available. Rendered
-  // inside a rounded tile tinted with imageGradient.
-  thumb: LucideIcon;
-  imageGradient: string;
+  // Full promo art in /public/marketplace-promos/. On mini cards it fills the
+  // left tile edge-to-edge; on the hero card it's a full background layer
+  // beneath a dark gradient overlay so the text stays readable.
+  image: string;
 }[] = [
   {
-    tag: "NEW MARKET",
+    tag: "CONTEST",
     tagColor: "#5C2ED4",
-    title: "Workers' Comp built for Cannabis",
-    body: "FLUX just opened up appetite for the cannabis industry with dedicated Workers' Comp coverage. Get quotes in under 3 minutes.",
-    cta: "Explore Cannabis WC",
+    title: "Write big. Win Foo Fighters in Vegas.",
+    body: "Top binder in GL, WC, Bonds, or BOP between Mar 1 and Aug 1 wins a suite at Allegiant Stadium — Sept 26.",
+    cta: "See contest details",
     gradient: "linear-gradient(135deg,#5C2ED4 0%,#7A2FBE 40%,#A614C3 70%,#C8408E 100%)",
-    thumb: Sparkles,
-    imageGradient: "linear-gradient(135deg,#5C2ED4 0%,#A614C3 100%)",
-  },
-  {
-    tag: "PROSUITE",
-    tagColor: "#A614C3",
-    title: "Unlock ProSuite: automated CRM & marketing",
-    body: "Automated marketing, quote presentations, CRM tools built for your agency.",
-    cta: "Upgrade",
-    thumb: Briefcase,
-    imageGradient: "linear-gradient(135deg,#A614C3 0%,#7A1FA3 100%)",
+    image: "/marketplace-promos/foo-fighters.png",
   },
   {
     tag: "PRODUCT UPDATE",
     tagColor: "#0EA5A5",
-    title: "Faster mid-term endorsements",
-    body: "Pre-filled forms and live premium impact — endorse in seconds.",
-    cta: "See what's new",
-    thumb: Zap,
-    imageGradient: "linear-gradient(135deg,#0EA5A5 0%,#0F766E 100%)",
+    title: "Faster Commercial Auto submissions",
+    body: "Single-page flow with VIN auto-populate — decide fit first, then quote in minutes.",
+    cta: "Test drive it",
+    image: "/marketplace-promos/commercial-auto.png",
   },
   {
-    tag: "APPETITE",
+    tag: "NEW BOND",
     tagColor: "#E8622A",
-    title: "Food trucks & cannabis edibles",
-    body: "Norbie now handles two new specialty appetites this quarter.",
-    cta: "Check appetite",
-    thumb: Search,
-    imageGradient: "linear-gradient(135deg,#E8622A 0%,#C0410A 100%)",
+    title: "California MVD dealer bonds",
+    body: "$50k used-dealer bond from $400/yr, $10k wholesale from $90/yr — plus verifier and yacht broker bonds.",
+    cta: "Quote a bond",
+    image: "/marketplace-promos/ca-mvd-bonds.png",
   },
   {
-    tag: "FEEDBACK",
+    tag: "NEW MARKET",
     tagColor: "#6366F1",
-    title: "Tell us what you think",
-    body: "Share your NorbieLink experience — takes 2 minutes.",
-    cta: "Give feedback",
-    thumb: MessageSquareText,
-    imageGradient: "linear-gradient(135deg,#6366F1 0%,#4338CA 100%)",
+    title: "Non-Contractor GL & BOP marketplace",
+    body: "Quote, bind, and issue GL and BOP online across 100+ classes — accounting, retail, food services, tech, and more.",
+    cta: "Explore marketplace",
+    image: "/marketplace-promos/bop-marketplace.png",
   },
 ];
 
@@ -294,23 +280,30 @@ export default function Marketplace({ isDark = false }: MarketplaceProps) {
                   boxShadow: "0 12px 32px rgba(92,46,212,0.22)",
                 }}
               >
-                {/* Decorative rings */}
-                <span
+                {/* Full-cover promo art — sits behind text; `objectPosition:
+                    center right` keeps the banner's key illustration visible
+                    on the right while the left is dimmed for text legibility. */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={hero.image}
+                  alt=""
                   aria-hidden="true"
-                  className="absolute rounded-full pointer-events-none"
+                  className="absolute inset-0"
                   style={{
-                    width: 280, height: 280,
-                    right: -110, top: -110,
-                    border: "1px solid rgba(255,255,255,0.20)",
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                    objectPosition: "center right",
                   }}
                 />
+                {/* Legibility overlay — heavy on the left where the text sits,
+                    fading to transparent on the right where the art shows through. */}
                 <span
                   aria-hidden="true"
-                  className="absolute rounded-full pointer-events-none"
+                  className="absolute inset-0 pointer-events-none"
                   style={{
-                    width: 180, height: 180,
-                    right: -50, bottom: -70,
-                    background: "rgba(255,255,255,0.10)",
+                    background:
+                      "linear-gradient(90deg, rgba(58,20,128,0.88) 0%, rgba(90,32,180,0.65) 45%, rgba(166,20,195,0.15) 100%)",
                   }}
                 />
 
@@ -365,7 +358,6 @@ export default function Marketplace({ isDark = false }: MarketplaceProps) {
           {HIGHLIGHTS.length > 1 && (
             <div className="flex flex-col gap-3">
               {HIGHLIGHTS.slice(1, 4).map(h => {
-                const Thumb = h.thumb;
                 return (
                   <a
                     key={h.title}
@@ -388,35 +380,29 @@ export default function Marketplace({ isDark = false }: MarketplaceProps) {
                       e.currentTarget.style.border = `1px solid ${border}`;
                     }}
                   >
-                    {/* Promo art — placeholder gradient tile w/ icon. Swap for
-                        <Image/> when real artwork lands. */}
+                    {/* Full-cover promo art — the campaign hero image fills
+                        the entire left tile edge-to-edge. `items-stretch` on
+                        the parent <a> gives this span the card's full height. */}
                     <span
-                      className="relative flex-shrink-0 rounded-xl overflow-hidden flex items-center justify-center"
-                      style={{
-                        width: 96,
-                        background: h.imageGradient,
-                      }}
+                      className="relative flex-shrink-0 rounded-xl overflow-hidden"
+                      style={{ width: 96 }}
                       aria-hidden="true"
                     >
-                      <span
-                        aria-hidden="true"
-                        className="absolute rounded-full pointer-events-none"
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={h.image}
+                        alt=""
+                        className="absolute inset-0"
                         style={{
-                          width: 90, height: 90,
-                          right: -30, top: -30,
-                          border: "1px solid rgba(255,255,255,0.22)",
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                          // Source banners are 900×352 — cropped to a ~96px
+                          // square, the middle is usually meaningless text.
+                          // Right-anchored crop lands on the illustration.
+                          objectPosition: "right center",
                         }}
                       />
-                      <span
-                        aria-hidden="true"
-                        className="absolute rounded-full pointer-events-none"
-                        style={{
-                          width: 60, height: 60,
-                          left: -20, bottom: -20,
-                          background: "rgba(255,255,255,0.10)",
-                        }}
-                      />
-                      <Thumb className="relative w-7 h-7 text-white" strokeWidth={1.75} />
                     </span>
                     <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5">
                       <div>
