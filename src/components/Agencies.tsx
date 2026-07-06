@@ -9795,7 +9795,6 @@ export default function Agencies({ isDark, clientMode = false }: { isDark: boole
         style={{
           background: c.cardBg,
           border: `1px solid ${c.border}`,
-          boxShadow: isDark ? "none" : "0 1px 3px rgba(15,23,42,0.06)",
         }}>
 
       {/* Table */}
