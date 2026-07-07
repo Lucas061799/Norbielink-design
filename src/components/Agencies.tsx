@@ -10024,6 +10024,13 @@ export default function Agencies({ isDark, clientMode = false }: { isDark: boole
                         );
                       })()}
                     </>
+                  ) : (key === "code" || key === "totalUsers" || key === "status") ? (
+                    // Centered columns use an explicit flex wrapper so the
+                    // label + SortIcon anchor around the same content-box
+                    // center as the cell values below. `text-align: center`
+                    // was giving inconsistent overflow behavior when the
+                    // label was wider than the cell.
+                    <div className="flex items-center justify-center">{label}{sortable && key && <SortIcon col={key} />}</div>
                   ) : (
                     <>{label}{sortable && key && <SortIcon col={key} />}</>
                   )}
@@ -10072,17 +10079,23 @@ export default function Agencies({ isDark, clientMode = false }: { isDark: boole
                     </span>
                   </td>
                 ))}
-                {/* Total User — click to jump straight to the agency's Users tab */}
+                {/* Total User — click to jump straight to the agency's Users tab.
+                    Flex wrapper centers the button around the same content-box
+                    axis the header uses, so the icon+count line up vertically
+                    with the "Total User" label above even when the header text
+                    overflows the narrow (~87px) cell. */}
                 {!agenciesHiddenCols.has("totalUsers") && (
-                <td className="py-3 pr-6 whitespace-nowrap text-center" style={{ paddingLeft: 45 }}>
-                  <button onClick={e => { e.stopPropagation(); setSelectedAgencyTab("users"); setSelectedAgency(getDetail(a)); }}
-                    title={`View ${a.totalUsers} ${a.totalUsers === 1 ? "user" : "users"}`}
-                    className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md transition-colors"
-                    onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
-                    onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-                    <Users className="w-3.5 h-3.5 flex-shrink-0" style={{ color: c.muted }} />
-                    <span className="text-[13px] font-medium underline-offset-2 hover:underline" style={{ fontFamily: FONT, color: "#A614C3" }}>{a.totalUsers}</span>
-                  </button>
+                <td className="py-3 pr-6 whitespace-nowrap" style={{ paddingLeft: 45 }}>
+                  <div className="flex items-center justify-center">
+                    <button onClick={e => { e.stopPropagation(); setSelectedAgencyTab("users"); setSelectedAgency(getDetail(a)); }}
+                      title={`View ${a.totalUsers} ${a.totalUsers === 1 ? "user" : "users"}`}
+                      className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md transition-colors"
+                      onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+                      onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                      <Users className="w-3.5 h-3.5 flex-shrink-0" style={{ color: c.muted }} />
+                      <span className="text-[13px] font-medium underline-offset-2 hover:underline" style={{ fontFamily: FONT, color: "#A614C3" }}>{a.totalUsers}</span>
+                    </button>
+                  </div>
                 </td>
                 )}
                 {/* Last Login */}
