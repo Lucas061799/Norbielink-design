@@ -339,17 +339,17 @@ export default function Marketplace({ isDark = false }: MarketplaceProps) {
                     objectPosition: "center right",
                   }}
                 />
-                {/* Legibility overlay — solid deep-purple wash across the
-                    text half so the title / body / CTA sit on a stable dark
-                    backdrop, then a smoother mid-fade rather than dropping
-                    to near-transparent (which let the FF stamp bleed through
-                    and clash with the headline). */}
+                {/* Legibility overlay — nearly-opaque deep-purple wash
+                    across the entire text half (~60% width) with a darker
+                    base tint so the source banner's marketing text stops
+                    bleeding through the headline. Fades sharply from 60%
+                    onward to let the FF stamp show on the right. */}
                 <span
                   aria-hidden="true"
                   className="absolute inset-0 pointer-events-none"
                   style={{
                     background:
-                      "linear-gradient(90deg, rgba(30,10,80,0.94) 0%, rgba(30,10,80,0.88) 50%, rgba(58,20,128,0.55) 100%)",
+                      "linear-gradient(90deg, rgba(20,5,60,0.97) 0%, rgba(20,5,60,0.94) 70%, rgba(58,20,128,0.55) 100%)",
                   }}
                 />
 
