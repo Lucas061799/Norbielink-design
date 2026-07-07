@@ -350,20 +350,22 @@ export default function Marketplace({ isDark = false }: MarketplaceProps) {
                   }}
                 />
                 {/* Legibility overlay — nearly-opaque deep-purple wash
-                    across the entire text half (~60% width) with a darker
-                    base tint so the source banner's marketing text stops
-                    bleeding through the headline. Fades sharply from 60%
-                    onward to let the FF stamp show on the right. */}
+                    across the text column (~80% width), then a sharp fade
+                    to a much lighter tint on the right ~20% so the FF stamp
+                    reads through crisply instead of getting washed out. */}
                 <span
                   aria-hidden="true"
                   className="absolute inset-0 pointer-events-none"
                   style={{
                     background:
-                      "linear-gradient(90deg, rgba(20,5,60,0.97) 0%, rgba(20,5,60,0.94) 70%, rgba(58,20,128,0.55) 100%)",
+                      "linear-gradient(90deg, rgba(20,5,60,0.97) 0%, rgba(20,5,60,0.94) 80%, rgba(58,20,128,0.20) 100%)",
                   }}
                 />
 
                 <div className="relative z-10 h-full p-6 flex flex-col gap-5">
+                  {/* Title keeps its natural card-wide wrap for a poster
+                      feel; only the body gets a max-width so the smaller
+                      copy doesn't stretch into the FF-stamp fade zone. */}
                   <div className="flex flex-col gap-3">
                     <span
                       className="self-start text-[10px] font-bold uppercase px-2.5 py-1 rounded-md"
@@ -380,7 +382,7 @@ export default function Marketplace({ isDark = false }: MarketplaceProps) {
                       {hero.title}
                     </div>
                     {hero.body && (
-                      <div className="text-white text-[12.5px] leading-relaxed" style={{ opacity: 0.92 }}>
+                      <div className="text-white text-[12.5px] leading-relaxed" style={{ maxWidth: 300 }}>
                         {hero.body}
                       </div>
                     )}
