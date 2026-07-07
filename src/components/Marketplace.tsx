@@ -48,7 +48,7 @@ const CATEGORIES: { label: string; icon: string; noDark?: boolean }[] = [
   { label: "Truckers GL",                  icon: "Truckers GL" },
 ];
 
-type PromoCategory = "Products" | "Markets" | "Bonds" | "Contests";
+type PromoCategory = "Products" | "Contests" | "Promotions" | "Learning";
 
 // The right column is a curated editorial feed, not a rotating carousel. The
 // first item is the featured "hero" (gradient card); the rest render as a
@@ -87,7 +87,7 @@ const HIGHLIGHTS: {
     image: "/marketplace-promos/foo-fighters.png",
   },
   {
-    category: "Bonds",
+    category: "Products",
     tag: "NEW BOND",
     tagColor: "#A614C3",
     title: "California MVD dealer bonds",
@@ -96,7 +96,7 @@ const HIGHLIGHTS: {
     image: "/marketplace-promos/ca-mvd-bonds.png",
   },
   {
-    category: "Markets",
+    category: "Products",
     tag: "NEW MARKET",
     tagColor: "#6366F1",
     title: "Non-Contractor GL & BOP marketplace",
@@ -119,7 +119,7 @@ const HIGHLIGHTS: {
     image: "/marketplace-promos/brivado-new-classes.png",
   },
   {
-    category: "Contests",
+    category: "Promotions",
     tag: "PROMO",
     tagColor: "#5C2ED4",
     title: "$50 gift card per WC bind",
@@ -130,7 +130,17 @@ const HIGHLIGHTS: {
 ];
 
 // Ordered filter tabs. "All" sits first so users land on the widest set.
-const FILTERS: ("All" | PromoCategory)[] = ["All", "Products", "Markets", "Bonds", "Contests"];
+const FILTERS: ("All" | PromoCategory)[] = ["All", "Products", "Contests", "Promotions", "Learning"];
+
+// Category-tuned empty-state copy — leans marketing so a barren tab reads
+// as anticipation rather than a dead end.
+const EMPTY_STATE_COPY: Record<"All" | PromoCategory, string> = {
+  All:        "New drops incoming — stay tuned",
+  Products:   "New product updates on the way",
+  Contests:   "New contests brewing — stay tuned",
+  Promotions: "Fresh perks incoming",
+  Learning:   "New training dropping soon",
+};
 
 export default function Marketplace({ isDark = false }: MarketplaceProps) {
   const text     = isDark ? "#F9FAFB" : "#1F2937";
@@ -508,6 +518,21 @@ export default function Marketplace({ isDark = false }: MarketplaceProps) {
                 </a>
               );
             })}
+            {/* Empty state — shown only when a filter has zero live cards
+                so the list doesn't collapse to nothing. Kept as a single
+                dashed slot instead of padding-to-N so it reads as "we're
+                cooking something up" rather than as an intentional layout. */}
+            {visibleMinis.length === 0 && (
+              <div
+                className="rounded-2xl flex items-center justify-center text-[12px] text-center py-8 px-4"
+                style={{
+                  border: `1px dashed ${border}`,
+                  color: muted,
+                }}
+              >
+                {EMPTY_STATE_COPY[filter]}
+              </div>
+            )}
           </div>
 
           {/* Quick-link cards — compact horizontal rows */}
