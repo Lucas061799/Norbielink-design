@@ -19,6 +19,10 @@ interface DashboardShellProps {
 export default function DashboardShell({ children, pageTitle }: DashboardShellProps) {
   const [darkMode, setDarkMode] = useState(false);
   const [activePage, setActivePage] = useState("Marketplace");
+  // Super admin role — toggled from the profile modal. Gates the internal
+  // Agencies "Accounting" tab (ITC record view/edit). Lifted here so both
+  // Sidenav (toggle) and Agencies (consumer) read the same value.
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
   if (activePage === "Website") {
     return (
@@ -41,7 +45,7 @@ export default function DashboardShell({ children, pageTitle }: DashboardShellPr
         // which leaks state (bookRolled, inactiveUserIds, etc.) from one
         // perspective to the other (internal staff mutations would show up in
         // the agency's own client portal).
-        return <Agencies key="agencies-internal" isDark={darkMode} />;
+        return <Agencies key="agencies-internal" isDark={darkMode} isSuperAdmin={isSuperAdmin} />;
       case "Admin":
         // External-client view: same Agency detail surface, scoped to the user's
         // own (mock) agency. Distinct `key` from the Agencies case — see above.
@@ -71,6 +75,8 @@ export default function DashboardShell({ children, pageTitle }: DashboardShellPr
         onToggleDark={() => setDarkMode(!darkMode)}
         activeItem={activePage}
         onActiveChange={setActivePage}
+        isSuperAdmin={isSuperAdmin}
+        onToggleSuperAdmin={() => setIsSuperAdmin(v => !v)}
       />
       <div className="flex-1 flex flex-col overflow-hidden">
         <TopBar isDark={darkMode} activePage={activePage} />

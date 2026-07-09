@@ -94,9 +94,14 @@ interface SidenavProps {
   onToggleDark?: () => void;
   activeItem?: string;
   onActiveChange?: (item: string) => void;
+  // Super admin role — surfaced as a toggle inside the profile modal. Lifted
+  // to DashboardShell so the same value drives both the sidenav toggle and
+  // the internal Agencies "Accounting" tab visibility.
+  isSuperAdmin?: boolean;
+  onToggleSuperAdmin?: () => void;
 }
 
-export default function Sidenav({ isDark = false, onToggleDark, activeItem = "Marketplace", onActiveChange }: SidenavProps) {
+export default function Sidenav({ isDark = false, onToggleDark, activeItem = "Marketplace", onActiveChange, isSuperAdmin = false, onToggleSuperAdmin }: SidenavProps) {
   const [legacyView, setLegacyView] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const accountRef = useRef<HTMLDivElement | null>(null);
@@ -365,6 +370,24 @@ export default function Sidenav({ isDark = false, onToggleDark, activeItem = "Ma
               style={{ left: legacyView ? "19px" : "2px" }} />
           </div>
           <span style={{ fontSize: "13px", fontWeight: 400, color: isDark ? "#F9FAFB" : "#6B7280" }}>Legacy View</span>
+        </button>
+
+        {/* Super Admin — role toggle. On unlocks the internal Agencies
+            "Accounting" tab (ITC record view/edit). Sits with the other
+            session toggles because it's a preview-time role switch, not a
+            profile setting. Uses the purple brand accent on-state so it
+            reads as a permission toggle rather than a UI-mode toggle. */}
+        <button
+          onClick={() => onToggleSuperAdmin?.()}
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all"
+          style={{ background: isSuperAdmin && isDark ? "rgba(255,255,255,0.06)" : "transparent" }}
+        >
+          <div className="w-9 h-5 rounded-full relative transition-all shrink-0"
+            style={{ background: isSuperAdmin ? "#A614C3" : "#D1D5DB" }}>
+            <div className="absolute top-0.5 w-4 h-4 rounded-full shadow-sm bg-white transition-all"
+              style={{ left: isSuperAdmin ? "19px" : "2px" }} />
+          </div>
+          <span style={{ fontSize: "13px", fontWeight: 400, color: isDark ? "#F9FAFB" : "#6B7280" }}>Super Admin</span>
         </button>
 
       </div>

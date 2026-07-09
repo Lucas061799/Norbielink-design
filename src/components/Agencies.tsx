@@ -9,6 +9,7 @@ import {
   StickyNote, LayoutGrid, Trash2, Archive, Pin, List, Table2, FolderOpen, FileCheck,
   CheckSquare, Maximize2, Minimize2, Lock, Unlock, Copy, CopyPlus,
   MoreVertical, UserCircle, UserX, UserMinus, Download, Upload, UserCog, Pencil, Globe, Eye, Mail, Phone, Bell, Bookmark, FilePen, AlertCircle, Filter, Paperclip, Check, Send,
+  Landmark,
 } from "lucide-react";
 import { AddressAutocomplete } from "./AddressAutocomplete";
 
@@ -289,6 +290,42 @@ const mockAgencies: Agency[] = [
   { id: "12", name: "Ironclad Insurance",   code: "IRON12",  city: "Dallas",     state: "TX", totalUsers: 15, status: "Appointed",   isStarred: false, affiliations: ["LTA Marketing Group (LT006)", "Pacific Crest (PA004)", "TWFG (TW037)"], lastLogin: "04/24/2026" },
 ];
 
+// ── ITC (accounting) records ─────────────────────────────────────────────
+// Super-admin-only surface — shows whether an agency is registered in the
+// downstream ITC accounting system and lets an admin edit the record. A
+// `null` value means the agency exists in Norbielink but has NOT been
+// registered in ITC yet (empty state / "Add to ITC" affordance).
+type ITCStatus = "Active" | "Suspended" | "Terminated" | "Pending";
+type PaymentTerms = "Net 15" | "Net 30" | "Net 45" | "Net 60";
+
+interface ITCRecord {
+  itcCode: string;
+  status: ITCStatus;
+  effectiveDate: string;      // MM/DD/YYYY
+  terminationDate: string | null;
+  commissionRate: number;     // percent, e.g. 12.5
+  paymentTerms: PaymentTerms;
+  accountBalance: number;     // dollars, negative = agency owes
+  lastPaymentDate: string;
+  bankAccountMasked: string;  // e.g. "****4521"
+  notes: string;
+}
+
+const INITIAL_ITC_RECORDS: Record<string, ITCRecord | null> = {
+  ACME01:  { itcCode: "ITC-ACME-01924", status: "Active",    effectiveDate: "03/24/2026", terminationDate: null,          commissionRate: 12.5, paymentTerms: "Net 30", accountBalance: 4820.15,  lastPaymentDate: "04/18/2026", bankAccountMasked: "****4521", notes: "Auto-pay enrolled. Primary contact: Jason Smith." },
+  SUMIT22: { itcCode: "ITC-SUMIT-00447", status: "Active",    effectiveDate: "01/12/2024", terminationDate: null,          commissionRate: 11.0, paymentTerms: "Net 30", accountBalance: 1120.00,  lastPaymentDate: "04/22/2026", bankAccountMasked: "****9033", notes: "Wire transfers preferred." },
+  PION33:  null, // Not registered in ITC — demo empty state
+  LAKE04:  { itcCode: "ITC-LAKE-02110",  status: "Active",    effectiveDate: "08/02/2023", terminationDate: null,          commissionRate: 13.0, paymentTerms: "Net 45", accountBalance: -215.40,  lastPaymentDate: "03/28/2026", bankAccountMasked: "****1276", notes: "Small carryover; expected to clear by next cycle." },
+  RIDG05:  { itcCode: "ITC-RIDG-00832",  status: "Suspended", effectiveDate: "11/15/2022", terminationDate: null,          commissionRate: 12.5, paymentTerms: "Net 30", accountBalance: 15200.75, lastPaymentDate: "12/10/2025", bankAccountMasked: "****6641", notes: "Suspended pending 2025 statement review. Contact accounting before reactivating." },
+  HARB06:  null,
+  MIDL07:  { itcCode: "ITC-MIDL-00201",  status: "Pending",   effectiveDate: "04/01/2026", terminationDate: null,          commissionRate: 11.5, paymentTerms: "Net 30", accountBalance: 0,        lastPaymentDate: "—",         bankAccountMasked: "****—",     notes: "New producer. Awaiting first premium disbursement." },
+  COAS08:  null,
+  APEX09:  { itcCode: "ITC-APEX-01880",  status: "Active",    effectiveDate: "06/14/2024", terminationDate: null,          commissionRate: 13.5, paymentTerms: "Net 30", accountBalance: 8930.42,  lastPaymentDate: "04/20/2026", bankAccountMasked: "****3717", notes: "" },
+  KEYS10:  { itcCode: "ITC-KEYS-01455",  status: "Active",    effectiveDate: "09/03/2023", terminationDate: null,          commissionRate: 12.0, paymentTerms: "Net 45", accountBalance: 2210.00,  lastPaymentDate: "04/15/2026", bankAccountMasked: "****8802", notes: "" },
+  BLUE11:  null,
+  IRON12:  { itcCode: "ITC-IRON-02033",  status: "Active",    effectiveDate: "02/28/2025", terminationDate: null,          commissionRate: 14.0, paymentTerms: "Net 30", accountBalance: 5400.10,  lastPaymentDate: "04/24/2026", bankAccountMasked: "****5590", notes: "" },
+};
+
 /* ─── Extended mock detail data ─────────────────────────────────────────── */
 interface AgencyDetail extends Agency {
   website: string;
@@ -493,9 +530,9 @@ const mockAgencyUsers: AgencyUser[] = [
 ];
 
 /* ─── Agency Detail View ─────────────────────────────────────────────────── */
-type DetailTab = "overview" | "quotes" | "policies" | "users" | "documents" | "notes";
+type DetailTab = "overview" | "quotes" | "policies" | "users" | "documents" | "notes" | "accounting";
 
-function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleStar, inactiveUserIds, setInactiveUserIds, statusInactiveUserIds, setStatusInactiveUserIds, removedUserIds, setRemovedUserIds, bookRolled, setBookRolled, allAgencies, initialTab, onNavigateToAgency, viewMode = "internal" }: {
+function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleStar, inactiveUserIds, setInactiveUserIds, statusInactiveUserIds, setStatusInactiveUserIds, removedUserIds, setRemovedUserIds, bookRolled, setBookRolled, allAgencies, initialTab, onNavigateToAgency, viewMode = "internal", isSuperAdmin = false, itcRecords, setItcRecords }: {
   agency: AgencyDetail;
   isDark: boolean;
   onBack: () => void;
@@ -518,6 +555,14 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
   // "client"   = the agency's own external user, viewing their single agency. Their edit
   //             power depends on whether they're the agency admin — see `clientIsAdmin`.
   viewMode?: "internal" | "client";
+  // Super admin (Shannon, etc.) — gates the internal "Accounting" tab that
+  // surfaces the ITC record. Read from DashboardShell via the Agencies parent.
+  isSuperAdmin?: boolean;
+  // ITC records live at the Agencies-component level so edits persist across
+  // detail-view remounts. Both are optional so the client-mode invocation
+  // (which never renders the Accounting tab anyway) can leave them off.
+  itcRecords?: Record<string, ITCRecord | null>;
+  setItcRecords?: React.Dispatch<React.SetStateAction<Record<string, ITCRecord | null>>>;
 }) {
   // Mock role toggle for the Admin (client) section. In production internal & client are
   // separate deployments and this flag would come from auth; here we let the demo user
@@ -525,6 +570,11 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
   // edit power like BTIS staff), `false` = non-admin (edit buttons show a "no permission"
   // tooltip on hover instead of opening the edit modal).
   const [clientIsAdmin, setClientIsAdmin] = useState(true);
+  // Accounting tab local state — editing mode and the in-flight draft. The
+  // committed record lives on the parent (itcRecords / setItcRecords) so
+  // changes survive when the user switches agencies.
+  const [itcEditing, setItcEditing] = useState(false);
+  const [itcDraft, setItcDraft] = useState<ITCRecord | null>(null);
   const [detailTab, setDetailTab] = useState<DetailTab>(initialTab ?? "overview");
   const [isEditing, setIsEditing]           = useState(false);
   const [editExpanded, setEditExpanded]     = useState(false);
@@ -1685,6 +1735,12 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
     ["documents", "Documents", <FolderOpen className="w-[15px] h-[15px]" />],
     ...(viewMode === "internal"
       ? [["notes", "Notes", <CopyPlus className="w-[15px] h-[15px]" />] as [DetailTab, string, React.ReactElement]]
+      : []),
+    // Accounting — super admin only, internal only. Surfaces the agency's ITC
+    // record (see mock data). Sits at the end because it's a specialized role
+    // view rather than day-to-day workflow.
+    ...(viewMode === "internal" && isSuperAdmin
+      ? [["accounting", "Accounting", <Landmark className="w-[15px] h-[15px]" />] as [DetailTab, string, React.ReactElement]]
       : []),
   ];
 
@@ -5193,6 +5249,162 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
           </div>
         )}
 
+        {/* ── Accounting tab ── Super admin surface for the ITC record.
+             Three states: not-in-ITC (empty), view (record present, read-only),
+             edit (form). Editing a record mutates the parent's `itcRecords`
+             map so the change is visible after re-entering the tab. */}
+        {detailTab === "accounting" && (() => {
+          const record = itcRecords?.[agency.code] ?? null;
+          const fmtMoney = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD" });
+          const statusColor = (s: ITCStatus) => s === "Active" ? "#10B981"
+            : s === "Suspended" ? "#F59E0B"
+            : s === "Terminated" ? "#EF4444"
+            : "#6366F1";
+
+          // ── Empty state ──
+          if (!record && !itcEditing) {
+            return (
+              <div className="p-6 overflow-y-auto">
+                <div className="rounded-2xl p-10 text-center max-w-[560px] mx-auto"
+                  style={{ border: `1px dashed ${c.border}`, background: c.cardBg }}>
+                  <AlertCircle className="w-9 h-9 mx-auto mb-3" style={{ color: c.muted }} strokeWidth={1.5} />
+                  <p className="text-[15px] font-bold mb-1.5" style={{ ...font, color: c.text }}>Not registered in ITC</p>
+                  <p className="text-[12.5px] leading-relaxed" style={{ ...font, color: c.muted }}>
+                    <b>{agency.name}</b> exists in Norbielink but has no ITC accounting record yet. New producers land here first — the record is created after onboarding completes downstream.
+                  </p>
+                </div>
+              </div>
+            );
+          }
+
+          // ── Edit mode ──
+          if (itcEditing && itcDraft) {
+            const set = <K extends keyof ITCRecord>(k: K, v: ITCRecord[K]) => setItcDraft(prev => prev ? { ...prev, [k]: v } : prev);
+            const inputStyle = { fontFamily: FONT, background: isDark ? "rgba(255,255,255,0.05)" : "#F9FAFB", border: `1px solid ${c.border}`, color: c.text };
+            const field = (label: string, node: React.ReactNode) => (
+              <div>
+                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ ...font, color: c.muted, letterSpacing: "0.06em" }}>{label}</label>
+                {node}
+              </div>
+            );
+            return (
+              <div className="p-6 overflow-y-auto">
+                <div className="flex items-center justify-between mb-5">
+                  <h2 className="text-[18px] font-bold" style={{ ...font, color: c.text }}>Edit ITC Record</h2>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => { setItcEditing(false); setItcDraft(null); }}
+                      className="px-4 py-2 rounded-lg text-[13px] font-semibold transition-colors"
+                      style={{ ...font, color: c.text, border: `1px solid ${c.border}`, background: c.cardBg }}>
+                      Cancel
+                    </button>
+                    <button onClick={() => {
+                      if (itcDraft && setItcRecords) setItcRecords(prev => ({ ...prev, [agency.code]: itcDraft }));
+                      setItcEditing(false); setItcDraft(null);
+                    }}
+                      className="px-4 py-2 rounded-lg text-[13px] font-semibold text-white transition-colors"
+                      style={{ ...font, background: btnGrad }}>
+                      Save changes
+                    </button>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl p-6" style={{ background: c.cardBg, border: `1px solid ${c.border}` }}>
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+                    {field("ITC Producer Code",
+                      <input value={itcDraft.itcCode} onChange={e => set("itcCode", e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg text-[13px] outline-none" style={inputStyle} />)}
+                    {field("Status",
+                      <select value={itcDraft.status} onChange={e => set("status", e.target.value as ITCStatus)}
+                        className="w-full px-3 py-2 rounded-lg text-[13px] outline-none" style={inputStyle}>
+                        {(["Active","Suspended","Terminated","Pending"] as ITCStatus[]).map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>)}
+                    {field("Effective Date",
+                      <input value={itcDraft.effectiveDate} onChange={e => set("effectiveDate", e.target.value)}
+                        placeholder="MM/DD/YYYY" className="w-full px-3 py-2 rounded-lg text-[13px] outline-none" style={inputStyle} />)}
+                    {field("Termination Date",
+                      <input value={itcDraft.terminationDate ?? ""} onChange={e => set("terminationDate", e.target.value || null)}
+                        placeholder="—" className="w-full px-3 py-2 rounded-lg text-[13px] outline-none" style={inputStyle} />)}
+                    {field("Commission Rate (%)",
+                      <input type="number" step="0.1" value={itcDraft.commissionRate} onChange={e => set("commissionRate", Number(e.target.value) || 0)}
+                        className="w-full px-3 py-2 rounded-lg text-[13px] outline-none" style={inputStyle} />)}
+                    {field("Payment Terms",
+                      <select value={itcDraft.paymentTerms} onChange={e => set("paymentTerms", e.target.value as PaymentTerms)}
+                        className="w-full px-3 py-2 rounded-lg text-[13px] outline-none" style={inputStyle}>
+                        {(["Net 15","Net 30","Net 45","Net 60"] as PaymentTerms[]).map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>)}
+                    {field("Account Balance ($)",
+                      <input type="number" step="0.01" value={itcDraft.accountBalance} onChange={e => set("accountBalance", Number(e.target.value) || 0)}
+                        className="w-full px-3 py-2 rounded-lg text-[13px] outline-none" style={inputStyle} />)}
+                    {field("Last Payment Date",
+                      <input value={itcDraft.lastPaymentDate} onChange={e => set("lastPaymentDate", e.target.value)}
+                        placeholder="MM/DD/YYYY" className="w-full px-3 py-2 rounded-lg text-[13px] outline-none" style={inputStyle} />)}
+                    {field("Bank Account (masked)",
+                      <input value={itcDraft.bankAccountMasked} onChange={e => set("bankAccountMasked", e.target.value)}
+                        placeholder="****0000" className="w-full px-3 py-2 rounded-lg text-[13px] outline-none" style={inputStyle} />)}
+                  </div>
+                  <div className="mt-4">
+                    <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ ...font, color: c.muted, letterSpacing: "0.06em" }}>Notes</label>
+                    <textarea value={itcDraft.notes} onChange={e => set("notes", e.target.value)}
+                      rows={3} className="w-full px-3 py-2 rounded-lg text-[13px] outline-none resize-none" style={inputStyle} />
+                  </div>
+                </div>
+              </div>
+            );
+          }
+
+          // ── View mode ──
+          if (record) {
+            const cell = (label: string, value: React.ReactNode) => (
+              <div className="rounded-2xl p-4" style={{ background: c.cardBg, border: `1px solid ${c.border}` }}>
+                <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ ...font, color: c.muted, letterSpacing: "0.06em" }}>{label}</p>
+                <p className="text-[14px] font-semibold mt-1" style={{ ...font, color: c.text }}>{value}</p>
+              </div>
+            );
+            return (
+              <div className="p-6 overflow-y-auto">
+                <div className="flex items-center justify-between mb-5">
+                  <div>
+                    <h2 className="text-[18px] font-bold" style={{ ...font, color: c.text }}>ITC Record</h2>
+                    <p className="text-[12px] mt-0.5" style={{ ...font, color: c.muted }}>Last payment {record.lastPaymentDate} · {record.paymentTerms}</p>
+                  </div>
+                  <button onClick={() => { setItcDraft(record); setItcEditing(true); }}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-[13px] font-semibold text-white transition-colors"
+                    style={{ ...font, background: btnGrad }}>
+                    <Pencil className="w-3.5 h-3.5" strokeWidth={2} />Edit record
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-3 gap-4">
+                  {cell("Status",
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] font-semibold"
+                      style={{ background: `${statusColor(record.status)}18`, color: statusColor(record.status) }}>
+                      <span className="w-1.5 h-1.5 rounded-full" style={{ background: statusColor(record.status) }} />
+                      {record.status}
+                    </span>)}
+                  {cell("ITC Producer Code", record.itcCode)}
+                  {cell("Effective Date", record.effectiveDate)}
+                  {cell("Termination Date", record.terminationDate ?? "—")}
+                  {cell("Commission Rate", `${record.commissionRate.toFixed(1)}%`)}
+                  {cell("Payment Terms", record.paymentTerms)}
+                  {cell("Account Balance",
+                    <span style={{ color: record.accountBalance < 0 ? "#EF4444" : c.text }}>{fmtMoney(record.accountBalance)}</span>)}
+                  {cell("Last Payment", record.lastPaymentDate)}
+                  {cell("Bank Account", record.bankAccountMasked)}
+                </div>
+
+                {record.notes && (
+                  <div className="mt-4 rounded-2xl p-5" style={{ background: c.cardBg, border: `1px solid ${c.border}` }}>
+                    <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ ...font, color: c.muted, letterSpacing: "0.06em" }}>Notes</p>
+                    <p className="text-[13px] leading-relaxed mt-1.5" style={{ ...font, color: c.text }}>{record.notes}</p>
+                  </div>
+                )}
+              </div>
+            );
+          }
+
+          return null;
+        })()}
+
         {/* ── Policies tab ── */}
         {detailTab === "policies" && (() => {
           const isSold = bookRolled.has(agency.id);
@@ -8360,7 +8572,7 @@ function AddAgencyForm({ isDark, onSaveForLater, onDiscard, initialDraft, c, btn
 }
 
 /* ─── Component ─────────────────────────────────────────────────────────── */
-export default function Agencies({ isDark, clientMode = false }: { isDark: boolean; clientMode?: boolean }) {
+export default function Agencies({ isDark, clientMode = false, isSuperAdmin = false }: { isDark: boolean; clientMode?: boolean; isSuperAdmin?: boolean }) {
   const [search, setSearch]           = useState("");
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("All");
   const [sortKey, setSortKey]         = useState<SortKey>(null);
@@ -8372,6 +8584,9 @@ export default function Agencies({ isDark, clientMode = false }: { isDark: boole
   const [tab, setTab]                 = useState<TabKey>("agencies");
   const [selectedAgency, setSelectedAgency] = useState<AgencyDetail | null>(null);
   const [selectedAgencyTab, setSelectedAgencyTab] = useState<DetailTab | undefined>(undefined);
+  // ITC records lifted here so edits from the Accounting tab persist across
+  // detail-view navigation within this Agencies module instance.
+  const [itcRecords, setItcRecords] = useState<Record<string, ITCRecord | null>>(INITIAL_ITC_RECORDS);
   const [stars, setStars]             = useState<Set<string>>(
     new Set(mockAgencies.filter(a => a.isStarred).map(a => a.id))
   );
@@ -9030,6 +9245,9 @@ export default function Agencies({ isDark, clientMode = false }: { isDark: boole
         bookRolled={bookRolled}
         setBookRolled={setBookRolled}
         allAgencies={allAgencies}
+        isSuperAdmin={isSuperAdmin}
+        itcRecords={itcRecords}
+        setItcRecords={setItcRecords}
       />
     );
   }
@@ -9040,6 +9258,9 @@ export default function Agencies({ isDark, clientMode = false }: { isDark: boole
         agency={selectedAgency}
         isDark={isDark}
         initialTab={selectedAgencyTab}
+        isSuperAdmin={isSuperAdmin}
+        itcRecords={itcRecords}
+        setItcRecords={setItcRecords}
         onBack={() => { setSelectedAgency(null); setSelectedAgencyTab(undefined); }}
         c={c}
         btnGrad={btnGrad}
