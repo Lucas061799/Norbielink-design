@@ -531,7 +531,11 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
   // In the Admin segment (viewMode="client"), the user is browsing their own agency
   // read-only: no Edit, Add User, Bulk Upload, Deactivate, Reassign, etc. Internal staff
   // view stays full-power.
-  const currentUserIsAdmin = viewMode === "internal";
+  // Edit powers: both internal staff (Agencies page) and external agency
+  // admins (Admin page) currently count as admin — the Admin segment defaults
+  // to the agency-admin role, and the non-admin external tier isn't surfaced
+  // yet. Add an explicit role check here if that tier is introduced later.
+  const currentUserIsAdmin = viewMode === "internal" || viewMode === "client";
   const currentUserIsReadOnlyAdmin = viewMode === "client"; // hides per-row action menus
   const [lockedUserIds, setLockedUserIds] = useState<Set<string>>(() => new Set(["u5"])); // mock: Brian Nguyen locked by default
   const [contactRequestOpen, setContactRequestOpen] = useState(false);
@@ -2666,11 +2670,14 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
 
         {/* 4 info cards */}
         <div className="flex gap-4 mb-6 flex-shrink-0">
-          {/* Agency Contact — editable card */}
-          <div className="flex-1 rounded-2xl p-5 relative min-w-0 group transition-all cursor-pointer"
+          {/* Agency Contact — editable card (view-only for non-admin: no
+              Edit button, no hover highlight, no pointer cursor so nothing
+              suggests it can be interacted with). */}
+          <div
+            className={`flex-1 rounded-2xl p-5 relative min-w-0 group transition-all ${currentUserIsAdmin ? "cursor-pointer" : ""}`}
             style={{ background: c.cardBg, border: `1px solid ${c.border}` }}
-            onMouseEnter={e => { if (!contactCardEditing) { e.currentTarget.style.background = `linear-gradient(${c.cardBg},${c.cardBg}) padding-box, linear-gradient(90deg,#5C2ED4 0%,#A614C3 65%) border-box`; e.currentTarget.style.border = "1px solid transparent"; e.currentTarget.style.boxShadow = "0 4px 12px rgba(110,33,196,0.18)"; }}}
-            onMouseLeave={e => { if (!contactCardEditing) { e.currentTarget.style.background = c.cardBg; e.currentTarget.style.border = `1px solid ${c.border}`; e.currentTarget.style.boxShadow = "none"; }}}>
+            onMouseEnter={currentUserIsAdmin ? (e => { if (!contactCardEditing) { e.currentTarget.style.background = `linear-gradient(${c.cardBg},${c.cardBg}) padding-box, linear-gradient(90deg,#5C2ED4 0%,#A614C3 65%) border-box`; e.currentTarget.style.border = "1px solid transparent"; e.currentTarget.style.boxShadow = "0 4px 12px rgba(110,33,196,0.18)"; }}) : undefined}
+            onMouseLeave={currentUserIsAdmin ? (e => { if (!contactCardEditing) { e.currentTarget.style.background = c.cardBg; e.currentTarget.style.border = `1px solid ${c.border}`; e.currentTarget.style.boxShadow = "none"; }}) : undefined}>
             {/* Header row */}
             <div className="flex items-center mb-3">
               <p className="text-[12px] font-semibold" style={{ ...font, color: c.muted }}>Agency Contact</p>
@@ -2681,9 +2688,10 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                 <User className="w-5 h-5" style={{ color: "#A855F7" }} />
               </div>
             )}
-            {/* Edit button — floats left of icon on hover only */}
-            {!contactCardEditing && (
-              <button onClick={() => { if (currentUserIsAdmin) { setContactCardEditing(true); } else { setRequestedName(agency.contact); setRequestedPhone(agency.contactPhone); setRequestedEmail(agency.contactEmail); setContactRequestOpen(true); } }}
+            {/* Edit button — admin only. Non-admin sees no editing affordance
+                (the previous "Request Contact Update" workflow is disabled). */}
+            {!contactCardEditing && currentUserIsAdmin && (
+              <button onClick={() => setContactCardEditing(true)}
                 className="absolute opacity-0 group-hover:opacity-100 flex items-center gap-1.5 px-3 rounded-lg text-[12px] font-semibold transition-all"
                 style={{ top: "16px", right: "56px", height: 36, fontFamily: FONT, color: c.text, border: `1px solid ${isDark ? "rgba(255,255,255,0.15)" : "#E5E7EB"}`, background: isDark ? "rgba(255,255,255,0.05)" : c.cardBg }}
                 onMouseEnter={e => e.currentTarget.style.background = c.hoverBg}
