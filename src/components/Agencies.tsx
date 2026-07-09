@@ -515,9 +515,16 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
   initialTab?: DetailTab;
   onNavigateToAgency?: (targetCode: string, tab?: DetailTab) => void;
   // "internal" = BTIS staff viewing all agencies (default, full edit power).
-  // "client"   = agency's own user viewing their single agency, read-only.
+  // "client"   = the agency's own external user, viewing their single agency. Their edit
+  //             power depends on whether they're the agency admin — see `clientIsAdmin`.
   viewMode?: "internal" | "client";
 }) {
+  // Mock role toggle for the Admin (client) section. In production internal & client are
+  // separate deployments and this flag would come from auth; here we let the demo user
+  // flip roles from a segmented control in the section header. `true` = admin (full
+  // edit power like BTIS staff), `false` = non-admin (edit buttons show a "no permission"
+  // tooltip on hover instead of opening the edit modal).
+  const [clientIsAdmin, setClientIsAdmin] = useState(true);
   const [detailTab, setDetailTab] = useState<DetailTab>(initialTab ?? "overview");
   const [isEditing, setIsEditing]           = useState(false);
   const [editExpanded, setEditExpanded]     = useState(false);
@@ -528,21 +535,13 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
   const [newContactName, setNewContactName] = useState("");
   const [newContactPhone, setNewContactPhone] = useState("");
   const [newContactEmail, setNewContactEmail] = useState("");
-  // In the Admin segment (viewMode="client"), the user is browsing their own agency
-  // read-only: no Edit, Add User, Bulk Upload, Deactivate, Reassign, etc. Internal staff
-  // view stays full-power.
-  // Edit powers: both internal staff (Agencies page) and external agency
-  // admins (Admin page) currently count as admin — the Admin segment defaults
-  // to the agency-admin role, and the non-admin external tier isn't surfaced
-  // yet. Add an explicit role check here if that tier is introduced later.
-  const currentUserIsAdmin = viewMode === "internal" || viewMode === "client";
-  const currentUserIsReadOnlyAdmin = viewMode === "client"; // hides per-row action menus
+  // Permission derivation. Internal staff always full power. External-client users split
+  // by the mock role toggle: admin gets the same edit affordances as internal; non-admin
+  // sees Edit buttons but they surface a "no permission" tooltip on hover instead of
+  // opening modals, and per-row action menus stay hidden.
+  const currentUserIsAdmin = viewMode === "internal" || (viewMode === "client" && clientIsAdmin);
+  const currentUserIsReadOnlyAdmin = viewMode === "client" && !clientIsAdmin;
   const [lockedUserIds, setLockedUserIds] = useState<Set<string>>(() => new Set(["u5"])); // mock: Brian Nguyen locked by default
-  const [contactRequestOpen, setContactRequestOpen] = useState(false);
-  const [requestedName, setRequestedName] = useState("");
-  const [requestedPhone, setRequestedPhone] = useState("");
-  const [requestedEmail, setRequestedEmail] = useState("");
-  const [contactRequestSent, setContactRequestSent] = useState(false);
   const [eContactPhone, setEContactPhone]   = useState(agency.contactPhone);
   const font = { fontFamily: FONT };
   const isStarred = stars.has(agency.id);
@@ -1604,6 +1603,36 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
     backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239CA3AF' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`,
     backgroundRepeat: "no-repeat", backgroundPosition: "right 10px center",
   };
+  // External-client mode: only the agency principal can edit Agency Address / Phone
+  // Number / Agency Contact. Every other Agency Information field mirrors the Agency
+  // Code padlock affordance — readOnly input, muted color, not-allowed cursor, lock
+  // icon overlay. `clientLocked` is the on/off switch; the helpers below are the
+  // rendering primitives used across the edit form.
+  const clientLocked = viewMode === "client";
+  const lockedInputStyle: React.CSSProperties = {
+    ...inputStyle,
+    paddingRight: 34,
+    background: isDark ? "rgba(255,255,255,0.04)" : "#F9FAFB",
+    color: c.muted,
+    cursor: "not-allowed",
+  };
+  const LOCKED_HINT = "Only the agency principal can modify this — contact them to request a change.";
+  const LockedInput = ({ value }: { value: string | number }) => (
+    <div className="relative">
+      <input value={value} readOnly aria-readonly="true" title={LOCKED_HINT} style={lockedInputStyle} />
+      <Lock className="w-3.5 h-3.5 absolute pointer-events-none"
+        style={{ right: 10, top: "50%", transform: "translateY(-50%)", color: c.muted }} />
+    </div>
+  );
+  // Multi-select grids (Affiliations / Direct Appointments / Tags): keep the visual
+  // layout so the reader still sees which items are selected, but block interaction
+  // and dim the group.
+  const LockedGroupOverlay = ({ children }: { children: React.ReactNode }) => (
+    <div title={LOCKED_HINT}
+      style={{ pointerEvents: "none", opacity: 0.55, cursor: "not-allowed" }}>
+      {children}
+    </div>
+  );
 
   // Note: rendered as <span> not <button> because Radio is typically nested inside a parent
   // <button> (e.g. the Agency Type toggle), and HTML disallows nested buttons.
@@ -2504,7 +2533,9 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
           </div>
         </div>
       )}
-      {/* Section title — same as list view */}
+      {/* Section title — same as list view. In production the external-client user's role
+          would come from auth (see `clientIsAdmin` in AgencyDetailView); here we simply
+          default to admin, so the header renders the h1 alone as it did originally. */}
       <div className="flex flex-col justify-center flex-shrink-0 mb-12"
         style={{ height: 71, borderBottom: `0.87px solid ${isDark ? "rgba(255,255,255,0.08)" : "#E5E7EB"}`, marginLeft: -48, marginRight: -48, paddingLeft: 28, paddingRight: 28 }}>
         <h1 className="text-[22px] font-normal" style={{ ...font, color: c.text }}>{viewMode === "client" ? "Admin" : "Agencies"}</h1>
@@ -2670,14 +2701,11 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
 
         {/* 4 info cards */}
         <div className="flex gap-4 mb-6 flex-shrink-0">
-          {/* Agency Contact — editable card (view-only for non-admin: no
-              Edit button, no hover highlight, no pointer cursor so nothing
-              suggests it can be interacted with). */}
-          <div
-            className={`flex-1 rounded-2xl p-5 relative min-w-0 group transition-all ${currentUserIsAdmin ? "cursor-pointer" : ""}`}
+          {/* Agency Contact — editable card */}
+          <div className="flex-1 rounded-2xl p-5 relative min-w-0 group transition-all cursor-pointer"
             style={{ background: c.cardBg, border: `1px solid ${c.border}` }}
-            onMouseEnter={currentUserIsAdmin ? (e => { if (!contactCardEditing) { e.currentTarget.style.background = `linear-gradient(${c.cardBg},${c.cardBg}) padding-box, linear-gradient(90deg,#5C2ED4 0%,#A614C3 65%) border-box`; e.currentTarget.style.border = "1px solid transparent"; e.currentTarget.style.boxShadow = "0 4px 12px rgba(110,33,196,0.18)"; }}) : undefined}
-            onMouseLeave={currentUserIsAdmin ? (e => { if (!contactCardEditing) { e.currentTarget.style.background = c.cardBg; e.currentTarget.style.border = `1px solid ${c.border}`; e.currentTarget.style.boxShadow = "none"; }}) : undefined}>
+            onMouseEnter={e => { if (!contactCardEditing) { e.currentTarget.style.background = `linear-gradient(${c.cardBg},${c.cardBg}) padding-box, linear-gradient(90deg,#5C2ED4 0%,#A614C3 65%) border-box`; e.currentTarget.style.border = "1px solid transparent"; e.currentTarget.style.boxShadow = "0 4px 12px rgba(110,33,196,0.18)"; }}}
+            onMouseLeave={e => { if (!contactCardEditing) { e.currentTarget.style.background = c.cardBg; e.currentTarget.style.border = `1px solid ${c.border}`; e.currentTarget.style.boxShadow = "none"; }}}>
             {/* Header row */}
             <div className="flex items-center mb-3">
               <p className="text-[12px] font-semibold" style={{ ...font, color: c.muted }}>Agency Contact</p>
@@ -2688,16 +2716,39 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                 <User className="w-5 h-5" style={{ color: "#A855F7" }} />
               </div>
             )}
-            {/* Edit button — admin only. Non-admin sees no editing affordance
-                (the previous "Request Contact Update" workflow is disabled). */}
-            {!contactCardEditing && currentUserIsAdmin && (
-              <button onClick={() => setContactCardEditing(true)}
-                className="absolute opacity-0 group-hover:opacity-100 flex items-center gap-1.5 px-3 rounded-lg text-[12px] font-semibold transition-all"
-                style={{ top: "16px", right: "56px", height: 36, fontFamily: FONT, color: c.text, border: `1px solid ${isDark ? "rgba(255,255,255,0.15)" : "#E5E7EB"}`, background: isDark ? "rgba(255,255,255,0.05)" : c.cardBg }}
-                onMouseEnter={e => e.currentTarget.style.background = c.hoverBg}
-                onMouseLeave={e => e.currentTarget.style.background = isDark ? "rgba(255,255,255,0.05)" : c.cardBg}>
-                <Pencil className="w-3.5 h-3.5" />Edit
-              </button>
+            {/* Edit button — floats left of icon on card hover.
+                • Admin (internal staff OR external admin): opens the contact edit modal.
+                • Non-admin external user: button is disabled and its own hover shows a
+                  small tooltip explaining the permission gate. No modal, no submit flow. */}
+            {!contactCardEditing && (
+              currentUserIsAdmin ? (
+                <button onClick={() => setContactCardEditing(true)}
+                  className="absolute opacity-0 group-hover:opacity-100 flex items-center gap-1.5 px-3 rounded-lg text-[12px] font-semibold transition-all"
+                  style={{ top: "16px", right: "56px", height: 36, fontFamily: FONT, color: c.text, border: `1px solid ${isDark ? "rgba(255,255,255,0.15)" : "#E5E7EB"}`, background: isDark ? "rgba(255,255,255,0.05)" : c.cardBg }}
+                  onMouseEnter={e => e.currentTarget.style.background = c.hoverBg}
+                  onMouseLeave={e => e.currentTarget.style.background = isDark ? "rgba(255,255,255,0.05)" : c.cardBg}>
+                  <Pencil className="w-3.5 h-3.5" />Edit
+                </button>
+              ) : (
+                <div className="absolute opacity-0 group-hover:opacity-100 transition-all"
+                  style={{ top: "16px", right: "56px" }}>
+                  <div className="relative group/lockedit">
+                    <button disabled
+                      className="flex items-center gap-1.5 px-3 rounded-lg text-[12px] font-semibold cursor-not-allowed"
+                      style={{ height: 36, fontFamily: FONT, color: c.muted, border: `1px solid ${isDark ? "rgba(255,255,255,0.10)" : "#E5E7EB"}`, background: isDark ? "rgba(255,255,255,0.03)" : c.cardBg, opacity: 0.75 }}>
+                      <Lock className="w-3.5 h-3.5" />Edit
+                    </button>
+                    {/* Tooltip surfaces on the button's own hover (nested tailwind group:
+                        `group/lockedit`). Hidden by default, visible when the Edit button
+                        itself is hovered — the card-hover already brought the button into
+                        view, so the extra hover feels natural. */}
+                    <div className="absolute pointer-events-none opacity-0 group-hover/lockedit:opacity-100 transition-opacity whitespace-nowrap"
+                      style={{ top: "calc(100% + 6px)", right: 0, background: isDark ? "#1F2233" : "#111827", color: "#fff", fontFamily: FONT, fontSize: 11, padding: "6px 10px", borderRadius: 8, zIndex: 20, boxShadow: "0 6px 20px rgba(15,23,42,0.15)" }}>
+                      You don&apos;t have permission — only your admin can modify this
+                    </div>
+                  </div>
+                </div>
+              )
             )}
             {/* Content */}
             <p className="text-[13px] font-semibold mb-0.5" style={{ ...font, color: c.text }}>{eContact}</p>
@@ -2981,7 +3032,9 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
             <div className="grid grid-cols-3 gap-6 mb-6">
               <div>
                 <label style={labelStyle}>Agency Name:</label>
-                <input value={eName} onChange={e => setEName(e.target.value)} style={inputStyle} />
+                {clientLocked
+                  ? <LockedInput value={eName} />
+                  : <input value={eName} onChange={e => setEName(e.target.value)} style={inputStyle} />}
               </div>
               <div>
                 <label style={labelStyle}>Agency Code:</label>
@@ -3006,30 +3059,32 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
               </div>
               <div>
                 <label style={labelStyle}>Agency Type:</label>
-                <div className="flex" style={{ gap: 10 }}>
-                  {(["Retail","Wholesale"] as const).map(t => {
-                    const active = eType === t;
-                    return (
-                      <button key={t} onClick={() => setEType(t)}
-                        className="flex items-center gap-1.5 rounded-lg text-[12px] font-semibold whitespace-nowrap justify-center transition-all"
-                        style={{ ...font, width: 120, height: 40, boxSizing: "border-box",
-                          border: active ? "1px solid transparent" : `1px solid ${c.border}`,
-                          backgroundColor: active ? undefined : c.cardBg,
-                          backgroundImage: active
-                            ? `linear-gradient(88.54deg, rgba(92,46,212,0.06) 0.1%, rgba(166,20,195,0.06) 63.88%), linear-gradient(${c.cardBg}, ${c.cardBg}), linear-gradient(88.54deg, #5C2ED4 0.1%, #A614C3 63.88%)`
-                            : undefined,
-                          backgroundOrigin: active ? "padding-box, padding-box, border-box" : undefined,
-                          backgroundClip: active ? "padding-box, padding-box, border-box" : undefined,
-                        }}>
-                        <Radio checked={active} onClick={() => setEType(t)} />
-                        {active
-                          ? <span style={isDark ? { color: "#FFFFFF" } : { backgroundImage: "linear-gradient(88.54deg, #5C2ED4 0.1%, #A614C3 63.88%)", backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>{t}</span>
-                          : <span style={{ color: c.muted }}>{t}</span>
-                        }
-                      </button>
-                    );
-                  })}
-                </div>
+                {clientLocked ? <LockedInput value={eType} /> : (
+                  <div className="flex" style={{ gap: 10 }}>
+                    {(["Retail","Wholesale"] as const).map(t => {
+                      const active = eType === t;
+                      return (
+                        <button key={t} onClick={() => setEType(t)}
+                          className="flex items-center gap-1.5 rounded-lg text-[12px] font-semibold whitespace-nowrap justify-center transition-all"
+                          style={{ ...font, width: 120, height: 40, boxSizing: "border-box",
+                            border: active ? "1px solid transparent" : `1px solid ${c.border}`,
+                            background: active ? undefined : c.cardBg,
+                            backgroundImage: active
+                              ? `linear-gradient(88.54deg, rgba(92,46,212,0.06) 0.1%, rgba(166,20,195,0.06) 63.88%), linear-gradient(${c.cardBg}, ${c.cardBg}), linear-gradient(88.54deg, #5C2ED4 0.1%, #A614C3 63.88%)`
+                              : undefined,
+                            backgroundOrigin: active ? "padding-box, padding-box, border-box" : undefined,
+                            backgroundClip: active ? "padding-box, padding-box, border-box" : undefined,
+                          }}>
+                          <Radio checked={active} onClick={() => setEType(t)} />
+                          {active
+                            ? <span style={isDark ? { color: "#FFFFFF" } : { backgroundImage: "linear-gradient(88.54deg, #5C2ED4 0.1%, #A614C3 63.88%)", backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>{t}</span>
+                            : <span style={{ color: c.muted }}>{t}</span>
+                          }
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -3122,50 +3177,21 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
             <div className="grid grid-cols-3 gap-6 mb-6">
               <div>
                 <label style={labelStyle}>Status:</label>
-                <div className="relative" onClick={e => e.stopPropagation()}>
-                  <button type="button" onClick={() => { setEStatusOpen(o => !o); setEBizTypeOpen(false); }}
-                    className="w-full flex items-center justify-between outline-none"
-                    style={{ ...inputStyle, cursor: "pointer" }}>
-                    <span style={{ color: eStatus ? c.text : c.muted }}>{eStatus || "- Select one"}</span>
-                    <ChevronDown className={`w-3.5 h-3.5 transition-transform ${eStatusOpen ? "rotate-180" : ""}`} style={{ color: c.muted }} />
-                  </button>
-                  {eStatusOpen && (
-                    <div className="absolute left-0 right-0 top-full mt-1 z-20 rounded-lg overflow-hidden"
-                      style={{ background: c.cardBg, border: `1px solid ${c.border}`, boxShadow: "0 8px 24px rgba(0,0,0,0.12)" }}>
-                      {["Appointed", "Unappointed"].map(opt => {
-                        const active = eStatus === opt;
-                        return (
-                          <button key={opt} type="button" onClick={() => { setEStatus(opt); setEStatusOpen(false); }}
-                            className="w-full text-left px-3 py-2 text-[13px] flex items-center justify-between transition-colors"
-                            style={{ ...font, color: active ? "#A614C3" : c.text, background: active ? "rgba(168,85,247,0.08)" : "transparent" }}
-                            onMouseEnter={e => { if (!active) e.currentTarget.style.background = c.hoverBg; }}
-                            onMouseLeave={e => { if (!active) e.currentTarget.style.background = "transparent"; }}>
-                            <span>{opt}</span>
-                            {active && <svg width="10" height="8" viewBox="0 0 9 7" fill="none"><path d="M1 3.5L3.5 6L8 1" stroke="#A614C3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              </div>
-              {eStatus === "Unappointed" ? (
-                <div>
-                  <label style={labelStyle}>Reason:</label>
+                {clientLocked ? <LockedInput value={eStatus || "—"} /> : (
                   <div className="relative" onClick={e => e.stopPropagation()}>
-                    <button type="button" onClick={() => { setEReasonOpen(o => !o); setEStatusOpen(false); setEBizTypeOpen(false); }}
+                    <button type="button" onClick={() => { setEStatusOpen(o => !o); setEBizTypeOpen(false); }}
                       className="w-full flex items-center justify-between outline-none"
                       style={{ ...inputStyle, cursor: "pointer" }}>
-                      <span style={{ color: eReason ? c.text : c.muted }}>{eReason || "Select reason"}</span>
-                      <ChevronDown className={`w-3.5 h-3.5 transition-transform ${eReasonOpen ? "rotate-180" : ""}`} style={{ color: c.muted }} />
+                      <span style={{ color: eStatus ? c.text : c.muted }}>{eStatus || "- Select one"}</span>
+                      <ChevronDown className={`w-3.5 h-3.5 transition-transform ${eStatusOpen ? "rotate-180" : ""}`} style={{ color: c.muted }} />
                     </button>
-                    {eReasonOpen && (
+                    {eStatusOpen && (
                       <div className="absolute left-0 right-0 top-full mt-1 z-20 rounded-lg overflow-hidden"
                         style={{ background: c.cardBg, border: `1px solid ${c.border}`, boxShadow: "0 8px 24px rgba(0,0,0,0.12)" }}>
-                        {E_REASON_OPTIONS.map(opt => {
-                          const active = eReason === opt;
+                        {["Appointed", "Unappointed"].map(opt => {
+                          const active = eStatus === opt;
                           return (
-                            <button key={opt} type="button" onClick={() => { setEReason(opt); setEReasonOpen(false); }}
+                            <button key={opt} type="button" onClick={() => { setEStatus(opt); setEStatusOpen(false); }}
                               className="w-full text-left px-3 py-2 text-[13px] flex items-center justify-between transition-colors"
                               style={{ ...font, color: active ? "#A614C3" : c.text, background: active ? "rgba(168,85,247,0.08)" : "transparent" }}
                               onMouseEnter={e => { if (!active) e.currentTarget.style.background = c.hoverBg; }}
@@ -3178,11 +3204,46 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                       </div>
                     )}
                   </div>
+                )}
+              </div>
+              {eStatus === "Unappointed" ? (
+                <div>
+                  <label style={labelStyle}>Reason:</label>
+                  {clientLocked ? <LockedInput value={eReason || "—"} /> : (
+                    <div className="relative" onClick={e => e.stopPropagation()}>
+                      <button type="button" onClick={() => { setEReasonOpen(o => !o); setEStatusOpen(false); setEBizTypeOpen(false); }}
+                        className="w-full flex items-center justify-between outline-none"
+                        style={{ ...inputStyle, cursor: "pointer" }}>
+                        <span style={{ color: eReason ? c.text : c.muted }}>{eReason || "Select reason"}</span>
+                        <ChevronDown className={`w-3.5 h-3.5 transition-transform ${eReasonOpen ? "rotate-180" : ""}`} style={{ color: c.muted }} />
+                      </button>
+                      {eReasonOpen && (
+                        <div className="absolute left-0 right-0 top-full mt-1 z-20 rounded-lg overflow-hidden"
+                          style={{ background: c.cardBg, border: `1px solid ${c.border}`, boxShadow: "0 8px 24px rgba(0,0,0,0.12)" }}>
+                          {E_REASON_OPTIONS.map(opt => {
+                            const active = eReason === opt;
+                            return (
+                              <button key={opt} type="button" onClick={() => { setEReason(opt); setEReasonOpen(false); }}
+                                className="w-full text-left px-3 py-2 text-[13px] flex items-center justify-between transition-colors"
+                                style={{ ...font, color: active ? "#A614C3" : c.text, background: active ? "rgba(168,85,247,0.08)" : "transparent" }}
+                                onMouseEnter={e => { if (!active) e.currentTarget.style.background = c.hoverBg; }}
+                                onMouseLeave={e => { if (!active) e.currentTarget.style.background = "transparent"; }}>
+                                <span>{opt}</span>
+                                {active && <svg width="10" height="8" viewBox="0 0 9 7" fill="none"><path d="M1 3.5L3.5 6L8 1" stroke="#A614C3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div>
                   <label style={labelStyle}>Appt. Date</label>
-                  <DatePicker value={eApptDate} onChange={setEApptDate} inputStyle={inputStyle} c={c} btnGrad={btnGrad} font={font} />
+                  {clientLocked
+                    ? <LockedInput value={eApptDate || "—"} />
+                    : <DatePicker value={eApptDate} onChange={setEApptDate} inputStyle={inputStyle} c={c} btnGrad={btnGrad} font={font} />}
                 </div>
               )}
               <div />
@@ -3204,40 +3265,46 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
             <div className="grid grid-cols-3 gap-6 mb-6">
               <div>
                 <label style={labelStyle}>Type of Business:</label>
-                <div className="relative" onClick={e => e.stopPropagation()}>
-                  <button type="button" onClick={() => { setEBizTypeOpen(o => !o); setEStatusOpen(false); }}
-                    className="w-full flex items-center justify-between outline-none"
-                    style={{ ...inputStyle, cursor: "pointer" }}>
-                    <span style={{ color: eBizType && eBizType !== "-Business Type" ? c.text : c.muted }}>{eBizType && eBizType !== "-Business Type" ? eBizType : "-Business Type"}</span>
-                    <ChevronDown className={`w-3.5 h-3.5 transition-transform ${eBizTypeOpen ? "rotate-180" : ""}`} style={{ color: c.muted }} />
-                  </button>
-                  {eBizTypeOpen && (
-                    <div className="absolute left-0 right-0 top-full mt-1 z-20 rounded-lg overflow-hidden"
-                      style={{ background: c.cardBg, border: `1px solid ${c.border}`, boxShadow: "0 8px 24px rgba(0,0,0,0.12)" }}>
-                      {["Corporation","Joint Venture","Limited Liability Company","Limited Partnership","Partnership","Sole Proprietorship or individual","Sole Proprietorship"].map(opt => {
-                        const active = eBizType === opt;
-                        return (
-                          <button key={opt} type="button" onClick={() => { setEBizType(opt); setEBizTypeOpen(false); }}
-                            className="w-full text-left px-3 py-2 text-[13px] flex items-center justify-between transition-colors"
-                            style={{ ...font, color: active ? "#A614C3" : c.text, background: active ? "rgba(168,85,247,0.08)" : "transparent" }}
-                            onMouseEnter={e => { if (!active) e.currentTarget.style.background = c.hoverBg; }}
-                            onMouseLeave={e => { if (!active) e.currentTarget.style.background = "transparent"; }}>
-                            <span>{opt}</span>
-                            {active && <svg width="10" height="8" viewBox="0 0 9 7" fill="none"><path d="M1 3.5L3.5 6L8 1" stroke="#A614C3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
+                {clientLocked ? <LockedInput value={eBizType && eBizType !== "-Business Type" ? eBizType : "—"} /> : (
+                  <div className="relative" onClick={e => e.stopPropagation()}>
+                    <button type="button" onClick={() => { setEBizTypeOpen(o => !o); setEStatusOpen(false); }}
+                      className="w-full flex items-center justify-between outline-none"
+                      style={{ ...inputStyle, cursor: "pointer" }}>
+                      <span style={{ color: eBizType && eBizType !== "-Business Type" ? c.text : c.muted }}>{eBizType && eBizType !== "-Business Type" ? eBizType : "-Business Type"}</span>
+                      <ChevronDown className={`w-3.5 h-3.5 transition-transform ${eBizTypeOpen ? "rotate-180" : ""}`} style={{ color: c.muted }} />
+                    </button>
+                    {eBizTypeOpen && (
+                      <div className="absolute left-0 right-0 top-full mt-1 z-20 rounded-lg overflow-hidden"
+                        style={{ background: c.cardBg, border: `1px solid ${c.border}`, boxShadow: "0 8px 24px rgba(0,0,0,0.12)" }}>
+                        {["Corporation","Joint Venture","Limited Liability Company","Limited Partnership","Partnership","Sole Proprietorship or individual","Sole Proprietorship"].map(opt => {
+                          const active = eBizType === opt;
+                          return (
+                            <button key={opt} type="button" onClick={() => { setEBizType(opt); setEBizTypeOpen(false); }}
+                              className="w-full text-left px-3 py-2 text-[13px] flex items-center justify-between transition-colors"
+                              style={{ ...font, color: active ? "#A614C3" : c.text, background: active ? "rgba(168,85,247,0.08)" : "transparent" }}
+                              onMouseEnter={e => { if (!active) e.currentTarget.style.background = c.hoverBg; }}
+                              onMouseLeave={e => { if (!active) e.currentTarget.style.background = "transparent"; }}>
+                              <span>{opt}</span>
+                              {active && <svg width="10" height="8" viewBox="0 0 9 7" fill="none"><path d="M1 3.5L3.5 6L8 1" stroke="#A614C3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
               <div>
                 <label style={labelStyle}>Tax ID:</label>
-                <input value={eTaxId} onChange={e => setETaxId(e.target.value)} style={inputStyle} />
+                {clientLocked
+                  ? <LockedInput value={eTaxId || "—"} />
+                  : <input value={eTaxId} onChange={e => setETaxId(e.target.value)} style={inputStyle} />}
               </div>
               <div>
                 <label style={labelStyle}>Website Url:</label>
-                <input value={eWebsite} onChange={e => setEWebsite(e.target.value)} style={inputStyle} />
+                {clientLocked
+                  ? <LockedInput value={eWebsite || "—"} />
+                  : <input value={eWebsite} onChange={e => setEWebsite(e.target.value)} style={inputStyle} />}
               </div>
             </div>
 
@@ -3249,7 +3316,9 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
               </div>
               <div>
                 <label style={labelStyle}>Toll Free Number:</label>
-                <input value={eTollFree} onChange={e => setETollFree(formatPhone(e.target.value))} placeholder="(000) 000-0000" style={inputStyle} inputMode="tel" />
+                {clientLocked
+                  ? <LockedInput value={eTollFree || "—"} />
+                  : <input value={eTollFree} onChange={e => setETollFree(formatPhone(e.target.value))} placeholder="(000) 000-0000" style={inputStyle} inputMode="tel" />}
               </div>
               <div />
             </div>
@@ -3258,11 +3327,15 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
             <div className="grid grid-cols-3 gap-6 mb-6">
               <div>
                 <label style={labelStyle}>License Number:</label>
-                <input value={eLicNo} onChange={e => setELicNo(e.target.value)} style={inputStyle} />
+                {clientLocked
+                  ? <LockedInput value={eLicNo || "—"} />
+                  : <input value={eLicNo} onChange={e => setELicNo(e.target.value)} style={inputStyle} />}
               </div>
               <div>
                 <label style={labelStyle}>Expiration Date:</label>
-                <DatePicker value={eLicExp} onChange={setELicExp} inputStyle={inputStyle} c={c} btnGrad={btnGrad} font={font} />
+                {clientLocked
+                  ? <LockedInput value={eLicExp || "—"} />
+                  : <DatePicker value={eLicExp} onChange={setELicExp} inputStyle={inputStyle} c={c} btnGrad={btnGrad} font={font} />}
               </div>
               <div />
             </div>
@@ -3271,11 +3344,15 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
             <div className="grid grid-cols-3 gap-6 mb-6">
               <div>
                 <label style={labelStyle}>E&O Policy #:</label>
-                <input value={eEoNo} onChange={e => setEEoNo(e.target.value)} style={inputStyle} />
+                {clientLocked
+                  ? <LockedInput value={eEoNo || "—"} />
+                  : <input value={eEoNo} onChange={e => setEEoNo(e.target.value)} style={inputStyle} />}
               </div>
               <div>
                 <label style={labelStyle}>Expiration Date:</label>
-                <DatePicker value={eEoExp} onChange={setEEoExp} inputStyle={inputStyle} c={c} btnGrad={btnGrad} font={font} />
+                {clientLocked
+                  ? <LockedInput value={eEoExp || "—"} />
+                  : <DatePicker value={eEoExp} onChange={setEEoExp} inputStyle={inputStyle} c={c} btnGrad={btnGrad} font={font} />}
               </div>
               <div />
             </div>
@@ -3289,84 +3366,102 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
               ] as [string, boolean, (v: boolean) => void][]).map(([lbl, val, set]) => (
                 <div key={lbl}>
                   <label style={labelStyle}>{lbl}</label>
-                  <div className="flex gap-3">
-                    {([["Yes", true], ["No", false]] as [string, boolean][]).map(([opt, bool]) => {
-                      const active = val === bool;
-                      return (
-                        <button key={opt} onClick={() => set(bool)}
-                          className="flex items-center gap-1.5 rounded-lg text-[12px] font-semibold whitespace-nowrap justify-center transition-all"
-                          style={{ ...font, width: 120, height: 40, boxSizing: "border-box",
-                            border: active ? "1.65px solid transparent" : `1.65px solid ${c.border}`,
-                            backgroundColor: active ? undefined : c.cardBg,
-                            backgroundImage: active
-                              ? `linear-gradient(88.54deg, rgba(92,46,212,0.06) 0.1%, rgba(166,20,195,0.06) 63.88%), linear-gradient(${c.cardBg}, ${c.cardBg}), linear-gradient(88.54deg, #5C2ED4 0.1%, #A614C3 63.88%)`
-                              : undefined,
-                            backgroundOrigin: active ? "padding-box, padding-box, border-box" : undefined,
-                            backgroundClip: active ? "padding-box, padding-box, border-box" : undefined,
-                          }}>
-                          <Radio checked={active} onClick={() => set(bool)} />
-                          {active
-                            ? <span style={isDark ? { color: "#FFFFFF" } : { backgroundImage: "linear-gradient(88.54deg, #5C2ED4 0.1%, #A614C3 63.88%)", backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>{opt}</span>
-                            : <span style={{ color: c.muted }}>{opt}</span>
-                          }
-                        </button>
-                      );
-                    })}
-                  </div>
+                  {clientLocked ? <LockedInput value={val ? "Yes" : "No"} /> : (
+                    <div className="flex gap-3">
+                      {([["Yes", true], ["No", false]] as [string, boolean][]).map(([opt, bool]) => {
+                        const active = val === bool;
+                        return (
+                          <button key={opt} onClick={() => set(bool)}
+                            className="flex items-center gap-1.5 rounded-lg text-[12px] font-semibold whitespace-nowrap justify-center transition-all"
+                            style={{ ...font, width: 120, height: 40, boxSizing: "border-box",
+                              border: active ? "1.65px solid transparent" : `1.65px solid ${c.border}`,
+                              background: active ? undefined : c.cardBg,
+                              backgroundImage: active
+                                ? `linear-gradient(88.54deg, rgba(92,46,212,0.06) 0.1%, rgba(166,20,195,0.06) 63.88%), linear-gradient(${c.cardBg}, ${c.cardBg}), linear-gradient(88.54deg, #5C2ED4 0.1%, #A614C3 63.88%)`
+                                : undefined,
+                              backgroundOrigin: active ? "padding-box, padding-box, border-box" : undefined,
+                              backgroundClip: active ? "padding-box, padding-box, border-box" : undefined,
+                            }}>
+                            <Radio checked={active} onClick={() => set(bool)} />
+                            {active
+                              ? <span style={isDark ? { color: "#FFFFFF" } : { backgroundImage: "linear-gradient(88.54deg, #5C2ED4 0.1%, #A614C3 63.88%)", backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>{opt}</span>
+                              : <span style={{ color: c.muted }}>{opt}</span>
+                            }
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
 
-            {/* Affiliations */}
+            {/* Affiliations — checkbox grid, wrapped in LockedGroupOverlay for client mode so
+                the reader can still see which affiliations are selected but can't edit. */}
             <SectionDivider title="Affiliations" />
-            <div className="grid grid-cols-4 gap-x-6 gap-y-3">
-              {AFFILIATIONS.map(aff => (
-                <label key={aff} className="flex items-center gap-2.5 cursor-pointer select-none min-w-0" style={{ height: 24 }}>
-                  <div className="flex-shrink-0">
-                    <Checkbox checked={eAffil.has(aff)} onClick={() => toggleSet(eAffil, aff, setEAffil)} />
-                  </div>
-                  <span className="text-[12px] truncate" style={{ ...font, color: c.text }} title={aff}>{aff}</span>
-                </label>
-              ))}
-            </div>
+            {(() => {
+              const grid = (
+                <div className="grid grid-cols-4 gap-x-6 gap-y-3">
+                  {AFFILIATIONS.map(aff => (
+                    <label key={aff} className="flex items-center gap-2.5 cursor-pointer select-none min-w-0" style={{ height: 24 }}>
+                      <div className="flex-shrink-0">
+                        <Checkbox checked={eAffil.has(aff)} onClick={() => toggleSet(eAffil, aff, setEAffil)} />
+                      </div>
+                      <span className="text-[12px] truncate" style={{ ...font, color: c.text }} title={aff}>{aff}</span>
+                    </label>
+                  ))}
+                </div>
+              );
+              return clientLocked ? <LockedGroupOverlay>{grid}</LockedGroupOverlay> : grid;
+            })()}
 
             {/* Direct Appointments */}
             <SectionDivider title="Direct Appointments" />
             <p className="text-[12px] mb-3" style={{ ...font, color: c.muted }}>Workers Compensation</p>
-            <div className="grid grid-cols-4 gap-x-6 gap-y-3">
-              {WORKERS_COMP.map(w => (
-                <label key={w} className="flex items-center gap-2.5 cursor-pointer select-none min-w-0" style={{ height: 24 }}>
-                  <div className="flex-shrink-0">
-                    <Checkbox checked={eWC.has(w)} onClick={() => toggleSet(eWC, w, setEWC)} />
-                  </div>
-                  <span className="text-[12px] truncate" style={{ ...font, color: c.text }} title={w}>{w}</span>
-                </label>
-              ))}
-            </div>
+            {(() => {
+              const grid = (
+                <div className="grid grid-cols-4 gap-x-6 gap-y-3">
+                  {WORKERS_COMP.map(w => (
+                    <label key={w} className="flex items-center gap-2.5 cursor-pointer select-none min-w-0" style={{ height: 24 }}>
+                      <div className="flex-shrink-0">
+                        <Checkbox checked={eWC.has(w)} onClick={() => toggleSet(eWC, w, setEWC)} />
+                      </div>
+                      <span className="text-[12px] truncate" style={{ ...font, color: c.text }} title={w}>{w}</span>
+                    </label>
+                  ))}
+                </div>
+              );
+              return clientLocked ? <LockedGroupOverlay>{grid}</LockedGroupOverlay> : grid;
+            })()}
 
             {/* Tags */}
             <SectionDivider title="Tags" />
             <p className="text-[12px] mb-3" style={{ ...font, color: c.muted }}>Shown on the Agency Status card. Pick any that apply.</p>
-            <div className="grid grid-cols-4 gap-x-6 gap-y-3">
-              {AGENCY_BADGES.map(b => {
-                const checked = eBadges.has(b);
-                return (
-                  <label key={b} className="flex items-center gap-2.5 cursor-pointer select-none min-w-0" style={{ height: 24 }}>
-                    <div className="flex-shrink-0">
-                      <Checkbox checked={checked} onClick={() => toggleSet(eBadges, b, setEBadges)} />
-                    </div>
-                    <span className="inline-flex items-center justify-center rounded-full whitespace-nowrap"
-                      style={{ background: checked ? (isDark ? "rgba(168,85,247,0.22)" : "rgba(168,85,247,0.10)") : (isDark ? "rgba(255,255,255,0.04)" : "#F3F4F6"), padding: "3px 10px" }}>
-                      {checked ? (
-                        <span style={{ backgroundImage: isDark ? "linear-gradient(88.54deg, #A855F7 0.1%, #D946EF 63.88%)" : "linear-gradient(88.54deg, #5C2ED4 0.1%, #A614C3 63.88%)", backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", fontSize: 11, fontWeight: 600, lineHeight: "16px" }}>{b}</span>
-                      ) : (
-                        <span style={{ color: c.muted, fontSize: 11, fontWeight: 600, lineHeight: "16px" }}>{b}</span>
-                      )}
-                    </span>
-                  </label>
-                );
-              })}
-            </div>
+            {(() => {
+              const grid = (
+                <div className="grid grid-cols-4 gap-x-6 gap-y-3">
+                  {AGENCY_BADGES.map(b => {
+                    const checked = eBadges.has(b);
+                    return (
+                      <label key={b} className="flex items-center gap-2.5 cursor-pointer select-none min-w-0" style={{ height: 24 }}>
+                        <div className="flex-shrink-0">
+                          <Checkbox checked={checked} onClick={() => toggleSet(eBadges, b, setEBadges)} />
+                        </div>
+                        <span className="inline-flex items-center justify-center rounded-full whitespace-nowrap"
+                          style={{ background: checked ? (isDark ? "rgba(168,85,247,0.22)" : "rgba(168,85,247,0.10)") : (isDark ? "rgba(255,255,255,0.04)" : "#F3F4F6"), padding: "3px 10px" }}>
+                          {checked ? (
+                            <span style={{ backgroundImage: isDark ? "linear-gradient(88.54deg, #A855F7 0.1%, #D946EF 63.88%)" : "linear-gradient(88.54deg, #5C2ED4 0.1%, #A614C3 63.88%)", backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", fontSize: 11, fontWeight: 600, lineHeight: "16px" }}>{b}</span>
+                          ) : (
+                            <span style={{ color: c.muted, fontSize: 11, fontWeight: 600, lineHeight: "16px" }}>{b}</span>
+                          )}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              );
+              return clientLocked ? <LockedGroupOverlay>{grid}</LockedGroupOverlay> : grid;
+            })()}
 
             {/* Footer buttons — inside the card so they share width and don't float independently */}
             <div className="flex items-center justify-between" style={{ marginTop: 36, paddingTop: 28, paddingBottom: 8, borderTop: `1px solid ${c.border}` }}>
@@ -3378,26 +3473,41 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                 Cancel
               </button>
               <button onClick={() => {
-                  const w9Changed = (
-                    eName !== agency.name
-                    || eType !== agency.agencyType
-                    || eStreet !== agency.street || eCity !== agency.city || eState !== agency.state || eZip !== agency.zip
-                    || eTaxId !== agency.taxId
-                  );
-                  const licChanged = eLicNo !== agency.licenseNo;
-                  if (w9Changed || licChanged) {
-                    // Block save — modal will require new docs to be uploaded before allowing it.
-                    // The uploaded W-9 lands in agencyDocs with category "w9", but because that
-                    // category is in HIDDEN_AGENCY_DOC_CATEGORIES it never surfaces in the agency
-                    // docs UI — kept in mock data only, per the soft-hide product decision.
-                    setDocModalUploads({});
-                    setDocUpdateModal({ w9: w9Changed, license: licChanged });
-                    return;
+                  // Doc-refresh gate is internal-staff only. External (client) principals go
+                  // straight through — their edits are forwarded to the Register Team for
+                  // review instead of forcing a W-9 / license upload here.
+                  if (!clientLocked) {
+                    const w9Changed = (
+                      eName !== agency.name
+                      || eType !== agency.agencyType
+                      || eStreet !== agency.street || eCity !== agency.city || eState !== agency.state || eZip !== agency.zip
+                      || eTaxId !== agency.taxId
+                    );
+                    const licChanged = eLicNo !== agency.licenseNo;
+                    if (w9Changed || licChanged) {
+                      // Block save — modal will require new docs to be uploaded before allowing it.
+                      // The uploaded W-9 lands in agencyDocs with category "w9", but because that
+                      // category is in HIDDEN_AGENCY_DOC_CATEGORIES it never surfaces in the agency
+                      // docs UI — kept in mock data only, per the soft-hide product decision.
+                      setDocModalUploads({});
+                      setDocUpdateModal({ w9: w9Changed, license: licChanged });
+                      return;
+                    }
                   }
                   setBadgesOverride(Array.from(eBadges));
                   setAffilOverride(Array.from(eAffil));
                   setWcOverride(Array.from(eWC));
                   setIsEditing(false);
+                  if (clientLocked) {
+                    // Principal (external admin) submitted their editable-tier changes.
+                    // Show a top-right toast so they know we've forwarded the update to
+                    // the Register Team for review. Generic stable copy — no echoing of
+                    // user-entered values into transient UI.
+                    showToast({
+                      title: "Changes sent to Register Team",
+                      description: "We've forwarded your update — you'll hear back once it's reviewed.",
+                    }, 5000);
+                  }
                 }}
                 className="text-[13px] font-semibold text-white transition-all"
                 style={{ ...font, background: btnGrad, padding:"10px 24px", borderRadius:"5.58px" }}
@@ -6507,82 +6617,6 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
         );
       })()}
 
-      {/* ── Contact Request Modal (non-admin) ── */}
-      {contactRequestOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.45)" }}
-          onClick={() => { setContactRequestOpen(false); setContactRequestSent(false); }}>
-          <div className="rounded-2xl w-[460px] max-w-[95vw] overflow-hidden"
-            style={{ background: c.cardBg, boxShadow: "0 20px 60px rgba(0,0,0,0.25)" }}
-            onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-6 pt-5 pb-4" style={{ borderBottom: `1px solid ${c.border}` }}>
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: "rgba(168,85,247,0.10)" }}>
-                  <Lock className="w-4 h-4" style={{ color: "#A855F7" }} />
-                </div>
-                <h2 className="text-[16px] font-bold" style={{ fontFamily: FONT, color: c.text }}>Request Contact Update</h2>
-              </div>
-              <button onClick={() => { setContactRequestOpen(false); setContactRequestSent(false); }}
-                className="p-1.5 rounded-lg transition-colors" style={{ color: c.muted }}
-                onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
-                onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="px-6 py-5">
-              {contactRequestSent ? (
-                <div className="flex flex-col items-center text-center py-4">
-                  <div className="w-12 h-12 rounded-full flex items-center justify-center mb-3" style={{ background: "rgba(115,201,183,0.15)" }}>
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M5 12l4 4L19 7" stroke="#73C9B7" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                  </div>
-                  <p className="text-[14px] font-semibold mb-1" style={{ fontFamily: FONT, color: c.text }}>Request submitted</p>
-                  <p className="text-[12px]" style={{ fontFamily: FONT, color: c.muted }}>An admin will review and approve your change.</p>
-                </div>
-              ) : (<>
-                <p className="text-[12px] mb-4 leading-relaxed" style={{ fontFamily: FONT, color: c.muted }}>
-                  You don't have permission to edit the agency contact. Submit the new contact info below and an admin will review.
-                </p>
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-[12px] font-semibold mb-1.5" style={{ fontFamily: FONT, color: c.text }}>Contact Name</label>
-                    <input value={requestedName} onChange={e => setRequestedName(e.target.value)} placeholder="Full name"
-                      className="w-full px-3 py-2 rounded-lg text-[13px] outline-none"
-                      style={{ fontFamily: FONT, background: isDark ? "rgba(255,255,255,0.05)" : "#fff", border: `1px solid ${c.border}`, color: c.text }} />
-                  </div>
-                  <div>
-                    <label className="block text-[12px] font-semibold mb-1.5" style={{ fontFamily: FONT, color: c.text }}>Phone</label>
-                    <input value={requestedPhone} onChange={e => setRequestedPhone(e.target.value)} placeholder="(000) 000-0000"
-                      className="w-full px-3 py-2 rounded-lg text-[13px] outline-none"
-                      style={{ fontFamily: FONT, background: isDark ? "rgba(255,255,255,0.05)" : "#fff", border: `1px solid ${c.border}`, color: c.text }} />
-                  </div>
-                  <div>
-                    <label className="block text-[12px] font-semibold mb-1.5" style={{ fontFamily: FONT, color: c.text }}>Email</label>
-                    <input value={requestedEmail} onChange={e => setRequestedEmail(e.target.value)} placeholder="email@example.com"
-                      className="w-full px-3 py-2 rounded-lg text-[13px] outline-none"
-                      style={{ fontFamily: FONT, background: isDark ? "rgba(255,255,255,0.05)" : "#fff", border: `1px solid ${c.border}`, color: c.text }} />
-                  </div>
-                </div>
-              </>)}
-            </div>
-            {!contactRequestSent && (
-              <div className="flex items-center justify-between gap-2 px-6 py-4" style={{ borderTop: `1px solid ${c.border}` }}>
-                <button onClick={() => setContactRequestOpen(false)}
-                  className="px-[17px] py-[9px] rounded-lg text-[12px] font-normal transition-colors"
-                  style={{ fontFamily: FONT, border: `1px solid ${c.borderStrong}`, color: c.text, background: "transparent" }}>
-                  Cancel
-                </button>
-                <button onClick={() => { setContactRequestSent(true); setTimeout(() => { setContactRequestOpen(false); setContactRequestSent(false); }, 1800); }}
-                  className="px-[17px] py-[9px] rounded-lg text-[12px] font-semibold text-white transition-all"
-                  style={{ fontFamily: FONT, background: btnGrad }}
-                  onMouseEnter={e => (e.currentTarget.style.filter = "brightness(1.1)")}
-                  onMouseLeave={e => (e.currentTarget.style.filter = "none")}>
-                  Submit Request
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* ── Import Users Modal ── */}
       {importUsersOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background:"rgba(0,0,0,0.45)" }}
@@ -7866,7 +7900,7 @@ function AddAgencyForm({ isDark, onSaveForLater, onDiscard, initialDraft, c, btn
                       className="flex items-center gap-1.5 rounded-lg text-[12px] font-semibold whitespace-nowrap justify-center transition-all"
                       style={{ ...font, width: 120, height: 40, boxSizing: "border-box",
                         border: active ? "1px solid transparent" : `1px solid ${c.border}`,
-                        backgroundColor: active ? undefined : c.cardBg,
+                        background: active ? undefined : c.cardBg,
                         backgroundImage: active
                           ? `linear-gradient(88.54deg, rgba(92,46,212,0.06) 0.1%, rgba(166,20,195,0.06) 63.88%), linear-gradient(${c.cardBg}, ${c.cardBg}), linear-gradient(88.54deg, #5C2ED4 0.1%, #A614C3 63.88%)`
                           : undefined,
@@ -8114,7 +8148,7 @@ function AddAgencyForm({ isDark, onSaveForLater, onDiscard, initialDraft, c, btn
                         className="flex items-center gap-1.5 rounded-lg text-[12px] font-semibold whitespace-nowrap justify-center transition-all"
                         style={{ ...font, width: 120, height: 40, boxSizing: "border-box",
                           border: active ? "1.65px solid transparent" : `1.65px solid ${c.border}`,
-                          backgroundColor: active ? undefined : c.cardBg,
+                          background: active ? undefined : c.cardBg,
                           backgroundImage: active
                             ? `linear-gradient(88.54deg, rgba(92,46,212,0.06) 0.1%, rgba(166,20,195,0.06) 63.88%), linear-gradient(${c.cardBg}, ${c.cardBg}), linear-gradient(88.54deg, #5C2ED4 0.1%, #A614C3 63.88%)`
                             : undefined,
@@ -8329,11 +8363,6 @@ function AddAgencyForm({ isDark, onSaveForLater, onDiscard, initialDraft, c, btn
 export default function Agencies({ isDark, clientMode = false }: { isDark: boolean; clientMode?: boolean }) {
   const [search, setSearch]           = useState("");
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("All");
-  // Per-tab card-selection state — used to visually pin the active stat card
-  // on the Users / Affiliations tabs. Not yet wired to actual table filtering
-  // (no matching filter state in the mock); click just toggles the visual.
-  const [usersStatKey, setUsersStatKey] = useState<"All" | "Active" | "Inactive" | "Admins">("All");
-  const [affStatKey,   setAffStatKey]   = useState<"All" | "New" | "Appointed" | "Unappointed">("All");
   const [sortKey, setSortKey]         = useState<SortKey>(null);
   const [sortDir, setSortDir]         = useState<SortDir>("asc");
   const [page, setPage]               = useState(1);
@@ -8546,6 +8575,7 @@ export default function Agencies({ isDark, clientMode = false }: { isDark: boole
   const totalPagesUsers = Math.max(1, Math.ceil(filteredUsersCount / perPage));
   const totalPages = tab === "users" ? totalPagesUsers : totalPagesAgencies;
   const paginated  = filtered.slice((page - 1) * perPage, page * perPage);
+  const starred    = allAgencies.filter(a => a.isStarred);
 
   const toggleStar = (id: string) => {
     setStars(prev => {
@@ -8904,6 +8934,34 @@ export default function Agencies({ isDark, clientMode = false }: { isDark: boole
         </span>
   );
 
+  const filterPill = (label: FilterStatus) => {
+    const active = filterStatus === label;
+    const inactiveBg = isDark ? "rgba(255,255,255,0.04)" : "transparent";
+    const inactiveHoverBg = isDark ? "rgba(255,255,255,0.08)" : "#F5F5F5";
+    return (
+      <button key={label} onClick={() => { setFilterStatus(label); setPage(1); }}
+        className="flex-shrink-0 transition-all"
+        style={{ fontFamily: FONT, background: active
+          ? (isDark ? "linear-gradient(88.54deg,#A855F7 0.1%,#D946EF 63.88%)" : "linear-gradient(88.54deg,#5C2ED4 0.1%,#A614C3 63.88%)")
+          : inactiveBg, padding: active ? 1 : 0, borderRadius: 12, border: active ? "none" : `1px solid ${c.border}` }}
+        onMouseEnter={e => { if (!active) { e.currentTarget.style.background = inactiveHoverBg; } }}
+        onMouseLeave={e => { if (!active) e.currentTarget.style.background = inactiveBg; }}>
+        <span className="flex items-center gap-1.5 text-[13px] font-semibold" style={{ fontFamily: FONT, background: active
+            ? (isDark
+              ? `linear-gradient(88.54deg, rgba(168,85,247,0.20) 0.1%, rgba(217,70,239,0.20) 63.88%), #0F1120`
+              : `linear-gradient(88.54deg, rgba(92,46,212,0.05) 0.1%, rgba(166,20,195,0.05) 63.88%), #ffffff`)
+            : "transparent", borderRadius: 11, padding: "5px 15px" }}>
+          {label === "Starred" && <Star className="w-3.5 h-3.5" style={{ fill: "#F59E0B", color: "#F59E0B" }} />}
+          <span style={active
+            ? { backgroundImage: isDark
+                ? "linear-gradient(88.54deg,#A855F7 0.1%,#D946EF 63.88%)"
+                : "linear-gradient(88.54deg,#5C2ED4 0.1%,#A614C3 63.88%)",
+              backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", color: "transparent" }
+            : { color: c.muted }}>{label}</span>
+        </span>
+      </button>
+    );
+  };
 
   /* Section title — same full-width divider style as Clients */
   const sectionTitle = (
@@ -9449,28 +9507,28 @@ export default function Agencies({ isDark, clientMode = false }: { isDark: boole
       {/* Section title */}
       {sectionTitle}
 
-      {/* Toolbar row — search on the left, Drafts + Add Agency on the right.
-          The inline "Search" button was dropped: the input already live-filters
-          the table, so the extra click was purely decorative. */}
-      <div className="flex items-center gap-3 mb-6">
-        <div className="relative flex flex-1 max-w-[420px]">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none" style={{ color: c.muted }} />
+      {/* Search + buttons */}
+      <div className="flex items-center gap-2 mb-7">
+        <div className="flex flex-1 max-w-[360px] transition-all"
+          style={{ background: c.cardBg, border: `1px solid ${isDark ? "rgba(255,255,255,0.10)" : "#E5E7EB"}`, borderRadius: 10, overflow: "hidden" }}>
           <input value={search} onChange={e => { setSearch(e.target.value); setPage(1); }}
-            placeholder="Search by agency, code, or user..."
-            className="flex-1 outline-none w-full"
-            style={{
-              fontFamily: FONT,
-              background: c.cardBg,
-              border: `1px solid ${c.border}`,
-              borderRadius: 10,
-              color: c.text,
-              padding: "9px 14px 9px 36px",
-              fontSize: 13,
-            }}
-            onFocus={e => (e.currentTarget.style.borderColor = "#A614C3")}
-            onBlur={e => (e.currentTarget.style.borderColor = c.border)} />
+            placeholder="By agency, agency code, or user"
+            className="flex-1 outline-none"
+            style={{ fontFamily: FONT, background: "transparent", color: c.text, padding: "8px 14px", fontSize: 13, border: "none" }} />
+          <button className="flex items-center gap-1.5 px-4 text-[12px] font-semibold text-white flex-shrink-0 transition-all"
+            style={{ background: btnGrad, fontFamily: FONT }}
+            onMouseEnter={e => (e.currentTarget.style.filter = "brightness(1.12)")}
+            onMouseLeave={e => (e.currentTarget.style.filter = "none")}>
+            <Search className="w-3.5 h-3.5" />Search
+          </button>
         </div>
-        <div className="flex-1" />
+        <button onClick={() => { setResumeFromDraft(false); setAddOpen(true); }}
+          className="flex items-center gap-1.5 text-[13px] font-semibold text-white transition-all"
+          style={{ fontFamily: FONT, background: btnGrad, padding:"9px 16px", borderRadius: 10 }}
+          onMouseEnter={e => (e.currentTarget.style.filter = "brightness(1.10)")}
+          onMouseLeave={e => (e.currentTarget.style.filter = "none")}>
+          <Plus className="w-4 h-4" />Add New Agency
+        </button>
         {/* Drafts entry — visible whenever saved drafts exist; lets users hop back into in-progress agencies */}
         {(() => {
           const hasDrafts = agencyDrafts.length > 0;
@@ -9478,7 +9536,7 @@ export default function Agencies({ isDark, clientMode = false }: { isDark: boole
             <button onClick={() => hasDrafts && setResumeDraftOpen(true)}
               disabled={!hasDrafts}
               title={hasDrafts ? `${agencyDrafts.length} saved draft${agencyDrafts.length === 1 ? "" : "s"}` : "No saved drafts"}
-              className="relative flex items-center gap-1.5 text-[13px] font-semibold transition-colors flex-shrink-0"
+              className="relative flex items-center gap-1.5 text-[13px] font-semibold transition-colors"
               style={{ fontFamily: FONT,
                 padding: "9px 14px",
                 borderRadius: 10,
@@ -9489,6 +9547,7 @@ export default function Agencies({ isDark, clientMode = false }: { isDark: boole
                 opacity: hasDrafts ? 1 : 0.6 }}
               onMouseEnter={e => { if (hasDrafts) e.currentTarget.style.background = c.hoverBg; }}
               onMouseLeave={e => { if (hasDrafts) e.currentTarget.style.background = c.cardBg; }}>
+              {/* Brand-gradient bookmark — inline so we can paint with linearGradient */}
               <svg width="14" height="14" viewBox="0 0 24 24" fill={hasDrafts ? "url(#draftsBookmarkGrad)" : "none"} stroke={hasDrafts ? "url(#draftsBookmarkGrad)" : c.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <defs>
                   <linearGradient id="draftsBookmarkGrad" x1="0%" y1="0%" x2="100%" y2="0%">
@@ -9513,170 +9572,61 @@ export default function Agencies({ isDark, clientMode = false }: { isDark: boole
             </button>
           );
         })()}
-        <button onClick={() => { setResumeFromDraft(false); setAddOpen(true); }}
-          className="flex items-center gap-1.5 text-[13px] font-semibold text-white transition-all flex-shrink-0"
-          style={{ fontFamily: FONT, background: btnGrad, padding:"9px 16px", borderRadius: 10 }}
-          onMouseEnter={e => (e.currentTarget.style.filter = "brightness(1.10)")}
-          onMouseLeave={e => (e.currentTarget.style.filter = "none")}>
-          <Plus className="w-4 h-4" />Add Agency
-        </button>
       </div>
 
-      {/* Stat cards — replaces the old All / Appointed / Unappointed pill row.
-          Content swaps by tab: agencies/affiliations show agency counts +
-          "Total" clears the status filter; users tab shows Total Users / Active
-          / Inactive / Admins as display-only summaries. "New" and the user-tab
-          cards aren't wired to filters (no matching filter state in the mock).
-          Onboarded-at falls back to lastLogin as a proxy. */}
-      {(() => {
-        const totalCount = allAgencies.length;
-        const now = new Date();
-        const cutoff = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
-        const parseLast = (s: string) => {
-          const [m, d, y] = s.split("/").map(Number);
-          return new Date(y, (m ?? 1) - 1, d ?? 1);
-        };
-        const newCount = allAgencies.filter(a => parseLast(a.lastLogin) >= cutoff).length;
-        const appointedCount   = allAgencies.filter(a => a.status === "Appointed").length;
-        const unappointedCount = allAgencies.filter(a => a.status === "Unappointed").length;
-        // User-tab metrics — active / inactive derived from the same
-        // `showInactive` bookkeeping used to gate rows in the users table.
-        const totalUsersAll = mockAgencyUsers.length;
-        const inactiveUsersAll = mockAgencyUsers.filter(u => inactiveUserIds.has(u.id)).length;
-        const activeUsersAll = totalUsersAll - inactiveUsersAll;
-        const adminUsersAll  = mockAgencyUsers.filter(u => u.isAdmin && !inactiveUserIds.has(u.id)).length;
-        // Affiliation-tab metrics — distinct carrier group names across all
-        // agencies; new / appointed / unappointed are the count of DISTINCT
-        // affiliations that appear in at least one agency of that class.
-        const allAffiliationNames = Array.from(new Set(allAgencies.flatMap(a => a.affiliations)));
-        const totalAffiliations = allAffiliationNames.length;
-        const newAffiliations = Array.from(new Set(
-          allAgencies.filter(a => parseLast(a.lastLogin) >= cutoff).flatMap(a => a.affiliations)
-        )).length;
-        const appointedAffiliations = Array.from(new Set(
-          allAgencies.filter(a => a.status === "Appointed").flatMap(a => a.affiliations)
-        )).length;
-        const unappointedAffiliations = Array.from(new Set(
-          allAgencies.filter(a => a.status === "Unappointed").flatMap(a => a.affiliations)
-        )).length;
-        const cards: { key: FilterStatus | "New" | "Active" | "Inactive" | "Admins"; label: string; value: number; hint: string }[] = tab === "users"
-          ? [
-              { key: "All",      label: "Total Users", value: totalUsersAll,    hint: "Across all agencies" },
-              { key: "Active",   label: "Active",      value: activeUsersAll,   hint: "Currently active" },
-              { key: "Inactive", label: "Inactive",    value: inactiveUsersAll, hint: "Disabled or removed" },
-              { key: "Admins",   label: "Admins",      value: adminUsersAll,    hint: "Agency administrators" },
-            ]
-          : tab === "affiliations"
-          ? [
-              { key: "All",         label: "Total Affiliations", value: totalAffiliations,       hint: "Distinct carrier groups" },
-              { key: "New",         label: "New",                value: newAffiliations,         hint: "Onboarded in last 12 months" },
-              { key: "Appointed",   label: "Appointed",          value: appointedAffiliations,   hint: "Members appointed today" },
-              { key: "Unappointed", label: "Unappointed",        value: unappointedAffiliations, hint: "Members not yet appointed" },
-            ]
-          : [
-              { key: "All",         label: "Total Agencies", value: totalCount,       hint: "All in book" },
-              { key: "New",         label: "New",            value: newCount,         hint: "Onboarded in last 12 months" },
-              { key: "Appointed",   label: "Appointed",      value: appointedCount,   hint: "Currently appointed" },
-              { key: "Unappointed", label: "Unappointed",    value: unappointedCount, hint: "Not yet appointed" },
-            ];
-        return (
-          <div className="grid gap-3 mb-6" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
-            {cards.map(card => {
-              // All three tabs are clickable now. `activeKey` reads whichever
-              // per-tab state is holding the current selection, and the click
-              // handler writes to that same state.
-              const activeKey = tab === "users" ? usersStatKey
-                               : tab === "affiliations" ? affStatKey
-                               : filterStatus;
-              const clickable = card.key !== "New";
-              // "All" acts as a neutral "reset" — clickable, but never shows
-              // the active gradient border regardless of which tab.
-              const active = clickable && card.key !== "All" && activeKey === card.key;
-              return (
-                <button
-                  key={card.label}
-                  onClick={() => {
-                    if (!clickable) return;
-                    if (tab === "users")             setUsersStatKey(card.key as typeof usersStatKey);
-                    else if (tab === "affiliations") setAffStatKey(card.key as typeof affStatKey);
-                    else                             setFilterStatus(card.key as FilterStatus);
-                    setPage(1);
-                  }}
-                  disabled={!clickable}
-                  className="flex items-center justify-between gap-3 rounded-xl px-4 py-3 text-left transition-all"
-                  style={active ? {
-                    // Gradient border via double-background trick — set only one
-                    // background property to avoid the shorthand-vs-longhand
-                    // warning React throws when we toggle back to a plain color.
-                    background: `linear-gradient(${c.cardBg}, ${c.cardBg}) padding-box, linear-gradient(to right, #5C2ED4 0%, #A614C3 65%) border-box`,
-                    border: "1px solid transparent",
-                    boxShadow: "none",
-                    cursor: "pointer",
-                    fontFamily: FONT,
-                  } : {
-                    background: c.cardBg,
-                    border: `1px solid ${c.border}`,
-                    boxShadow: "none",
-                    cursor: clickable ? "pointer" : "default",
-                    fontFamily: FONT,
-                  }}
-                  onMouseEnter={e => {
-                    if (clickable && !active) e.currentTarget.style.background = c.hoverBg;
-                  }}
-                  onMouseLeave={e => {
-                    if (clickable && !active) e.currentTarget.style.background = c.cardBg;
-                  }}
-                >
-                  <div className="min-w-0">
-                    <div className="text-[13px] font-semibold" style={{ color: c.text }}>{card.label}</div>
-                    <div className="text-[11px] mt-0.5 truncate" style={{ color: c.muted }}>{card.hint}</div>
-                  </div>
-                  <span className="text-[24px] font-bold leading-none flex-shrink-0" style={{ color: c.text }}>
-                    {card.value}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        );
-      })()}
+      {/* Filter pills */}
+      <div className="flex items-center gap-2 mb-2 flex-wrap">
+        {filterPill("All")}
+        {filterPill("Appointed")}
+        {filterPill("Unappointed")}
+      </div>
 
-      {/* Tabs — segmented-control style. Grey track wraps all three pills;
-          active pill lifts up on a white bg with a subtle shadow (iOS-style
-          segmented control). */}
-      <div className="flex items-center gap-2 mb-0 flex-shrink-0">
-        <div
-          className="flex items-center gap-1 p-1 rounded-lg"
-          style={{
-            background: isDark ? "rgba(255,255,255,0.05)" : "#F3F4F6",
-            border: `1px solid ${isDark ? "rgba(255,255,255,0.06)" : "#E5E7EB"}`,
-          }}
-        >
+      {/* Starred agencies strip */}
+      {starred.length > 0 && (
+        <div className="mb-5">
+          <div className="flex items-center gap-2 mb-3">
+            <Star className="w-4 h-4 flex-shrink-0" style={{ color: "#F59E0B", fill: "#F59E0B" }} />
+            <span className="text-[13px] font-bold" style={{ fontFamily: FONT, color: c.text }}>
+              Starred Agencies <span className="font-normal" style={{ color: c.muted }}>({starred.length} of 6)</span>
+            </span>
+          </div>
+          <div className="flex gap-3 flex-wrap">
+            {starred.map(a => (
+              <div key={a.id} onClick={() => setSelectedAgency(getDetail(a))}
+                className="flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-colors"
+                style={{ background: c.cardBg, border: `1px solid ${c.border}`, minWidth: 180 }}
+                onMouseEnter={e => { e.currentTarget.style.background = isDark ? "rgba(255,255,255,0.04)" : "#F9FAFB"; }}
+                onMouseLeave={e => { e.currentTarget.style.background = c.cardBg; }}>
+                <Star className="w-4 h-4 flex-shrink-0" style={{ color: "#F59E0B", fill: "#F59E0B" }} />
+                <div className="min-w-0">
+                  <p className="text-[13px] font-semibold truncate" style={{ fontFamily: FONT, color: c.text }}>{a.name}</p>
+                  <p className="text-[11px]" style={{ fontFamily: FONT, color: c.muted }}>Code: {a.code}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Tabs */}
+      <div className="flex items-center gap-0 mb-0 flex-shrink-0" style={{ borderBottom: `1px solid ${c.border}` }}>
+        <div className="flex items-center gap-0">
           {([["agencies", "Agencies", Building2], ["users", "All Users", Users], ["affiliations", "Affiliations", Network]] as [TabKey, string, React.ComponentType<{className?:string;style?:React.CSSProperties}>][]).map(([key, label, Icon]) => {
             const active = tab === key;
             return (
               <button key={key} onClick={() => setTab(key)}
-                className="flex items-center gap-1.5 px-3 py-1 rounded-md text-[12.5px] font-medium transition-all"
-                style={{
-                  fontFamily: FONT,
-                  color: active ? (isDark ? "#F9FAFB" : "#1F2937") : c.muted,
-                  background: active
-                    ? (isDark ? "rgba(255,255,255,0.10)" : "#FFFFFF")
-                    : "transparent",
-                  boxShadow: active
-                    ? (isDark ? "0 1px 2px rgba(0,0,0,0.24)" : "0 1px 2px rgba(15,23,42,0.08), 0 0 0 1px rgba(15,23,42,0.04)")
-                    : "none",
-                  letterSpacing: "0.01em",
-                }}
+                className="flex items-center gap-1.5 px-4 py-2.5 text-[13px] font-normal relative transition-colors"
+                style={{ fontFamily: FONT, color: active ? (isDark ? "#fff" : "#A614C3") : c.muted, letterSpacing: "0.01em" }}
                 onMouseEnter={e => { if (!active) e.currentTarget.style.color = c.text; }}
                 onMouseLeave={e => { if (!active) e.currentTarget.style.color = c.muted; }}>
-                <Icon className="w-[14px] h-[14px]" style={{ color: active ? "#A614C3" : undefined }} />
+                <Icon className="w-[15px] h-[15px]" style={{ color: active ? "#A614C3" : undefined }} />
                 {label}
+                {active && <div className="absolute bottom-0 left-0 right-0 h-[2px]" style={{ background: "linear-gradient(90deg,#5C2ED4 0%,#A614C3 65%)" }} />}
               </button>
             );
           })}
         </div>
-        <div className="flex items-center gap-2 ml-auto">
+        <div className="flex items-center gap-1" style={{ borderLeft: `1px solid ${c.border}`, paddingLeft: 10, marginLeft: 6 }}>
           <button title="Reset filters & columns"
             onClick={() => {
               setSearch("");
@@ -9695,21 +9645,19 @@ export default function Agencies({ isDark, clientMode = false }: { isDark: boole
               setUsersHiddenCols(new Set());
               setAffVisibleCols(new Set(AFF_DEFAULT_VISIBLE));
             }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-colors"
-            style={{ fontFamily: FONT, color: c.text, border: `1px solid ${c.border}`, background: c.cardBg }}
+            className="p-2 rounded-lg transition-colors"
+            style={{ color: "#A614C3" }}
             onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
-            onMouseLeave={e => (e.currentTarget.style.background = c.cardBg)}>
-            <RefreshCw className="w-3.5 h-3.5" style={{ color: c.muted }} />
-            Reset
+            onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+            <RefreshCw className="w-4 h-4" />
           </button>
           <div className="relative" onClick={e => e.stopPropagation()}>
             <button title="View columns" onClick={() => setViewOpen(o => !o)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-colors"
-              style={{ fontFamily: FONT, color: c.text, border: `1px solid ${c.border}`, background: viewOpen ? c.hoverBg : c.cardBg }}
+              className="p-2 rounded-lg transition-colors"
+              style={{ color: "#A614C3", background: viewOpen ? c.hoverBg : "transparent" }}
               onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
-              onMouseLeave={e => (e.currentTarget.style.background = viewOpen ? c.hoverBg : c.cardBg)}>
-              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke={c.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="5" height="5" x="2" y="2" rx="1"/><rect width="5" height="5" x="9.5" y="2" rx="1"/><rect width="5" height="5" x="17" y="2" rx="1"/><rect width="5" height="5" x="2" y="9.5" rx="1"/><rect width="5" height="5" x="9.5" y="9.5" rx="1"/><rect width="5" height="5" x="17" y="9.5" rx="1"/><rect width="5" height="5" x="2" y="17" rx="1"/><rect width="5" height="5" x="9.5" y="17" rx="1"/><rect width="5" height="5" x="17" y="17" rx="1"/></svg>
-              View
+              onMouseLeave={e => (e.currentTarget.style.background = viewOpen ? c.hoverBg : "transparent")}>
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="5" height="5" x="2" y="2" rx="1"/><rect width="5" height="5" x="9.5" y="2" rx="1"/><rect width="5" height="5" x="17" y="2" rx="1"/><rect width="5" height="5" x="2" y="9.5" rx="1"/><rect width="5" height="5" x="9.5" y="9.5" rx="1"/><rect width="5" height="5" x="17" y="9.5" rx="1"/><rect width="5" height="5" x="2" y="17" rx="1"/><rect width="5" height="5" x="9.5" y="17" rx="1"/><rect width="5" height="5" x="17" y="17" rx="1"/></svg>
             </button>
             {viewOpen && (() => {
               // Unified column-visibility picker. Each tab tracks visibility differently:
@@ -9785,31 +9733,21 @@ export default function Agencies({ isDark, clientMode = false }: { isDark: boole
               }
               setExportDialogOpen(true);
             }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-colors"
-            style={{ fontFamily: FONT, color: c.text, border: `1px solid ${c.border}`, background: c.cardBg }}
+            className="p-2 rounded-lg transition-colors"
+            style={{ color: "#A614C3" }}
             title={tab === "affiliations" ? "Preview & export agencies in this affiliation" : tab === "users" ? "Preview & export users (filtered)" : "Preview & export agencies (filtered)"}
             onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
-            onMouseLeave={e => (e.currentTarget.style.background = c.cardBg)}>
-            <Download className="w-3.5 h-3.5" style={{ color: c.muted }} />
-            Export
+            onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+            <Download className="w-4 h-4" />
           </button>
         </div>
       </div>
 
-      {/* Card wrapper — table + in-card pagination, matches Clients / Quotes /
-          Policies. `mt-4` gives breathing room between the tabs row and the
-          card so the toolbar doesn't feel crammed. */}
-      <div className="flex-1 flex flex-col rounded-2xl overflow-hidden mt-4"
-        style={{
-          background: c.cardBg,
-          border: `1px solid ${c.border}`,
-        }}>
-
       {/* Table */}
       {tab === "agencies" && (
-      <div className="flex-1 overflow-x-hidden overflow-y-auto mt-0" onClick={() => { setLocationOpen(false); setAffiliationOpen(null); setAgencyNameOpen(false); setActivityFilterOpen(false); setViewOpen(false); }}>
+      <div className="flex-1 overflow-auto mt-0" style={{ scrollbarGutter: "stable" }} onClick={() => { setLocationOpen(false); setAffiliationOpen(null); setAgencyNameOpen(false); setActivityFilterOpen(false); setViewOpen(false); }}>
         <table className="w-full text-left border-collapse" style={{ tableLayout: "fixed" }}>
-          <thead className="sticky top-0 z-10" style={{ background: isDark ? "rgba(255,255,255,0.03)" : "#FAFAFB" }}>
+          <thead className="sticky top-0 z-10" style={{ background: isDark ? "#121628" : c.cardBg }}>
             <tr style={{ borderBottom: `1px solid ${c.border}` }}>
               {([
                 ["name",       "Agency Name", "15%",  true ],
@@ -9830,7 +9768,7 @@ export default function Agencies({ isDark, clientMode = false }: { isDark: boole
                 <th key={`${key}-${idx}`} onClick={() => sortable && key && key !== "lastLogin" && handleSort(key)}
                   className={`text-[11px] font-bold uppercase tracking-wider py-3 pr-6 select-none whitespace-nowrap ${sortable && key !== "lastLogin" ? "cursor-pointer" : ""} ${(key === "location" || key === "lastLogin" || affIdx !== null) ? "relative" : ""}`}
                   style={{ fontFamily: FONT, color: (key === "name" && sortKey === "name") || (key === "location" && locationFilter.size > 0) || (key === "lastLogin" && activityFilter !== "all") || (affIdx !== null && affiliationFilter.size > 0) ? "#A614C3" : c.muted, width: w,
-                    paddingLeft: idx === 0 ? 20
+                    paddingLeft: idx === 0 ? 52
                       : key === "location" ? 36
                       : affIdx === 1 ? 26
                       : (label?.startsWith("Affiliation")) ? 36
@@ -9840,28 +9778,10 @@ export default function Agencies({ isDark, clientMode = false }: { isDark: boole
                       : undefined,
                     textAlign: (key === "code" || key === "totalUsers" || key === "status") ? "center" : undefined }}>
                   {key === "name" ? (
-                    <div className="flex items-center gap-9">
-                      {/* Star toggle — filters the table to only starred agencies.
-                          Filled when the filter is active, outlined otherwise.
-                          Uses filterStatus === "Starred" for the toggle. */}
-                      <button
-                        onClick={e => {
-                          e.stopPropagation();
-                          setFilterStatus(filterStatus === "Starred" ? "All" : "Starred");
-                          setPage(1);
-                        }}
-                        title={filterStatus === "Starred" ? "Show all agencies" : "Show starred agencies"}
-                        className="flex-shrink-0 transition-transform cursor-pointer"
-                        onMouseEnter={e => (e.currentTarget.style.transform = "scale(1.15)")}
-                        onMouseLeave={e => (e.currentTarget.style.transform = "scale(1)")}
-                      >
-                        <Star className="w-4 h-4" style={{ color: "#F59E0B", fill: filterStatus === "Starred" ? "#F59E0B" : "none" }} />
-                      </button>
-                      <span className="inline-flex items-center">
-                        {label}
-                        <SortIcon col="name" />
-                      </span>
-                    </div>
+                    <>
+                      {label}
+                      <SortIcon col="name" />
+                    </>
                   ) : key === "location" ? (
                     <>
                       <button onClick={e => { e.stopPropagation(); setLocationOpen(o => !o); }}
@@ -10032,13 +9952,6 @@ export default function Agencies({ isDark, clientMode = false }: { isDark: boole
                         );
                       })()}
                     </>
-                  ) : (key === "code" || key === "totalUsers" || key === "status") ? (
-                    // Centered columns use an explicit flex wrapper so the
-                    // label + SortIcon anchor around the same content-box
-                    // center as the cell values below. `text-align: center`
-                    // was giving inconsistent overflow behavior when the
-                    // label was wider than the cell.
-                    <div className="flex items-center justify-center">{label}{sortable && key && <SortIcon col={key} />}</div>
                   ) : (
                     <>{label}{sortable && key && <SortIcon col={key} />}</>
                   )}
@@ -10055,7 +9968,7 @@ export default function Agencies({ isDark, clientMode = false }: { isDark: boole
                 onMouseEnter={e => (e.currentTarget.style.background = isDark ? "rgba(255,255,255,0.03)" : "#F9FAFB")}
                 onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
                 {/* Agency Name */}
-                <td className="py-3 pr-6" style={{ paddingLeft: 20 }}>
+                <td className="py-3 pr-6">
                   <div className="flex items-center gap-9">
                     <button onClick={e => { e.stopPropagation(); toggleStar(a.id); setSelectedAgency(null); }}
                       className="flex-shrink-0 transition-all"
@@ -10087,23 +10000,17 @@ export default function Agencies({ isDark, clientMode = false }: { isDark: boole
                     </span>
                   </td>
                 ))}
-                {/* Total User — click to jump straight to the agency's Users tab.
-                    Flex wrapper centers the button around the same content-box
-                    axis the header uses, so the icon+count line up vertically
-                    with the "Total User" label above even when the header text
-                    overflows the narrow (~87px) cell. */}
+                {/* Total User — click to jump straight to the agency's Users tab */}
                 {!agenciesHiddenCols.has("totalUsers") && (
-                <td className="py-3 pr-6 whitespace-nowrap" style={{ paddingLeft: 45 }}>
-                  <div className="flex items-center justify-center">
-                    <button onClick={e => { e.stopPropagation(); setSelectedAgencyTab("users"); setSelectedAgency(getDetail(a)); }}
-                      title={`View ${a.totalUsers} ${a.totalUsers === 1 ? "user" : "users"}`}
-                      className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md transition-colors"
-                      onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
-                      onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-                      <Users className="w-3.5 h-3.5 flex-shrink-0" style={{ color: c.muted }} />
-                      <span className="text-[13px] font-medium underline-offset-2 hover:underline" style={{ fontFamily: FONT, color: "#A614C3" }}>{a.totalUsers}</span>
-                    </button>
-                  </div>
+                <td className="py-3 pr-6 whitespace-nowrap text-center" style={{ paddingLeft: 45 }}>
+                  <button onClick={e => { e.stopPropagation(); setSelectedAgencyTab("users"); setSelectedAgency(getDetail(a)); }}
+                    title={`View ${a.totalUsers} ${a.totalUsers === 1 ? "user" : "users"}`}
+                    className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md transition-colors"
+                    onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+                    onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                    <Users className="w-3.5 h-3.5 flex-shrink-0" style={{ color: c.muted }} />
+                    <span className="text-[13px] font-medium underline-offset-2 hover:underline" style={{ fontFamily: FONT, color: "#A614C3" }}>{a.totalUsers}</span>
+                  </button>
                 </td>
                 )}
                 {/* Last Login */}
@@ -10159,7 +10066,7 @@ export default function Agencies({ isDark, clientMode = false }: { isDark: boole
               .sort((a, b) => a.name.localeCompare(b.name))
           : [];
         return (
-          <div className="flex-1 flex min-h-0 mt-0 overflow-hidden">
+          <div className="flex-1 flex min-h-0 mt-0 rounded-xl overflow-hidden" style={{ border: `1px solid ${c.border}` }}>
             {/* LEFT: affiliation list */}
             <div className="flex flex-col flex-shrink-0" style={{ width: 280, borderRight: `1px solid ${c.border}`, background: isDark ? "rgba(255,255,255,0.02)" : "#FAFAFA" }}>
               <div className="px-4 py-2.5 flex items-center justify-between flex-shrink-0 relative" style={{ borderBottom: `1px solid ${c.border}` }} onClick={e => e.stopPropagation()}>
@@ -10262,7 +10169,7 @@ export default function Agencies({ isDark, clientMode = false }: { isDark: boole
                   </div>
                   <div className="flex-1 overflow-auto" style={{ scrollbarGutter: "stable" }}>
                     <table className="text-left border-collapse" style={{ minWidth: "100%" }}>
-                      <thead className="sticky top-0 z-10" style={{ background: isDark ? "rgba(255,255,255,0.03)" : "#FAFAFB" }}>
+                      <thead className="sticky top-0 z-10" style={{ background: isDark ? "#121628" : c.cardBg }}>
                         <tr style={{ borderBottom: `1px solid ${c.border}` }}>
                           <th className="text-[11px] font-bold uppercase tracking-wider py-3 pr-6 whitespace-nowrap"
                             style={{ fontFamily: FONT, color: c.muted, paddingLeft: 24 }}>Agency Name</th>
@@ -10344,7 +10251,7 @@ export default function Agencies({ isDark, clientMode = false }: { isDark: boole
         };
         const sub = isDark ? "#6B7280" : "#9CA3AF";
         return (
-          <div className="flex-1 overflow-x-hidden overflow-y-auto mt-0" onClick={() => { setAllUsersJobOpen(false); setViewOpen(false); }}>
+          <div className="flex-1 overflow-auto mt-0" style={{ scrollbarGutter: "stable" }} onClick={() => { setAllUsersJobOpen(false); setViewOpen(false); }}>
             {/* Inline hint — shown only when active list has matches AND inactive also has matches.
                 Empty-state (0 active) keeps the orange banner inside the table body. */}
             {inactiveMatchCount > 0 && userRowsAll.length > 0 && (
@@ -10357,7 +10264,7 @@ export default function Agencies({ isDark, clientMode = false }: { isDark: boole
               </div>
             )}
             <table className="w-full text-left border-collapse" style={{ tableLayout: "fixed" }}>
-              <thead className="sticky top-0 z-10" style={{ background: isDark ? "rgba(255,255,255,0.03)" : "#FAFAFB" }}>
+              <thead className="sticky top-0 z-10" style={{ background: isDark ? "#121628" : c.cardBg }}>
                 <tr style={{ borderBottom: `1px solid ${c.border}` }}>
                   {/* NAME (sortable) */}
                   <th className="text-[11px] font-bold uppercase tracking-wider py-3 pr-6 cursor-pointer select-none whitespace-nowrap"
@@ -10530,83 +10437,62 @@ export default function Agencies({ isDark, clientMode = false }: { isDark: boole
         );
       })()}
 
-      {/* Pagination — Agencies & All Users tabs. Matches the Clients / Quotes
-          / Policies pattern: left-hand "X – Y of N …" count, right-hand page-
-          size popover + Previous / Next buttons. No grey band, no page-number
-          chips — leaner, and consistent across the app. */}
-      {(tab === "agencies" || tab === "users") && (() => {
-        const totalCount = tab === "users" ? filteredUsersCount : filtered.length;
-        const rangeStart = totalCount === 0 ? 0 : (page - 1) * perPage + 1;
-        const rangeEnd   = Math.min(page * perPage, totalCount);
-        const noun       = tab === "users" ? (totalCount === 1 ? "user" : "users")
-                                            : (totalCount === 1 ? "agency" : "agencies");
-        const atFirst = page === 1;
-        const atLast  = page >= totalPages || totalCount === 0;
-        return (
-          <div className="flex-shrink-0 flex items-center justify-between gap-3 px-5 py-3 flex-wrap mt-auto"
-            style={{ borderTop: `1px solid ${c.border}`, fontFamily: FONT }}>
-            <span className="text-[11.5px]" style={{ color: c.muted }}>
-              {rangeStart} – {rangeEnd} of {totalCount} {noun}
-            </span>
-            <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
-              {/* Page-size selector — custom popover matching Clients / Quotes. */}
-              <div className="relative">
-                <button
-                  onClick={() => setPerPageOpen(o => !o)}
-                  className="flex items-center gap-1.5 pl-2.5 pr-2 py-1.5 rounded-lg cursor-pointer transition-colors text-[11.5px] font-medium"
-                  style={{ background: c.cardBg, border: `1px solid ${c.border}`, color: c.text }}
-                  onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
-                  onMouseLeave={e => (e.currentTarget.style.background = c.cardBg)}>
-                  1 – {perPage}
-                  <ChevronDown className="w-3 h-3 transition-transform duration-200" style={{ opacity: 0.6, transform: perPageOpen ? "rotate(180deg)" : "rotate(0deg)" }} />
-                </button>
-                {perPageOpen && (
-                  <div
-                    className="absolute right-0 z-30 rounded-lg overflow-hidden py-1 min-w-[110px]"
-                    style={{
-                      bottom: "calc(100% + 6px)",
-                      background: c.cardBg,
-                      border: `1px solid ${c.border}`,
-                      boxShadow: "0 12px 28px rgba(15,23,42,0.10), 0 4px 8px rgba(15,23,42,0.04)",
-                    }}>
-                    {[10, 20, 50].map(n => {
-                      const active = perPage === n;
-                      return (
-                        <button
-                          key={n}
-                          onClick={() => { setPerPage(n); setPage(1); setPerPageOpen(false); }}
-                          className="w-full px-2.5 py-1.5 text-left text-[11.5px] flex items-center gap-2 cursor-pointer transition-colors"
-                          style={{ color: active ? "#A614C3" : c.text, fontWeight: active ? 600 : 500, background: "transparent" }}
-                          onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
-                          onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-                          <Check className="w-3 h-3 flex-shrink-0" style={{ opacity: active ? 1 : 0, color: "#A614C3" }} />
-                          <span className="whitespace-nowrap">1 – {n}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
+      {/* Pagination — Agencies & All Users tabs */}
+      {(tab === "agencies" || tab === "users") && (
+      <div className="flex-shrink-0 flex items-center justify-between py-3 mt-auto"
+        style={{ marginLeft: "-48px", marginRight: "-48px", marginBottom: "-48px", paddingLeft: "48px", paddingRight: "48px", paddingBottom: "16px", borderTop: `1px solid ${c.border}`, background: isDark ? "rgba(255,255,255,0.02)" : "#F9FAFB" }}>
+        {/* Per page */}
+        <div className="flex-1 flex items-center gap-2 text-[12px]" style={{ fontFamily: FONT, color: c.muted }}>
+          <span>Show</span>
+          <div className="relative" onClick={e => e.stopPropagation()}>
+            <button onClick={() => setPerPageOpen(p => !p)}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg transition-all"
+              style={{ border: `1px solid ${c.border}`, color: c.text, background: c.cardBg }}>
+              {perPage}
+              <ChevronDown className="w-3 h-3" style={{ color: c.muted }} />
+            </button>
+            {perPageOpen && (
+              <div className="absolute bottom-8 left-0 rounded-xl shadow-xl py-1 z-30 w-20"
+                style={{ background: c.cardBg, border: `1px solid ${c.border}` }}>
+                {[5, 10, 20, 50].map(n => (
+                  <button key={n} onClick={() => { setPerPage(n); setPage(1); setPerPageOpen(false); }}
+                    className="w-full text-left px-3 py-1.5 text-[12px] transition-colors"
+                    style={{ fontFamily: FONT, color: perPage === n ? "#A855F7" : c.text, background: perPage === n ? "rgba(168,85,247,0.08)" : "transparent" }}>
+                    {n}
+                  </button>
+                ))}
               </div>
-              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={atFirst}
-                className="text-[11.5px] font-medium px-3 py-1.5 rounded-lg transition-colors"
-                style={{ border: `1px solid ${c.border}`, color: c.text, background: c.cardBg, opacity: atFirst ? 0.5 : 1, cursor: atFirst ? "not-allowed" : "pointer" }}
-                onMouseEnter={e => { if (!atFirst) e.currentTarget.style.background = c.hoverBg; }}
-                onMouseLeave={e => (e.currentTarget.style.background = c.cardBg)}>
-                Previous
-              </button>
-              <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={atLast}
-                className="text-[11.5px] font-medium px-3 py-1.5 rounded-lg transition-colors"
-                style={{ border: `1px solid ${c.border}`, color: c.text, background: c.cardBg, opacity: atLast ? 0.5 : 1, cursor: atLast ? "not-allowed" : "pointer" }}
-                onMouseEnter={e => { if (!atLast) e.currentTarget.style.background = c.hoverBg; }}
-                onMouseLeave={e => (e.currentTarget.style.background = c.cardBg)}>
-                Next
-              </button>
-            </div>
+            )}
           </div>
-        );
-      })()}
+          <span>per page</span>
+        </div>
 
+        {/* Page nav */}
+        <div className="flex items-center gap-1">
+          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+            className="w-7 h-7 flex items-center justify-center rounded-lg transition-colors disabled:opacity-30"
+            style={{ color: c.muted }}
+            onMouseEnter={e => { if (page > 1) e.currentTarget.style.background = c.hoverBg; }}
+            onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <button className="w-7 h-7 flex items-center justify-center rounded-lg text-[12px] font-bold text-white"
+            style={{ fontFamily: FONT, background: "linear-gradient(88.54deg, #5C2ED4 0.1%, #A614C3 63.88%)" }}>
+            {page}
+          </button>
+          <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+            className="w-7 h-7 flex items-center justify-center rounded-lg transition-colors disabled:opacity-30"
+            style={{ color: c.muted }}
+            onMouseEnter={e => { if (page < totalPages) e.currentTarget.style.background = c.hoverBg; }}
+            onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="flex-1 text-right text-[12px]" style={{ fontFamily: FONT, color: c.muted }}>
+          Page {page} of {totalPages}
+        </div>
       </div>
+      )}
     </div>
   );
 }
