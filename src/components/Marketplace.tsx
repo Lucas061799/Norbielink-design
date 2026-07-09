@@ -127,6 +127,15 @@ const HIGHLIGHTS: {
     cta: "Start quoting",
     image: "/marketplace-promos/wc-gift-cards.png",
   },
+  {
+    category: "Learning",
+    tag: "WEBINAR",
+    tagColor: "#3B82F6",
+    title: "USLI habitational life-cycle webinar",
+    body: "Free 30-min session with Sr. Underwriter Matt McShane on property trends and coverage at every stage. Register to enter for a $100 gift card. July 15, 10 AM PT.",
+    cta: "Register now",
+    image: "/marketplace-promos/usli-webinar.png",
+  },
 ];
 
 // Ordered filter tabs. "All" sits first so users land on the widest set.
