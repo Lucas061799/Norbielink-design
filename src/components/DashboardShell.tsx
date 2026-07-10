@@ -10,6 +10,7 @@ import Policies from "@/components/Policies";
 import Endorsements from "@/components/Endorsements";
 import Marketplace from "@/components/Marketplace";
 import Website from "@/components/Website";
+import Pricing from "@/components/Pricing";
 
 interface DashboardShellProps {
   children: React.ReactNode;
@@ -52,6 +53,8 @@ export default function DashboardShell({ children, pageTitle }: DashboardShellPr
         return <Policies isDark={darkMode} />;
       case "Endorsements":
         return <Endorsements isDark={darkMode} />;
+      case "Pricing":
+        return <Pricing isDark={darkMode} />;
       default:
         // Un-routed / placeholder segments (Marketplace, Appetite Assistant, Make a
         // Payment, Accounting, Tools & Resources, Support, …) just render whatever
