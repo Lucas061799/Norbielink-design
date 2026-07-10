@@ -341,10 +341,11 @@ function TierCard({ tier, annually, isDark, c, btnGrad }: TierCardProps) {
       {/* Price + suffix — suffix always on its own line so every tier has the
           same price-section height. When it was inline for numeric prices and
           block-level for "Custom", the Enterprise CTA sat ~20px lower than
-          the other three and broke the button row. */}
+          the other three and broke the button row. Suffix uses c.muted (not
+          c.subtle) — the lighter subtle grey was disappearing on white. */}
       <div className="mb-5">
         <div className="text-[32px] font-bold leading-none" style={{ color: c.heading }}>{price}</div>
-        <p className="text-[11px] mt-1.5" style={{ color: c.subtle }}>{priceSuffix}</p>
+        <p className="text-[11px] mt-1.5" style={{ color: c.muted }}>{priceSuffix}</p>
       </div>
 
       {/* CTA — three states:
