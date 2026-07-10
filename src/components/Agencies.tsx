@@ -5246,10 +5246,11 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
           </div>
         )}
 
-        {/* ── Accounting tab ── Super admin surface for the ITC record.
-             Three states: not-in-ITC (empty), view (record present, read-only),
-             edit (form). Editing a record mutates the parent's `itcRecords`
-             map so the change is visible after re-entering the tab. */}
+        {/* ── Accounting tab ── ITC record view + edit. Mirrors the Overview
+             tab's single-big-card layout (LabelValue stacks, outlined muted
+             Edit button, `grid-cols-3 gap-x-12 gap-y-6`) instead of the
+             one-card-per-field grid it used to have — that read as a stat
+             dashboard and clashed with the rest of the detail view. */}
         {detailTab === "accounting" && (() => {
           const record = itcRecords?.[agency.code] ?? null;
           const fmtMoney = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD" });
@@ -5261,14 +5262,16 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
           // ── Empty state ──
           if (!record && !itcEditing) {
             return (
-              <div className="p-6 overflow-y-auto">
-                <div className="rounded-2xl p-10 text-center max-w-[560px] mx-auto"
-                  style={{ border: `1px dashed ${c.border}`, background: c.cardBg }}>
-                  <AlertCircle className="w-9 h-9 mx-auto mb-3" style={{ color: c.muted }} strokeWidth={1.5} />
-                  <p className="text-[15px] font-bold mb-1.5" style={{ ...font, color: c.text }}>Not registered in ITC</p>
-                  <p className="text-[12.5px] leading-relaxed" style={{ ...font, color: c.muted }}>
-                    <b>{agency.name}</b> exists in Norbielink but has no ITC accounting record yet. New producers land here first — the record is created after onboarding completes downstream.
-                  </p>
+              <div className="flex-1 overflow-y-auto pb-6">
+                <div className="rounded-2xl p-8 mb-8" style={{ background: c.cardBg, border: `1px solid ${c.border}` }}>
+                  <h3 className="text-[17px] font-bold mb-6" style={{ ...font, color: c.text }}>ITC Record</h3>
+                  <div className="rounded-xl p-10 text-center" style={{ border: `1px dashed ${c.border}` }}>
+                    <AlertCircle className="w-9 h-9 mx-auto mb-3" style={{ color: c.muted }} strokeWidth={1.5} />
+                    <p className="text-[15px] font-bold mb-1.5" style={{ ...font, color: c.text }}>Not registered in ITC</p>
+                    <p className="text-[12.5px] leading-relaxed max-w-[520px] mx-auto" style={{ ...font, color: c.muted }}>
+                      <b>{agency.name}</b> exists in Norbielink but has no ITC accounting record yet. New producers land here first — the record is created after onboarding completes downstream.
+                    </p>
+                  </div>
                 </div>
               </div>
             );
@@ -5277,72 +5280,77 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
           // ── Edit mode ──
           if (itcEditing && itcDraft) {
             const set = <K extends keyof ITCRecord>(k: K, v: ITCRecord[K]) => setItcDraft(prev => prev ? { ...prev, [k]: v } : prev);
-            const inputStyle = { fontFamily: FONT, background: isDark ? "rgba(255,255,255,0.05)" : "#F9FAFB", border: `1px solid ${c.border}`, color: c.text };
-            const field = (label: string, node: React.ReactNode) => (
-              <div>
-                <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ ...font, color: c.muted, letterSpacing: "0.06em" }}>{label}</label>
-                {node}
-              </div>
-            );
             return (
-              <div className="p-6 overflow-y-auto">
-                <div className="flex items-center justify-between mb-5">
-                  <h2 className="text-[18px] font-bold" style={{ ...font, color: c.text }}>Edit ITC Record</h2>
-                  <div className="flex items-center gap-2">
-                    <button onClick={() => { setItcEditing(false); setItcDraft(null); }}
-                      className="px-4 py-2 rounded-lg text-[13px] font-semibold transition-colors"
-                      style={{ ...font, color: c.text, border: `1px solid ${c.border}`, background: c.cardBg }}>
-                      Cancel
-                    </button>
-                    <button onClick={() => {
-                      if (itcDraft && setItcRecords) setItcRecords(prev => ({ ...prev, [agency.code]: itcDraft }));
-                      setItcEditing(false); setItcDraft(null);
-                    }}
-                      className="px-4 py-2 rounded-lg text-[13px] font-semibold text-white transition-colors"
-                      style={{ ...font, background: btnGrad }}>
-                      Save changes
-                    </button>
+              <div className="flex-1 overflow-y-auto pb-6">
+                <div className="rounded-2xl p-6 mb-6" style={{ background: c.cardBg, border: `1px solid ${c.border}` }}>
+                  <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-[17px] font-bold" style={{ ...font, color: c.text }}>ITC Record</h3>
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => { setItcEditing(false); setItcDraft(null); }}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-colors"
+                        style={{ ...font, border: `1px solid ${isDark ? "rgba(255,255,255,0.10)" : "#E5E7EB"}`, color: c.text }}
+                        onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+                        onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                        Cancel
+                      </button>
+                      <button onClick={() => {
+                        if (itcDraft && setItcRecords) setItcRecords(prev => ({ ...prev, [agency.code]: itcDraft }));
+                        setItcEditing(false); setItcDraft(null);
+                      }}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold text-white transition-colors"
+                        style={{ ...font, background: btnGrad }}>
+                        Save changes
+                      </button>
+                    </div>
                   </div>
-                </div>
 
-                <div className="rounded-2xl p-6" style={{ background: c.cardBg, border: `1px solid ${c.border}` }}>
-                  <div className="grid grid-cols-2 gap-x-6 gap-y-4">
-                    {field("ITC Producer Code",
-                      <input value={itcDraft.itcCode} onChange={e => set("itcCode", e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg text-[13px] outline-none" style={inputStyle} />)}
-                    {field("Status",
-                      <select value={itcDraft.status} onChange={e => set("status", e.target.value as ITCStatus)}
-                        className="w-full px-3 py-2 rounded-lg text-[13px] outline-none" style={inputStyle}>
+                  <div className="grid grid-cols-3 gap-6 mb-6">
+                    <div>
+                      <label style={labelStyle}>ITC Producer Code:</label>
+                      <input value={itcDraft.itcCode} onChange={e => set("itcCode", e.target.value)} style={inputStyle} />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Status:</label>
+                      <select value={itcDraft.status} onChange={e => set("status", e.target.value as ITCStatus)} style={selectStyle}>
                         {(["Active","Suspended","Terminated","Pending"] as ITCStatus[]).map(s => <option key={s} value={s}>{s}</option>)}
-                      </select>)}
-                    {field("Effective Date",
-                      <input value={itcDraft.effectiveDate} onChange={e => set("effectiveDate", e.target.value)}
-                        placeholder="MM/DD/YYYY" className="w-full px-3 py-2 rounded-lg text-[13px] outline-none" style={inputStyle} />)}
-                    {field("Termination Date",
-                      <input value={itcDraft.terminationDate ?? ""} onChange={e => set("terminationDate", e.target.value || null)}
-                        placeholder="—" className="w-full px-3 py-2 rounded-lg text-[13px] outline-none" style={inputStyle} />)}
-                    {field("Commission Rate (%)",
-                      <input type="number" step="0.1" value={itcDraft.commissionRate} onChange={e => set("commissionRate", Number(e.target.value) || 0)}
-                        className="w-full px-3 py-2 rounded-lg text-[13px] outline-none" style={inputStyle} />)}
-                    {field("Payment Terms",
-                      <select value={itcDraft.paymentTerms} onChange={e => set("paymentTerms", e.target.value as PaymentTerms)}
-                        className="w-full px-3 py-2 rounded-lg text-[13px] outline-none" style={inputStyle}>
+                      </select>
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Payment Terms:</label>
+                      <select value={itcDraft.paymentTerms} onChange={e => set("paymentTerms", e.target.value as PaymentTerms)} style={selectStyle}>
                         {(["Net 15","Net 30","Net 45","Net 60"] as PaymentTerms[]).map(s => <option key={s} value={s}>{s}</option>)}
-                      </select>)}
-                    {field("Account Balance ($)",
-                      <input type="number" step="0.01" value={itcDraft.accountBalance} onChange={e => set("accountBalance", Number(e.target.value) || 0)}
-                        className="w-full px-3 py-2 rounded-lg text-[13px] outline-none" style={inputStyle} />)}
-                    {field("Last Payment Date",
-                      <input value={itcDraft.lastPaymentDate} onChange={e => set("lastPaymentDate", e.target.value)}
-                        placeholder="MM/DD/YYYY" className="w-full px-3 py-2 rounded-lg text-[13px] outline-none" style={inputStyle} />)}
-                    {field("Bank Account (masked)",
-                      <input value={itcDraft.bankAccountMasked} onChange={e => set("bankAccountMasked", e.target.value)}
-                        placeholder="****0000" className="w-full px-3 py-2 rounded-lg text-[13px] outline-none" style={inputStyle} />)}
+                      </select>
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Effective Date:</label>
+                      <input value={itcDraft.effectiveDate} onChange={e => set("effectiveDate", e.target.value)} placeholder="MM/DD/YYYY" style={inputStyle} />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Termination Date:</label>
+                      <input value={itcDraft.terminationDate ?? ""} onChange={e => set("terminationDate", e.target.value || null)} placeholder="—" style={inputStyle} />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Commission Rate (%):</label>
+                      <input type="number" step="0.1" value={itcDraft.commissionRate} onChange={e => set("commissionRate", Number(e.target.value) || 0)} style={inputStyle} />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Account Balance ($):</label>
+                      <input type="number" step="0.01" value={itcDraft.accountBalance} onChange={e => set("accountBalance", Number(e.target.value) || 0)} style={inputStyle} />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Last Payment Date:</label>
+                      <input value={itcDraft.lastPaymentDate} onChange={e => set("lastPaymentDate", e.target.value)} placeholder="MM/DD/YYYY" style={inputStyle} />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Bank Account (masked):</label>
+                      <input value={itcDraft.bankAccountMasked} onChange={e => set("bankAccountMasked", e.target.value)} placeholder="****0000" style={inputStyle} />
+                    </div>
                   </div>
-                  <div className="mt-4">
-                    <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1.5" style={{ ...font, color: c.muted, letterSpacing: "0.06em" }}>Notes</label>
+
+                  <div>
+                    <label style={labelStyle}>Notes:</label>
                     <textarea value={itcDraft.notes} onChange={e => set("notes", e.target.value)}
-                      rows={3} className="w-full px-3 py-2 rounded-lg text-[13px] outline-none resize-none" style={inputStyle} />
+                      rows={3} style={{ ...inputStyle, resize: "none" }} />
                   </div>
                 </div>
               </div>
@@ -5351,50 +5359,49 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
 
           // ── View mode ──
           if (record) {
-            const cell = (label: string, value: React.ReactNode) => (
-              <div className="rounded-2xl p-4" style={{ background: c.cardBg, border: `1px solid ${c.border}` }}>
-                <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ ...font, color: c.muted, letterSpacing: "0.06em" }}>{label}</p>
-                <p className="text-[14px] font-semibold mt-1" style={{ ...font, color: c.text }}>{value}</p>
-              </div>
+            const statusBadge = (
+              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[12px] font-semibold"
+                style={{ background: `${statusColor(record.status)}1A`, color: statusColor(record.status) }}>
+                <span className="w-1.5 h-1.5 rounded-full" style={{ background: statusColor(record.status) }} />
+                {record.status}
+              </span>
             );
             return (
-              <div className="p-6 overflow-y-auto">
-                <div className="flex items-center justify-between mb-5">
-                  <div>
-                    <h2 className="text-[18px] font-bold" style={{ ...font, color: c.text }}>ITC Record</h2>
-                    <p className="text-[12px] mt-0.5" style={{ ...font, color: c.muted }}>Last payment {record.lastPaymentDate} · {record.paymentTerms}</p>
+              <div className="flex-1 overflow-y-auto pb-6">
+                <div className="rounded-2xl p-8 mb-8" style={{ background: c.cardBg, border: `1px solid ${c.border}` }}>
+                  <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-[17px] font-bold" style={{ ...font, color: c.text }}>ITC Record</h3>
+                    <button onClick={() => { setItcDraft(record); setItcEditing(true); }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-colors"
+                      style={{ ...font, border: `1px solid ${isDark ? "rgba(255,255,255,0.10)" : "#E5E7EB"}`, color: c.muted }}
+                      onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+                      onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                      <Pencil className="w-3.5 h-3.5" />Edit
+                    </button>
                   </div>
-                  <button onClick={() => { setItcDraft(record); setItcEditing(true); }}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-[13px] font-semibold text-white transition-colors"
-                    style={{ ...font, background: btnGrad }}>
-                    <Pencil className="w-3.5 h-3.5" strokeWidth={2} />Edit record
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-3 gap-4">
-                  {cell("Status",
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] font-semibold"
-                      style={{ background: `${statusColor(record.status)}18`, color: statusColor(record.status) }}>
-                      <span className="w-1.5 h-1.5 rounded-full" style={{ background: statusColor(record.status) }} />
-                      {record.status}
-                    </span>)}
-                  {cell("ITC Producer Code", record.itcCode)}
-                  {cell("Effective Date", record.effectiveDate)}
-                  {cell("Termination Date", record.terminationDate ?? "—")}
-                  {cell("Commission Rate", `${record.commissionRate.toFixed(1)}%`)}
-                  {cell("Payment Terms", record.paymentTerms)}
-                  {cell("Account Balance",
-                    <span style={{ color: record.accountBalance < 0 ? "#EF4444" : c.text }}>{fmtMoney(record.accountBalance)}</span>)}
-                  {cell("Last Payment", record.lastPaymentDate)}
-                  {cell("Bank Account", record.bankAccountMasked)}
-                </div>
-
-                {record.notes && (
-                  <div className="mt-4 rounded-2xl p-5" style={{ background: c.cardBg, border: `1px solid ${c.border}` }}>
-                    <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ ...font, color: c.muted, letterSpacing: "0.06em" }}>Notes</p>
-                    <p className="text-[13px] leading-relaxed mt-1.5" style={{ ...font, color: c.text }}>{record.notes}</p>
+                  <div className="grid grid-cols-3 gap-x-12 gap-y-6">
+                    <LabelValue label="ITC Producer Code" value={record.itcCode} />
+                    <div>
+                      <p className="text-[13px] font-semibold mb-2" style={{ ...font, color: c.text }}>Status:</p>
+                      {statusBadge}
+                    </div>
+                    <LabelValue label="Payment Terms" value={record.paymentTerms} />
+                    <LabelValue label="Effective Date" value={record.effectiveDate} />
+                    <LabelValue label="Termination Date" value={record.terminationDate ?? "—"} />
+                    <LabelValue label="Commission Rate" value={`${record.commissionRate.toFixed(1)}%`} />
+                    <LabelValue label="Account Balance" value={
+                      <span style={{ color: record.accountBalance < 0 ? "#EF4444" : c.muted }}>{fmtMoney(record.accountBalance)}</span>
+                    } />
+                    <LabelValue label="Last Payment" value={record.lastPaymentDate} />
+                    <LabelValue label="Bank Account" value={record.bankAccountMasked} />
                   </div>
-                )}
+                  {record.notes && (
+                    <div className="mt-8 pt-6" style={{ borderTop: `1px solid ${c.border}` }}>
+                      <p className="text-[13px] font-semibold mb-1" style={{ ...font, color: c.text }}>Notes:</p>
+                      <p className="text-[13px] leading-relaxed" style={{ ...font, color: c.muted }}>{record.notes}</p>
+                    </div>
+                  )}
+                </div>
               </div>
             );
           }
