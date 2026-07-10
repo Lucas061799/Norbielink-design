@@ -532,7 +532,7 @@ const mockAgencyUsers: AgencyUser[] = [
 /* ─── Agency Detail View ─────────────────────────────────────────────────── */
 type DetailTab = "overview" | "quotes" | "policies" | "users" | "documents" | "notes" | "accounting";
 
-function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleStar, inactiveUserIds, setInactiveUserIds, statusInactiveUserIds, setStatusInactiveUserIds, removedUserIds, setRemovedUserIds, bookRolled, setBookRolled, allAgencies, initialTab, onNavigateToAgency, viewMode = "internal", isSuperAdmin = false, itcRecords, setItcRecords }: {
+function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleStar, inactiveUserIds, setInactiveUserIds, statusInactiveUserIds, setStatusInactiveUserIds, removedUserIds, setRemovedUserIds, bookRolled, setBookRolled, allAgencies, initialTab, onNavigateToAgency, viewMode = "internal", itcRecords, setItcRecords }: {
   agency: AgencyDetail;
   isDark: boolean;
   onBack: () => void;
@@ -555,9 +555,6 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
   // "client"   = the agency's own external user, viewing their single agency. Their edit
   //             power depends on whether they're the agency admin — see `clientIsAdmin`.
   viewMode?: "internal" | "client";
-  // Super admin (Shannon, etc.) — gates the internal "Accounting" tab that
-  // surfaces the ITC record. Read from DashboardShell via the Agencies parent.
-  isSuperAdmin?: boolean;
   // ITC records live at the Agencies-component level so edits persist across
   // detail-view remounts. Both are optional so the client-mode invocation
   // (which never renders the Accounting tab anyway) can leave them off.
@@ -1736,10 +1733,10 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
     ...(viewMode === "internal"
       ? [["notes", "Notes", <CopyPlus className="w-[15px] h-[15px]" />] as [DetailTab, string, React.ReactElement]]
       : []),
-    // Accounting — super admin only, internal only. Surfaces the agency's ITC
-    // record (see mock data). Sits at the end because it's a specialized role
-    // view rather than day-to-day workflow.
-    ...(viewMode === "internal" && isSuperAdmin
+    // Accounting — internal only. Surfaces the agency's ITC record (see mock
+    // data). Sits at the end because it's a specialized accounting view rather
+    // than day-to-day workflow.
+    ...(viewMode === "internal"
       ? [["accounting", "Accounting", <Landmark className="w-[15px] h-[15px]" />] as [DetailTab, string, React.ReactElement]]
       : []),
   ];
@@ -8572,7 +8569,7 @@ function AddAgencyForm({ isDark, onSaveForLater, onDiscard, initialDraft, c, btn
 }
 
 /* ─── Component ─────────────────────────────────────────────────────────── */
-export default function Agencies({ isDark, clientMode = false, isSuperAdmin = false }: { isDark: boolean; clientMode?: boolean; isSuperAdmin?: boolean }) {
+export default function Agencies({ isDark, clientMode = false }: { isDark: boolean; clientMode?: boolean }) {
   const [search, setSearch]           = useState("");
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("All");
   // Per-tab card-selection state — used to visually pin the active stat card
@@ -9221,7 +9218,6 @@ export default function Agencies({ isDark, clientMode = false, isSuperAdmin = fa
         bookRolled={bookRolled}
         setBookRolled={setBookRolled}
         allAgencies={allAgencies}
-        isSuperAdmin={isSuperAdmin}
         itcRecords={itcRecords}
         setItcRecords={setItcRecords}
       />
@@ -9234,7 +9230,6 @@ export default function Agencies({ isDark, clientMode = false, isSuperAdmin = fa
         agency={selectedAgency}
         isDark={isDark}
         initialTab={selectedAgencyTab}
-        isSuperAdmin={isSuperAdmin}
         itcRecords={itcRecords}
         setItcRecords={setItcRecords}
         onBack={() => { setSelectedAgency(null); setSelectedAgencyTab(undefined); }}
