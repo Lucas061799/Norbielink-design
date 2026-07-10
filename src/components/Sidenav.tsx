@@ -10,7 +10,7 @@ import {
   LayoutGrid, Sparkles, FileText, Shield,
   Briefcase, CreditCard, BookOpen, FileEdit,
   Wrench, HelpCircle, UserCog, Building2, Globe, ChevronDown, Users,
-  User, LogOut, X, Images, Pencil, ZoomIn, ZoomOut, AlertTriangle, Tag,
+  User, LogOut, X, Images, Pencil, ZoomIn, ZoomOut, AlertTriangle, Rocket,
 } from "lucide-react";
 
 interface NavItemProps {
@@ -161,7 +161,7 @@ export default function Sidenav({ isDark = false, onToggleDark, activeItem = "Ma
     { label: "Admin",             icon: <UserCog    className="w-[18px] h-[18px]" /> },
     { label: "Agencies",          icon: <Building2  className="w-[18px] h-[18px]" /> },
     { label: "Website",           icon: <Globe      className="w-[18px] h-[18px]" /> },
-    { label: "Pricing",           icon: <Tag        className="w-[18px] h-[18px]" /> },
+    { label: "Pricing",           icon: <Rocket     className="w-[18px] h-[18px]" /> },
   ];
 
   return (
