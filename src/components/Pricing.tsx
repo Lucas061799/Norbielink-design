@@ -316,7 +316,7 @@ function TierCard({ tier, annually, isDark, c, btnGrad }: TierCardProps) {
         <h3 className="text-[18px] font-bold" style={{ color: c.heading }}>{tier.name}</h3>
         {tier.badge && (
           <span
-            className="inline-flex items-center px-2 py-0.5 rounded-md text-[9.5px] font-bold uppercase tracking-wider"
+            className="inline-flex items-center px-2 py-0.5 rounded-md text-[9.5px] font-bold uppercase tracking-wider whitespace-nowrap"
             style={
               tier.badge.tone === "gold"
                 ? { background: btnGrad, color: "#FFFFFF", letterSpacing: "0.10em" }
@@ -338,17 +338,13 @@ function TierCard({ tier, annually, isDark, c, btnGrad }: TierCardProps) {
         {tier.tagline}
       </p>
 
-      {/* Price + suffix */}
+      {/* Price + suffix — suffix always on its own line so every tier has the
+          same price-section height. When it was inline for numeric prices and
+          block-level for "Custom", the Enterprise CTA sat ~20px lower than
+          the other three and broke the button row. */}
       <div className="mb-5">
-        <div className="flex items-baseline gap-1.5">
-          <span className="text-[32px] font-bold leading-none" style={{ color: c.heading }}>{price}</span>
-          {!isCustomPrice && (
-            <span className="text-[12px]" style={{ color: c.muted }}>{priceSuffix}</span>
-          )}
-        </div>
-        {isCustomPrice && (
-          <p className="text-[11px] mt-1.5" style={{ color: c.subtle }}>{priceSuffix}</p>
-        )}
+        <div className="text-[32px] font-bold leading-none" style={{ color: c.heading }}>{price}</div>
+        <p className="text-[11px] mt-1.5" style={{ color: c.subtle }}>{priceSuffix}</p>
       </div>
 
       {/* CTA — three states:
