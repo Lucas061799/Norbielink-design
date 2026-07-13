@@ -246,10 +246,25 @@ function TierCard({ tier, isDark, c, btnGrad }: TierCardProps) {
   return (
     <div
       className="relative rounded-2xl p-6 flex flex-col"
-      style={{
-        background: c.cardBg,
-        border: `1px solid ${c.border}`,
-      }}
+      style={
+        isPrimaryCta
+          ? {
+              // Gradient border via double background-image trick — inner
+              // fill matches the card bg, outer layer is the brand gradient,
+              // clipped so only the 2px border ring shows the gradient.
+              // Plus a soft purple glow so the recommended tier reads as
+              // "lifted" from the row.
+              background: `linear-gradient(${c.cardBg}, ${c.cardBg}) padding-box, ${btnGrad} border-box`,
+              border: "2px solid transparent",
+              boxShadow: isDark
+                ? "0 12px 40px rgba(166,20,195,0.25)"
+                : "0 12px 32px rgba(166,20,195,0.18)",
+            }
+          : {
+              background: c.cardBg,
+              border: `1px solid ${c.border}`,
+            }
+      }
     >
       {/* Header row — tier name + inline badge (Most popular / Most valuable).
           Kept inline so the tier name still anchors the eye on the left; a
