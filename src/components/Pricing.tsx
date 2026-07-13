@@ -122,8 +122,6 @@ const TIERS: Tier[] = [
       "Multi-Agency Architecture",
       "White-Label Portal Options",
       "API Access & Integrations",
-      "Custom Workflow Automation",
-      "SAML SSO & SCIM",
       "Dedicated Success Manager",
       "24/7 Priority Support",
     ],
