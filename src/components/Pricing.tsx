@@ -1,7 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { Check } from "lucide-react";
+import { Check, Zap, Rocket } from "lucide-react";
 
 interface PricingProps {
   isDark?: boolean;
@@ -26,15 +25,27 @@ interface PricingProps {
                between tiers or between billing modes.
    ------------------------------------------------------------------- */
 interface Tier {
-  key: "free" | "plus" | "business" | "enterprise";
+  key: "free" | "pro" | "business" | "enterprise";
   name: string;
+  // The card always shows the monthly rate as the marquee price. `annual` is
+  // kept on the type in case a future revision reintroduces a billing toggle;
+  // for now the annual context lives inline in `priceSubtext` (e.g.
+  // "per agency/month · Billed annually ($99/year)") so both cadences are
+  // visible on the card at once.
   monthly: string;
   annual:  string;
-  tagline: string;
+  priceSubtext: string;
   cta: string;
-  isCurrent?: boolean;
+  // Optional chip shown between the price block and the CTA — e.g. the
+  // "Free Trial Available" affordance on Business.
+  priceChip?: string;
   badge?: { label: string; tone: "brand" | "gold" };
   features: string[];
+  // Group the four tiers into two visual bands above the grid — Essentials
+  // (Free + Pro) vs Next Level (Business + Enterprise), matching the
+  // reference's "Get started with the basics" / "Power tools for growing
+  // agencies" copy split.
+  group: "essentials" | "next-level";
 }
 
 const TIERS: Tier[] = [
@@ -43,73 +54,83 @@ const TIERS: Tier[] = [
     name: "Free",
     monthly: "$0",
     annual:  "$0",
-    tagline: "Everything a producer needs to write and service a book.",
-    cta: "Your current plan",
-    isCurrent: true,
+    priceSubtext: "For individuals/agencies",
+    cta: "Get Started",
+    group: "essentials",
     features: [
-      "Full Marketplace — quote across all product lines",
-      "Agencies workspace — profiles, contacts, docs, notes",
-      "Quotes & Policies pipeline",
-      "Basic reporting and export",
+      "NorbieLink Portal Access",
+      "AI-Powered Appetite Search",
+      "Quote & Policy Management",
+      "Award-Winning Support",
+      "Knowledge Base Access",
+      "Basic Reporting",
     ],
   },
   {
-    key: "plus",
-    name: "Plus",
-    monthly: "$29",
-    annual:  "$23",
-    tagline: "Adds ProSuite for producers scaling the book.",
-    cta: "Upgrade now",
-    badge: { label: "Most popular", tone: "brand" },
+    key: "pro",
+    name: "Pro",
+    monthly: "$8.25",
+    annual:  "$99",
+    priceSubtext: "per agency/month · Billed annually ($99/year)",
+    cta: "Get Started",
+    group: "essentials",
     features: [
-      "Everything in Free",
-      "ProSuite CRM (contacts, tasks, pipeline)",
-      "Automated marketing campaigns",
-      "Quote presentations & document templates",
-      "Priority email support",
+      "Everything in Free, plus:",
+      "Full ProSuite Apps Suite",
+      "Quote Compare AI",
+      "NowCerts - Instant Certificates",
+      "Lead Connect - Real-time Leads",
+      "Easy CE Compliance (Save 10%)",
+      "Spanish Marketing Tools",
+      "Priority Support",
+      "Unlimited Agency Access",
     ],
   },
   {
     key: "business",
     name: "Business",
-    monthly: "$59",
-    annual:  "$47",
-    tagline: "The workspace agencies run their team on.",
-    cta: "Upgrade now",
-    badge: { label: "Most valuable", tone: "gold" },
+    monthly: "$25",
+    annual:  "$300",
+    priceSubtext: "per agency/month · Billed annually ($300/year)",
+    cta: "Start Free Trial",
+    priceChip: "Free Trial Available",
+    badge: { label: "Most popular", tone: "gold" },
+    group: "next-level",
     features: [
-      "Everything in Plus",
-      "Clients — full book of business view",
-      "Dashboard Overview with Premium Booked, Retention, Conversion KPIs",
-      "Action Items — renewals & follow-ups queue",
-      "Team roles & activity audit log",
-      "Advanced exports and scheduled reports",
+      "Everything in Pro, plus:",
+      "Client Portal & Storage",
+      "Quick Quote Pre-Pop Forms",
+      "Renewal Tracking & Reminders",
+      "AI Upsell Insights",
+      "Custom Dashboard",
+      "Performance Analytics",
+      "Advanced Outmarket Tools",
+      "Exclusive Carrier Deals",
     ],
   },
   {
     key: "enterprise",
     name: "Enterprise",
-    monthly: "Custom",
-    annual:  "Custom",
-    tagline: "For multi-office agencies and MGAs.",
-    cta: "Contact sales",
+    monthly: "Contact Sales",
+    annual:  "Contact Sales",
+    priceSubtext: "For multi-agency operations",
+    cta: "Contact Sales",
+    group: "next-level",
     features: [
-      "Everything in Business",
-      "Advanced customer management (segments, custom fields, workflows)",
-      "SSO + SCIM user provisioning",
-      "Custom retention & book-of-business dashboards",
-      "Dedicated Customer Success Manager",
-      "SLA-backed uptime & security review",
+      "Everything in Business, plus:",
+      "Unlimited Client Storage",
+      "Multi-Agency Architecture",
+      "White-Label Portal Options",
+      "API Access & Integrations",
+      "Custom Workflow Automation",
+      "SAML SSO & SCIM",
+      "Dedicated Success Manager",
+      "24/7 Priority Support",
     ],
   },
 ];
 
-type Billing = "monthly" | "annually";
-
 export default function Pricing({ isDark = false }: PricingProps) {
-  const [billing, setBilling] = useState<Billing>("monthly");
-  const annually = billing === "annually";
-
   const c = {
     text:    isDark ? "#F9FAFB" : "#1F2937",
     heading: isDark ? "#F9FAFB" : "#2D3653",
@@ -118,7 +139,6 @@ export default function Pricing({ isDark = false }: PricingProps) {
     border:  isDark ? "rgba(255,255,255,0.10)" : "#E5E7EB",
     cardBg:  isDark ? "#1E2240" : "#FFFFFF",
     hoverBg: isDark ? "rgba(255,255,255,0.05)" : "#F9FAFB",
-    bannerBg: isDark ? "rgba(166,20,195,0.06)" : "#F9FAFB",
   };
 
   const btnGrad = "linear-gradient(90deg,#5C2ED4 0%,#A614C3 65%)";
@@ -142,80 +162,46 @@ export default function Pricing({ isDark = false }: PricingProps) {
         <h1 className="text-[22px] font-normal" style={{ color: c.heading }}>Pricing</h1>
       </div>
 
-      {/* Section header row — small "CHOOSE YOUR PLANS" eyebrow on the left,
-          Monthly/Annually toggle on the right. Keeping the eyebrow left-
-          aligned and the toggle right-aligned reads as one horizontal band
-          instead of a stacked hero, which is what tightened up the layout
-          compared to the previous centered version. */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <span className="w-1 h-1 rounded-full" style={{ background: c.muted }} />
-          <span className="text-[11px] font-semibold uppercase tracking-wider"
-            style={{ color: c.muted, letterSpacing: "0.14em" }}>Choose your plans</span>
+      {/* Group headers — split the 4 tiers into two bands so the eye can
+          skim "starter tools" vs "growing-team tools" before diving into
+          the feature lists. Each header spans two columns of the tier grid
+          below (Free + Pro on the left, Business + Enterprise on the
+          right). Icons match the tone: soft-purple Zap for Essentials
+          (energy, quick wins), gradient Rocket for Next Level (growth,
+          upgrade) — same Rocket the sidenav uses for the Pricing route
+          itself so the visual thread runs from nav to page hero. */}
+      <div className="grid grid-cols-4 gap-5 mb-4">
+        <div className="col-span-2">
+          <div className="inline-flex items-center gap-2 mb-1.5">
+            <span
+              className="inline-flex items-center justify-center rounded-md"
+              style={{
+                width: 22, height: 22,
+                background: isDark ? "rgba(166,20,195,0.20)" : "rgba(166,20,195,0.10)",
+              }}
+            >
+              <Zap className="w-3 h-3" style={{ color: "#A614C3" }} strokeWidth={2.5} />
+            </span>
+            <span className="text-[11px] font-semibold uppercase tracking-wider"
+              style={{ color: c.muted, letterSpacing: "0.14em" }}>Essentials</span>
+          </div>
+          <h3 className="text-[20px] font-bold leading-tight" style={{ color: c.heading }}>Get started with the basics</h3>
+          <p className="text-[12.5px] mt-1" style={{ color: c.muted }}>Core tools to power your agency</p>
         </div>
-        <BillingToggle billing={billing} setBilling={setBilling} c={c} btnGrad={btnGrad} />
-      </div>
-
-      {/* Billing banner — swaps content in place instead of hiding when the
-          user flips to Annually. Hiding it made the whole tier grid jump up
-          the moment the toggle flipped, which read as a layout bug. Keeping
-          the same slot with different content preserves vertical rhythm and
-          gives the user positive feedback for switching. */}
-      <div
-        className="flex items-center justify-between rounded-2xl px-6 py-4 mb-6 gap-4 flex-wrap"
-        style={{ background: c.bannerBg, border: `1px solid ${c.border}` }}
-      >
-        {annually ? (
-          <>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2 mb-1">
-                <span
-                  className="inline-flex items-center justify-center rounded-full flex-shrink-0"
-                  style={{ width: 20, height: 20, background: "rgba(16,185,129,0.15)" }}
-                >
-                  <Check className="w-3 h-3" style={{ color: "#10B981" }} strokeWidth={3} />
-                </span>
-                <span className="text-[14px] font-bold" style={{ color: c.heading }}>You&apos;re saving 20% with annual billing</span>
-              </div>
-              <p className="text-[12.5px] pl-7" style={{ color: c.muted }}>
-                Paid up-front once a year. Cancel or downgrade anytime from your admin settings.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setBilling("monthly")}
-              className="px-4 py-2 rounded-lg text-[12.5px] font-semibold transition-colors flex-shrink-0"
-              style={{ background: c.cardBg, border: `1px solid ${c.border}`, color: c.text }}
-              onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
-              onMouseLeave={e => (e.currentTarget.style.background = c.cardBg)}
+        <div className="col-span-2">
+          <div className="inline-flex items-center gap-2 mb-1.5">
+            <span
+              className="inline-flex items-center justify-center rounded-md"
+              style={{ width: 22, height: 22, background: btnGrad }}
             >
-              Back to monthly
-            </button>
-          </>
-        ) : (
-          <>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-[14px] font-bold" style={{ color: c.heading }}>Free 2-month Plus trial available</span>
-                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider text-white"
-                  style={{ background: btnGrad, letterSpacing: "0.10em" }}>Save 20%</span>
-              </div>
-              <p className="text-[12.5px]" style={{ color: c.muted }}>
-                Switch to annual billing today and get your first two months of Plus on us.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setBilling("annually")}
-              className="px-4 py-2 rounded-lg text-[12.5px] font-semibold transition-colors flex-shrink-0"
-              style={{ background: c.cardBg, border: `1px solid ${c.border}`, color: c.text }}
-              onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
-              onMouseLeave={e => (e.currentTarget.style.background = c.cardBg)}
-            >
-              Switch to annually
-            </button>
-          </>
-        )}
+              <Rocket className="w-3 h-3 text-white" strokeWidth={2.25} />
+            </span>
+            <span className="text-[11px] font-semibold uppercase tracking-wider"
+              style={{ color: c.muted, letterSpacing: "0.14em" }}>Next Level</span>
+          </div>
+          <h3 className="text-[20px] font-bold leading-tight" style={{ color: c.heading }}>Power tools for growing agencies</h3>
+          <p className="text-[12.5px] mt-1" style={{ color: c.muted }}>Unlock your agency&apos;s full potential</p>
+        </div>
       </div>
 
       {/* Tier grid — 4 columns, same-height rounded cards. Badge pills
@@ -223,51 +209,9 @@ export default function Pricing({ isDark = false }: PricingProps) {
           so headers land on the same y-axis across all four. */}
       <div className="grid grid-cols-4 gap-5 pb-12" style={{ alignItems: "stretch" }}>
         {TIERS.map(tier => (
-          <TierCard key={tier.key} tier={tier} annually={annually} isDark={isDark} c={c} btnGrad={btnGrad} />
+          <TierCard key={tier.key} tier={tier} isDark={isDark} c={c} btnGrad={btnGrad} />
         ))}
       </div>
-    </div>
-  );
-}
-
-/* ─── Monthly / Annually toggle ─────────────────────────────────────── */
-interface BillingToggleProps {
-  billing: Billing;
-  setBilling: (b: Billing) => void;
-  c: Record<string, string>;
-  btnGrad: string;
-}
-function BillingToggle({ billing, setBilling, c, btnGrad }: BillingToggleProps) {
-  const isAnnually = billing === "annually";
-  return (
-    <div className="inline-flex items-center gap-2 rounded-full p-1"
-      style={{ background: c.hoverBg, border: `1px solid ${c.border}` }}>
-      <button
-        type="button"
-        onClick={() => setBilling("monthly")}
-        className="px-3 py-1 rounded-full text-[12px] font-semibold transition-colors"
-        style={{
-          background: !isAnnually ? c.cardBg : "transparent",
-          color: !isAnnually ? c.text : c.muted,
-          boxShadow: !isAnnually ? "0 1px 2px rgba(15,23,42,0.06)" : undefined,
-        }}
-      >
-        Monthly
-      </button>
-      <button
-        type="button"
-        onClick={() => setBilling("annually")}
-        className="px-3 py-1 rounded-full text-[12px] font-semibold transition-colors flex items-center gap-2"
-        style={{
-          background: isAnnually ? c.cardBg : "transparent",
-          color: isAnnually ? c.text : c.muted,
-          boxShadow: isAnnually ? "0 1px 2px rgba(15,23,42,0.06)" : undefined,
-        }}
-      >
-        Annually
-        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider text-white"
-          style={{ background: btnGrad, letterSpacing: "0.08em" }}>−20%</span>
-      </button>
     </div>
   );
 }
@@ -285,18 +229,16 @@ function BillingToggle({ billing, setBilling, c, btnGrad }: BillingToggleProps) 
    ------------------------------------------------------------------- */
 interface TierCardProps {
   tier: Tier;
-  annually: boolean;
   isDark: boolean;
   c: Record<string, string>;
   btnGrad: string;
 }
 
-function TierCard({ tier, annually, isDark, c, btnGrad }: TierCardProps) {
-  const price = annually ? tier.annual : tier.monthly;
-  const isCustomPrice = price === "Custom";
-  const priceSuffix = isCustomPrice
-    ? (annually ? "billed annually" : "contact for quote")
-    : "per agency / month";
+function TierCard({ tier, isDark, c, btnGrad }: TierCardProps) {
+  const price = tier.monthly;
+  // Non-numeric prices ("Contact Sales") skip the per-agency suffix and
+  // annual-billing sub-line — the label already communicates the model.
+  const isNumericPrice = price.startsWith("$");
 
   // Recommended tier drives visual emphasis (gradient border + gradient CTA)
   const isPrimaryCta = tier.badge?.tone === "gold";
@@ -332,42 +274,56 @@ function TierCard({ tier, annually, isDark, c, btnGrad }: TierCardProps) {
         )}
       </div>
 
-      {/* Tagline — one line, muted; minHeight keeps price rows aligned
-          across the four cards even when the tagline wraps. */}
-      <p className="text-[12px] leading-relaxed mb-5" style={{ color: c.muted, minHeight: 36 }}>
-        {tier.tagline}
-      </p>
-
-      {/* Price + suffix — suffix always on its own line so every tier has the
-          same price-section height. When it was inline for numeric prices and
-          block-level for "Custom", the Enterprise CTA sat ~20px lower than
-          the other three and broke the button row. Suffix uses c.muted (not
-          c.subtle) — the lighter subtle grey was disappearing on white. */}
-      <div className="mb-5">
-        <div className="text-[32px] font-bold leading-none" style={{ color: c.heading }}>{price}</div>
-        <p className="text-[11px] mt-1.5" style={{ color: c.muted }}>{priceSuffix}</p>
+      {/* Price block — big value on line 1, priceSubtext on line 2 (either
+          "per agency/month" for the priced tiers or a "who it's for" phrase
+          for Free / Enterprise), optional "Billed annually ($X/year)" on
+          line 3. minHeight reserves the 3-line slot so all four CTAs land
+          on the same y-axis regardless of which sub-lines are populated. */}
+      <div className="mb-5 mt-2" style={{ minHeight: 76 }}>
+        {/* Numeric prices use the marquee 32px weight; the text-label prices
+            ("Contact Sales") drop to 24px + nowrap so they fit on one line
+            in the ~180px-wide card without wrapping to "Contact\nSales". */}
+        <div
+          className={isNumericPrice ? "text-[32px] font-bold leading-none" : "text-[24px] font-bold leading-none whitespace-nowrap"}
+          style={{ color: c.heading }}
+        >
+          {price}
+        </div>
+        <p className="text-[11px] mt-1.5" style={{ color: c.muted }}>{tier.priceSubtext}</p>
       </div>
 
-      {/* CTA — three states:
-          - current plan  → muted outlined, non-interactive read
-          - primary       → gradient (Most valuable tier only)
-          - default       → outlined neutral */}
+      {/* Optional trial affordance chip — reserved slot below the price so
+          the CTA still lines up whether or not this tier advertises a free
+          trial. Empty when tier.priceChip is unset. */}
+      <div className="mb-4" style={{ minHeight: 24 }}>
+        {tier.priceChip && (
+          <span
+            className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold"
+            style={{
+              background: isDark ? "rgba(166,20,195,0.20)" : "rgba(166,20,195,0.10)",
+              color: "#A614C3",
+            }}
+          >
+            {tier.priceChip}
+          </span>
+        )}
+      </div>
+
+      {/* CTA — Business ("Most popular" gold badge) gets the primary purple
+          gradient; every other tier gets a neutral outlined button. */}
       <button
         type="button"
-        disabled={tier.isCurrent}
         className="w-full rounded-lg text-[13px] font-semibold transition-all mb-5"
         style={
-          tier.isCurrent
-            ? { padding: "10px 16px", background: "transparent", color: c.muted, border: `1px solid ${c.border}`, cursor: "default" }
-            : isPrimaryCta
-              ? { padding: "10px 16px", background: btnGrad, color: "#FFFFFF", border: "1px solid transparent" }
-              : { padding: "10px 16px", background: "transparent", color: c.text, border: `1px solid ${c.border}` }
+          isPrimaryCta
+            ? { padding: "10px 16px", background: btnGrad, color: "#FFFFFF", border: "1px solid transparent" }
+            : { padding: "10px 16px", background: "transparent", color: c.text, border: `1px solid ${c.border}` }
         }
         onMouseEnter={e => {
-          if (!tier.isCurrent && !isPrimaryCta) e.currentTarget.style.background = c.hoverBg;
+          if (!isPrimaryCta) e.currentTarget.style.background = c.hoverBg;
         }}
         onMouseLeave={e => {
-          if (!tier.isCurrent && !isPrimaryCta) e.currentTarget.style.background = "transparent";
+          if (!isPrimaryCta) e.currentTarget.style.background = "transparent";
         }}
       >
         {tier.cta}
@@ -376,22 +332,36 @@ function TierCard({ tier, annually, isDark, c, btnGrad }: TierCardProps) {
       {/* Divider between CTA and the feature list */}
       <div className="mb-5" style={{ borderTop: `1px solid ${c.border}` }} />
 
-      {/* Feature list */}
+      {/* Feature list — "Everything in <tier>, plus:" acts as a section
+          header linking this tier to the previous one. Render it without a
+          check chip and bolded so it reads as a header, not as another
+          feature row (the check chip made it look like a plain item and
+          added visual noise). */}
       <ul className="flex flex-col gap-2.5">
-        {tier.features.map(f => (
-          <li key={f} className="flex items-start gap-2">
-            <span
-              className="flex-shrink-0 flex items-center justify-center rounded-full mt-0.5"
-              style={{
-                width: 16, height: 16,
-                background: isDark ? "rgba(166,20,195,0.20)" : "rgba(166,20,195,0.10)",
-              }}
-            >
-              <Check className="w-3 h-3" style={{ color: "#A614C3" }} strokeWidth={3} />
-            </span>
-            <span className="text-[12px] leading-relaxed" style={{ color: c.text }}>{f}</span>
-          </li>
-        ))}
+        {tier.features.map(f => {
+          const isSectionHeader = /^Everything in .+, plus:$/.test(f);
+          if (isSectionHeader) {
+            return (
+              <li key={f} className="text-[12.5px] font-bold" style={{ color: c.heading }}>
+                {f}
+              </li>
+            );
+          }
+          return (
+            <li key={f} className="flex items-start gap-2">
+              <span
+                className="flex-shrink-0 flex items-center justify-center rounded-full mt-0.5"
+                style={{
+                  width: 16, height: 16,
+                  background: isDark ? "rgba(166,20,195,0.20)" : "rgba(166,20,195,0.10)",
+                }}
+              >
+                <Check className="w-3 h-3" style={{ color: "#A614C3" }} strokeWidth={3} />
+              </span>
+              <span className="text-[12px] leading-relaxed" style={{ color: c.text }}>{f}</span>
+            </li>
+          );
+        })}
       </ul>
     </div>
   );
