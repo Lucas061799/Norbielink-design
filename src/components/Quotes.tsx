@@ -521,9 +521,9 @@ export default function Quotes({ isDark }: { isDark: boolean }) {
     // submission doesn't drive any decision and pushed the row to 5 KPIs + 1 CTA, which felt
     // crowded. The Start-a-Quote CTA tile (rendered after this map) now completes a clean
     // 4-tile row alongside the 3 status breakdowns.
-    { keys: ["Pending"],                                                       label: "Pending",          sub: "In progress",          count: pendingCount   },
-    { keys: ["Sold/Issued", "Approved"],                                       label: "Sold & Approved",  sub: "Bound this period",    count: soldCount      },
-    { keys: ["Pending/Action Req.", "Add'l Insured Request", "Incomplete"],    label: "Action Required",  sub: "Needs your attention", count: actionReqCount },
+    { keys: ["Pending"],                                                       label: "Pending",          sub: "In progress",                                                count: pendingCount   },
+    { keys: ["Sold/Issued", "Approved"],                                       label: "Sold & Approved",  sub: "Bound this period",                                          count: soldCount      },
+    { keys: ["Pending/Action Req.", "Add'l Insured Request", "Incomplete"],    label: "Action Required",  sub: "Pending/Action Req. · Add'l Insured Request · Incomplete",   count: actionReqCount },
   ];
 
   return (

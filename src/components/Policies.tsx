@@ -544,9 +544,9 @@ export default function Policies({ isDark }: { isDark: boolean }) {
     // Action Required are the actionable signals; a total of every policy doesn't drive any
     // decision. The Start-a-Quote CTA tile (rendered before this map) now completes a clean
     // 4-tile row alongside the 3 status breakdowns.
-    { keys: ["Sold/Issued", "Approved"],                                            label: "Sold & Approved",    sub: "Currently in force",   count: activeCount   },
-    { keys: ["Upcoming Renewals"],                                                  label: "Upcoming Renewals",  sub: "Next 30 days",         count: renewalsCount },
-    { keys: ["Pending/Action Req.", "Add'l Insured Request", "Incomplete"],         label: "Action Required",    sub: "Needs your attention", count: actionReqCount },
+    { keys: ["Sold/Issued", "Approved"],                                            label: "Active",             sub: "Bound · Approved · Issued",                                  count: activeCount   },
+    { keys: ["Upcoming Renewals"],                                                  label: "Upcoming Renewals",  sub: "Next 30 days",                                               count: renewalsCount },
+    { keys: ["Pending/Action Req.", "Add'l Insured Request", "Incomplete"],         label: "Action Required",    sub: "Pending Quotes · Incomplete Apps · Add'l Insured Requests",  count: actionReqCount },
   ];
 
   return (
