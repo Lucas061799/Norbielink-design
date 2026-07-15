@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { DatePicker } from "./DatePicker";
 import { Search, Plus, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, ChevronsUpDown, RefreshCw, Download, MessageSquare, MessageCircle, Mail, Phone, Printer, Minus, Maximize2, FileText, FolderOpen, Eye, X, MoreVertical, Calendar, RotateCcw, MoreHorizontal, Check, Columns3, Pencil, Send, UserPlus, ArrowUpRight, Trash2, Sparkles, AlertTriangle, HelpCircle } from "lucide-react";
 
 const FONT = "var(--font-montserrat), Montserrat, sans-serif";
@@ -86,8 +87,14 @@ export default function Quotes({ isDark }: { isDark: boolean }) {
   const [helpOpen, setHelpOpen] = useState(false);
   const [viewOpen, setViewOpen] = useState(false);
   const [hiddenCols, setHiddenCols] = useState<Set<string>>(new Set());
-  const [dateRange, setDateRange] = useState("Last 60 days");
+  const [dateRange, setDateRange] = useState("Past 30 Days");
   const [dateOpen, setDateOpen] = useState(false);
+  // Custom-range sub-picker: shown inline inside the dropdown when the user picks
+  // "Custom Range". `customFrom` / `customTo` use the native <input type="date">
+  // YYYY-MM-DD format; applyCustomRange() reformats to "Mon D – Mon D" for the button.
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
+  const [customPickerOpen, setCustomPickerOpen] = useState(false);
   const [pageSizeOpen, setPageSizeOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [exportFormat, setExportFormat] = useState<"csv" | "tsv" | "xlsx" | "json">("csv");
@@ -125,7 +132,10 @@ export default function Quotes({ isDark }: { isDark: boolean }) {
     setLobFilter(new Set());
     setStatusFilter(new Set());
     setProducerFilter(new Set());
-    setDateRange("Last 60 days");
+    setDateRange("Past 30 Days");
+    setCustomFrom("");
+    setCustomTo("");
+    setCustomPickerOpen(false);
     setHiddenCols(new Set());
     setSortKey("createdDate");
     setSortDir("desc");
@@ -180,7 +190,7 @@ export default function Quotes({ isDark }: { isDark: boolean }) {
     ? "radial-gradient(171.32% 99.33% at 33.13% -9%, #282550 0%, #191735 55.82%, rgba(0,0,0,0.3) 74%, rgba(0,0,0,0) 100%), linear-gradient(88.34deg, #5C2ED4 0.11%, #A614C3 63.8%)"
     : "linear-gradient(90deg,#5C2ED4 0%,#A614C3 65%)";
 
-  const closeAllDropdowns = () => { setApplicantOpen(false); setLobOpen(false); setStatusOpen(false); setProducerOpen(false); setHelpOpen(false); setViewOpen(false); setDateOpen(false); setPageSizeOpen(false); setRowMenuOpen(null); };
+  const closeAllDropdowns = () => { setApplicantOpen(false); setLobOpen(false); setStatusOpen(false); setProducerOpen(false); setHelpOpen(false); setViewOpen(false); setDateOpen(false); setCustomPickerOpen(false); setPageSizeOpen(false); setRowMenuOpen(null); };
   const toggleSet = (set: Set<string>, v: string, setter: (s: Set<string>) => void) => { const n = new Set(set); n.has(v) ? n.delete(v) : n.add(v); setter(n); };
 
   const uniqueApplicants = Array.from(new Set(mockQuotes.map(q => q.applicant))).sort();
@@ -535,7 +545,7 @@ export default function Quotes({ isDark }: { isDark: boolean }) {
           Stays as a standalone row above the table (NOT visually fused with the card).
           Visual order (CSS `order`): CTA row = 1, KPI = 2, toolbar = 3, table = 4. */}
       <div className="flex items-center gap-3 pb-4 mb-3 flex-shrink-0 flex-wrap" style={{ order: 3 }} onClick={e => e.stopPropagation()}>
-        <div className="flex items-center gap-2 flex-wrap min-w-0">
+        <div className="flex items-center gap-2 flex-wrap min-w-0 flex-1">
           {/* Date scope */}
           <div className="relative flex-shrink-0">
             <button
@@ -549,9 +559,15 @@ export default function Quotes({ isDark }: { isDark: boolean }) {
               {dateRange}
               <ChevronDown className="w-3 h-3 transition-transform duration-200" style={{ opacity: 0.6, transform: dateOpen ? "rotate(180deg)" : "rotate(0deg)" }} />
             </button>
-            {dateOpen && (
+            {dateOpen && (() => {
+              // Custom range affordance sits below the presets; picking it swaps in
+              // two <input type="date"> fields + Apply button. The applied range shows
+              // as "Mon D – Mon D" in the trigger button label.
+              const DATE_PRESETS = ["Past 7 Days", "Past 30 Days", "Past 90 Days", "Past 6 Months", "Past 12 Months", "All Time"];
+              const isCustomActive = !DATE_PRESETS.includes(dateRange);
+              return (
               <div
-                className="absolute left-0 z-30 rounded-lg overflow-hidden py-1 min-w-[160px]"
+                className="absolute left-0 z-30 rounded-lg overflow-hidden min-w-[200px]"
                 style={{
                   top: "calc(100% + 6px)",
                   background: c.cardBg,
@@ -559,12 +575,13 @@ export default function Quotes({ isDark }: { isDark: boolean }) {
                   boxShadow: "0 12px 28px rgba(15,23,42,0.10), 0 4px 8px rgba(15,23,42,0.04)",
                 }}
               >
-                {["Last 20 days", "Last 60 days", "Last 90 days", "All Time"].map(opt => {
+                <div className="py-1">
+                {DATE_PRESETS.map(opt => {
                   const active = opt === dateRange;
                   return (
                     <button
                       key={opt}
-                      onClick={() => { setDateRange(opt); setDateOpen(false); }}
+                      onClick={() => { setDateRange(opt); setCustomPickerOpen(false); setDateOpen(false); }}
                       className="w-full px-2.5 py-1.5 text-left text-[12px] flex items-center gap-2 cursor-pointer transition-colors"
                       style={{ color: active ? c.accent : c.text, fontWeight: active ? 600 : 500, background: "transparent" }}
                       onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
@@ -575,9 +592,81 @@ export default function Quotes({ isDark }: { isDark: boolean }) {
                     </button>
                   );
                 })}
+                <button
+                  onClick={() => { setCustomPickerOpen(true); setDateOpen(false); }}
+                  className="w-full px-2.5 py-1.5 text-left text-[12px] flex items-center gap-2 cursor-pointer transition-colors"
+                  style={{ color: (isCustomActive || customPickerOpen) ? c.accent : c.text, fontWeight: (isCustomActive || customPickerOpen) ? 600 : 500, background: "transparent" }}
+                  onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+                  onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                >
+                  <Check className="w-3 h-3 flex-shrink-0" style={{ opacity: isCustomActive ? 1 : 0, color: c.accent }} />
+                  <span className="whitespace-nowrap">Custom Range</span>
+                </button>
+                </div>
               </div>
-            )}
+              );
+            })()}
           </div>
+
+          {/* Custom-range inline picker — appears next to the date button when the user
+              picks "Custom Range" from the dropdown. Sits in the toolbar instead of inside
+              the dropdown so the two DatePickers have room to breathe and the popups can
+              open without clipping. */}
+          {customPickerOpen && (() => {
+            const inputStyle: React.CSSProperties = {
+              background: c.cardBg, border: `1px solid ${c.border}`, color: c.text,
+              fontFamily: FONT, fontSize: 12, padding: "6px 30px 6px 10px",
+              borderRadius: 8, width: 132, outline: "none",
+            };
+            const formatDate = (mmddyyyy: string) => {
+              const [mm, dd, yyyy] = mmddyyyy.split("/");
+              if (!mm || !dd || !yyyy) return mmddyyyy;
+              return new Date(+yyyy, +mm - 1, +dd).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+            };
+            const applyCustomRange = () => {
+              if (!customFrom || !customTo) return;
+              setDateRange(`${formatDate(customFrom)} – ${formatDate(customTo)}`);
+              setCustomPickerOpen(false);
+            };
+            const canApply = !!customFrom && !!customTo;
+            return (
+              // flex-wrap so the whole picker can flow to a second line on narrow
+              // viewports; each label+DatePicker + the Apply/close pair stay glued together
+              // as an atomic sub-group so we never split a label from its input.
+              <div className="flex items-center gap-x-3 gap-y-2 flex-wrap" onClick={e => e.stopPropagation()}>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span className="text-[11px] font-semibold" style={{ color: c.muted }}>From</span>
+                  <DatePicker value={customFrom} onChange={setCustomFrom} inputStyle={inputStyle} c={c} btnGrad={btnGrad} font={{ fontFamily: FONT }} />
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span className="text-[11px] font-semibold" style={{ color: c.muted }}>To</span>
+                  <DatePicker value={customTo} onChange={setCustomTo} inputStyle={inputStyle} c={c} btnGrad={btnGrad} font={{ fontFamily: FONT }} />
+                </div>
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <button
+                    type="button"
+                    disabled={!canApply}
+                    onClick={applyCustomRange}
+                    className="text-[12px] font-semibold px-3 py-1.5 rounded-lg text-white transition-opacity"
+                    style={{ background: btnGrad, fontFamily: FONT, opacity: canApply ? 1 : 0.5, cursor: canApply ? "pointer" : "not-allowed" }}
+                  >
+                    Apply
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCustomPickerOpen(false)}
+                    className="p-1.5 rounded-lg transition-colors"
+                    style={{ color: c.muted }}
+                    onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+                    onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                    aria-label="Close custom range"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* View columns — paired with Date because they're both "scope" controls (which data, which columns) */}
           <div className="relative" onClick={e => e.stopPropagation()}>
@@ -627,8 +716,9 @@ export default function Quotes({ isDark }: { isDark: boolean }) {
             )}
           </div>
 
-          {/* Search */}
-          <div className="relative flex-shrink-0" style={{ width: 300 }}>
+          {/* Search — grows to fill leftover space, but can also shrink down to a usable
+              min-width when the toolbar is crowded (custom range + other filters). */}
+          <div className="relative flex-1 min-w-[180px]" style={{ maxWidth: 300 }}>
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none" style={{ color: c.textDim }} />
             <input
               placeholder="Search by ID, client, or producer…"
@@ -699,20 +789,14 @@ export default function Quotes({ isDark }: { isDark: boolean }) {
             )}
           </div>
 
-        </div>
-
-        {/* Data-action cluster (Refresh / Export) — pushed to the far right of the toolbar with
-            `ml-auto` so filter controls stay clustered on the left and table-action controls
-            anchor on the right. The space between left and right clusters from `ml-auto` is
-            visual separation enough; no divider line. */}
-        <div className="flex items-center gap-2 flex-wrap flex-shrink-0 ml-auto">
-
-        {/* Refresh — labeled, matches Overview */}
+        {/* Refresh — sits with the filter controls in the same flex-wrap so on narrow
+            viewports it wraps alongside Search / Help instead of dropping onto its own
+            line. `ml-auto` pushes it (and Export) to the far right on wide viewports. */}
         <button
           onClick={handleRefresh}
           disabled={refreshing}
           title="Refresh quotes"
-          className="flex items-center gap-1.5 text-[12px] font-medium px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer disabled:cursor-not-allowed"
+          className="flex items-center gap-1.5 text-[12px] font-medium px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer disabled:cursor-not-allowed ml-auto"
           style={{ background: c.cardBg, border: `1px solid ${c.border}`, color: c.text, opacity: refreshing ? 0.7 : 1 }}
           onMouseEnter={e => { if (!refreshing) e.currentTarget.style.background = c.hoverBg; }}
           onMouseLeave={e => (e.currentTarget.style.background = c.cardBg)}
