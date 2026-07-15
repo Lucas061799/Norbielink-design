@@ -10,7 +10,7 @@ import loginN from "@/assets/login-n.svg";
 
 const FONT = "var(--font-montserrat), Montserrat, sans-serif";
 
-type Step = "login" | "verify" | "create" | "reset";
+type Step = "login" | "signup" | "verify" | "create" | "reset";
 
 interface WebsiteProps {
   isDark?: boolean;
@@ -133,7 +133,7 @@ export default function Website({ isDark = false }: WebsiteProps) {
         >
         {/* Step indicator (top-right) — clickable for demo navigation */}
         <div className="absolute top-6 right-8 flex items-center gap-2">
-          {(["login", "reset", "verify", "create"] as Step[]).map((s, i) => (
+          {(["login", "signup", "verify", "create", "reset"] as Step[]).map((s, i) => (
             <button
               key={s}
               onClick={() => setStep(s)}
@@ -154,7 +154,7 @@ export default function Website({ isDark = false }: WebsiteProps) {
           {/* Form wrapper scaled to ~85% — gives the whole sign-in surface a more compact feel
               without resizing every individual element. `transformOrigin: center` keeps it
               vertically and horizontally centered as it shrinks. */}
-          <div className="w-full" style={{ maxWidth: 520, transform: "scale(0.85)", transformOrigin: "center" }}>
+          <div className="w-full" style={{ maxWidth: step === "signup" ? 760 : 520, transform: "scale(0.85)", transformOrigin: "center" }}>
             {step === "login"  && <LoginView  c={c} font={font} inputStyle={inputStyle} labelStyle={labelStyle} primaryBtnStyle={primaryBtnStyle} btnGrad={btnGrad}
               onContinue={() => {
                 // Continue stays a no-op for now — clicking shouldn't navigate the demo away
@@ -162,6 +162,7 @@ export default function Website({ isDark = false }: WebsiteProps) {
                 // when the next step is ready.
               }}
               onResetLinkClicked={() => setStep("reset")}
+              onCreateLinkClicked={() => setStep("signup")}
               onAgencyCodeDetected={(code) => {
                 // Agency codes identify the agency, not a specific user — they can't be used
                 // to sign in. Top-right toast: name what was typed (so user sees we recognized
@@ -194,6 +195,7 @@ export default function Website({ isDark = false }: WebsiteProps) {
                 setStep("reset");
               }}
             />}
+            {step === "signup" && <SignupView c={c} font={font} inputStyle={inputStyle} labelStyle={labelStyle} primaryBtnStyle={primaryBtnStyle} btnGrad={btnGrad} isDark={isDark} onContinue={() => setStep("verify")} onSignInClicked={() => setStep("login")} />}
             {step === "verify" && <VerifyView c={c} font={font} primaryBtnStyle={primaryBtnStyle} btnGrad={btnGrad} onVerify={() => setStep("create")} />}
             {step === "create" && <CreateView c={c} font={font} inputStyle={inputStyle} labelStyle={labelStyle} primaryBtnStyle={primaryBtnStyle} btnGrad={btnGrad} isDark={isDark} onContinue={() => setStep("login")} />}
             {step === "reset"  && <ResetPasswordView c={c} font={font} inputStyle={inputStyle} labelStyle={labelStyle} primaryBtnStyle={primaryBtnStyle} btnGrad={btnGrad} isDark={isDark} onContinue={() => setStep("login")} />}
@@ -248,7 +250,7 @@ export default function Website({ isDark = false }: WebsiteProps) {
 }
 
 /* ──────────────────────────── LOGIN ──────────────────────────── */
-function LoginView({ c, font, inputStyle, labelStyle, primaryBtnStyle, btnGrad, onContinue, onResetLinkClicked, onResetEmailSent, onAgencyCodeDetected }: {
+function LoginView({ c, font, inputStyle, labelStyle, primaryBtnStyle, btnGrad, onContinue, onResetLinkClicked, onCreateLinkClicked, onResetEmailSent, onAgencyCodeDetected }: {
   c: Record<string, string>;
   font: React.CSSProperties;
   inputStyle: React.CSSProperties;
@@ -257,6 +259,7 @@ function LoginView({ c, font, inputStyle, labelStyle, primaryBtnStyle, btnGrad, 
   btnGrad: string;
   onContinue: () => void;
   onResetLinkClicked: () => void;
+  onCreateLinkClicked: () => void;
   onResetEmailSent: (email: string, mode: "password" | "both") => void;
   // Called when the user blurs the identifier field having typed something that looks like
   // an agency code (e.g. ACME01, AAA364). Parent surfaces a toast explaining that agency
@@ -433,6 +436,29 @@ function LoginView({ c, font, inputStyle, labelStyle, primaryBtnStyle, btnGrad, 
           }}
         >
           Reset
+        </button>
+      </div>
+
+      <div className="mt-2" style={{ ...font, fontSize: 13, color: c.muted }}>
+        If you have not created your individual login,{" "}
+        <button
+          type="button"
+          onClick={onCreateLinkClicked}
+          className="underline cursor-pointer"
+          style={{
+            background: btnGrad,
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+            backgroundClip: "text",
+            border: "none",
+            padding: 0,
+            fontWeight: 700,
+            fontFamily: FONT,
+            fontSize: 13,
+            textUnderlineOffset: 3,
+          }}
+        >
+          click here
         </button>
       </div>
 
@@ -860,6 +886,233 @@ function VerifyView({ c, font, primaryBtnStyle, btnGrad, onVerify }: {
 }
 
 /* ──────────────────────────── CREATE PASSWORD ──────────────────────────── */
+function SignupView({ c, font, inputStyle, labelStyle, primaryBtnStyle, btnGrad, isDark, onContinue, onSignInClicked }: {
+  c: Record<string, string>;
+  font: React.CSSProperties;
+  inputStyle: React.CSSProperties;
+  labelStyle: React.CSSProperties;
+  primaryBtnStyle: (enabled: boolean) => React.CSSProperties;
+  btnGrad: string;
+  isDark: boolean;
+  onContinue: () => void;
+  onSignInClicked: () => void;
+}) {
+  const [agencyCode, setAgencyCode] = useState("");
+  const [agencyPassword, setAgencyPassword] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [showAgencyPw, setShowAgencyPw] = useState(false);
+  const [showPw, setShowPw] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [remember, setRemember] = useState(false);
+
+  const rules = [
+    { label: "Minimum 8 characters",         ok: password.length >= 8 },
+    { label: "At least 1 uppercase letter",  ok: /[A-Z]/.test(password) },
+    { label: "At least 1 lowercase letter",  ok: /[a-z]/.test(password) },
+    { label: "At least 1 number",            ok: /\d/.test(password) },
+    { label: "At least 1 special character (!, etc.)", ok: /[^A-Za-z0-9]/.test(password) },
+  ];
+  // Demo: always allow Continue. Production would gate on all rules + matching passwords + email + agency creds.
+  const allValid = true;
+
+  // Reuse the underlined gradient link pattern used by "Reset" on the login page.
+  const linkStyle: React.CSSProperties = {
+    background: btnGrad,
+    WebkitBackgroundClip: "text",
+    WebkitTextFillColor: "transparent",
+    backgroundClip: "text",
+    border: "none",
+    padding: 0,
+    fontWeight: 700,
+    fontFamily: FONT,
+    fontSize: 13,
+    textUnderlineOffset: 3,
+  };
+
+  return (
+    <>
+      <h1 className="mb-1" style={{ ...font, fontSize: 28, fontWeight: 600, lineHeight: "34px", color: c.text }}>
+        Welcome to{" "}
+        <span
+          style={{
+            background: btnGrad,
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+            backgroundClip: "text",
+          }}
+        >
+          NorbieLink!
+        </span>
+      </h1>
+      <p className="mb-8" style={{ ...font, fontSize: 14, color: c.muted }}>
+        Sign in with your agency, then create your individual login.
+      </p>
+
+      {/* ── Agency-level auth ── */}
+      <div className="grid grid-cols-2 gap-5 mb-2">
+        <div>
+          <label style={labelStyle}>Agency Code</label>
+          <input value={agencyCode} onChange={e => setAgencyCode(e.target.value)} style={inputStyle} />
+        </div>
+        <div>
+          <label style={labelStyle}>Agency Password</label>
+          <div className="relative">
+            <input
+              type={showAgencyPw ? "text" : "password"}
+              value={agencyPassword}
+              onChange={e => setAgencyPassword(e.target.value)}
+              style={{ ...inputStyle, paddingRight: 40 }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowAgencyPw(s => !s)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer"
+              style={{ color: c.muted, background: "transparent", border: "none", padding: 0, lineHeight: 0 }}
+            >
+              {showAgencyPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-5 mb-6">
+        <button type="button" className="underline cursor-pointer text-left" style={linkStyle}>
+          Forgot Agency Code?
+        </button>
+        <button type="button" className="underline cursor-pointer text-left" style={linkStyle}>
+          Forgot Agency Password?
+        </button>
+      </div>
+
+      {/* Divider between agency auth and individual signup — lighter than input-border
+          weight so it reads as a section separator, matching app-wide convention. */}
+      <div className="mb-5" style={{ borderTop: `1px solid ${isDark ? "rgba(255,255,255,0.10)" : "#E5E7EB"}` }} />
+
+      {/* ── Individual signup section header — gradient accent matches Welcome + Continue.
+          24/600/30 keeps proper hierarchy under the h1 (28/600) and uses the app's scale. */}
+      <h2 className="mb-5" style={{ ...font, fontSize: 24, fontWeight: 600, lineHeight: "30px", color: c.text }}>
+        New!{" "}
+        <span
+          style={{
+            background: btnGrad,
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+            backgroundClip: "text",
+          }}
+        >
+          Create Your Individual Login
+        </span>
+      </h2>
+
+      <div className="mb-4">
+        <label style={labelStyle}>Email Address</label>
+        <input
+          type="email"
+          value={email}
+          onChange={e => setEmail(e.target.value)}
+          style={inputStyle}
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-5 mb-4">
+        <div>
+          <label style={labelStyle}>Create Password</label>
+          <div className="relative">
+            <input
+              type={showPw ? "text" : "password"}
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              style={{ ...inputStyle, paddingRight: 40 }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPw(s => !s)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer"
+              style={{ color: c.muted, background: "transparent", border: "none", padding: 0, lineHeight: 0 }}
+            >
+              {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
+        </div>
+        <div>
+          <label style={labelStyle}>Confirm Password</label>
+          <div className="relative">
+            <input
+              type={showConfirm ? "text" : "password"}
+              value={confirm}
+              onChange={e => setConfirm(e.target.value)}
+              style={{ ...inputStyle, paddingRight: 40 }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowConfirm(s => !s)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer"
+              style={{ color: c.muted, background: "transparent", border: "none", padding: 0, lineHeight: 0 }}
+            >
+              {showConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Rules — plain two-column list beneath the password fields. Unmet rules are
+          muted (no red-X noise), met rules go green. */}
+      <div className="mb-6 grid grid-cols-2 gap-x-4 gap-y-1.5">
+        {rules.map(r => (
+          <div key={r.label} className="flex items-center gap-2"
+            style={{ ...font, fontSize: 12, color: r.ok ? "#10B981" : c.muted }}>
+            <span className="flex items-center justify-center flex-shrink-0"
+              style={{ width: 14, height: 14, borderRadius: 9999,
+                background: r.ok ? "rgba(16,185,129,0.14)" : (isDark ? "rgba(255,255,255,0.06)" : "#E5E7EB") }}>
+              {r.ok && <Check className="w-2.5 h-2.5" style={{ color: "#10B981" }} strokeWidth={3} />}
+            </span>
+            {r.label}
+          </div>
+        ))}
+      </div>
+
+      <label className="flex items-center gap-2 mb-6 cursor-pointer select-none" style={{ ...font, fontSize: 13, color: c.muted }}>
+        <input
+          type="checkbox"
+          checked={remember}
+          onChange={e => setRemember(e.target.checked)}
+          className="sr-only"
+        />
+        <span
+          className="flex-shrink-0 flex items-center justify-center"
+          style={{
+            width: 16,
+            height: 16,
+            borderRadius: 4,
+            border: `1.5px solid ${remember ? "transparent" : c.border}`,
+            background: remember ? btnGrad : "transparent",
+          }}
+        >
+          {remember && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+        </span>
+        Remember me
+      </label>
+
+      <button type="button" disabled={!allValid} onClick={onContinue} style={primaryBtnStyle(allValid)}>
+        Continue
+      </button>
+
+      <div className="mt-5" style={{ ...font, fontSize: 13, color: c.muted }}>
+        Already created individual login?{" "}
+        <button
+          type="button"
+          onClick={onSignInClicked}
+          className="underline cursor-pointer"
+          style={linkStyle}
+        >
+          Sign In
+        </button>
+      </div>
+    </>
+  );
+}
+
 function CreateView({ c, font, inputStyle, labelStyle, primaryBtnStyle, btnGrad, isDark, onContinue }: {
   c: Record<string, string>;
   font: React.CSSProperties;
