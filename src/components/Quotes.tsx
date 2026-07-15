@@ -523,7 +523,7 @@ export default function Quotes({ isDark }: { isDark: boolean }) {
     // 4-tile row alongside the 3 status breakdowns.
     { keys: ["Pending"],                                                       label: "Pending",          sub: "In progress",                                                count: pendingCount   },
     { keys: ["Sold/Issued", "Approved"],                                       label: "Sold & Approved",  sub: "Bound this period",                                          count: soldCount      },
-    { keys: ["Pending/Action Req.", "Add'l Insured Request", "Incomplete"],    label: "Action Required",  sub: "Pending/Action Req. · Add'l Insured Request · Incomplete",   count: actionReqCount },
+    { keys: ["Pending/Action Req.", "Add'l Insured Request", "Incomplete"],    label: "Action Required",  sub: "Pending · Add'l Insured Request · Incomplete",               count: actionReqCount },
   ];
 
   return (

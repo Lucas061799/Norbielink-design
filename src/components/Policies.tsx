@@ -546,7 +546,7 @@ export default function Policies({ isDark }: { isDark: boolean }) {
     // 4-tile row alongside the 3 status breakdowns.
     { keys: ["Sold/Issued", "Approved"],                                            label: "Active",             sub: "Bound · Approved · Issued",                                  count: activeCount   },
     { keys: ["Upcoming Renewals"],                                                  label: "Upcoming Renewals",  sub: "Next 30 days",                                               count: renewalsCount },
-    { keys: ["Pending/Action Req.", "Add'l Insured Request", "Incomplete"],         label: "Action Required",    sub: "Pending Quotes · Incomplete Apps · Add'l Insured Requests",  count: actionReqCount },
+    { keys: ["Pending/Action Req.", "Add'l Insured Request", "Incomplete"],         label: "Action Required",    sub: "Pending · Incomplete · Add'l Insured Requests",              count: actionReqCount },
   ];
 
   return (
