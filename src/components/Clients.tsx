@@ -1183,17 +1183,15 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
                       border: `1px solid ${active ? (isDark ? "#4ECDC4" : "#A614C3") : c.border}`,
                     }}
                     onMouseEnter={e => {
-                      // Background tint + border darken — a bare border-color shift
-                      // on a 1px line was basically invisible. Skip on the active
-                      // card so it doesn't "flash" when re-hovered.
+                      // Hover only nudges the border darker — no bg tint, so the
+                      // transition into the active state (purple border, still cardBg
+                      // background) is clean and doesn't leave a stuck gray fill.
                       if (!active) {
-                        e.currentTarget.style.background = c.hoverBg;
                         e.currentTarget.style.borderColor = isDark ? "rgba(255,255,255,0.20)" : "#D1D5DB";
                       }
                     }}
                     onMouseLeave={e => {
                       if (!active) {
-                        e.currentTarget.style.background = c.cardBg;
                         e.currentTarget.style.borderColor = c.border;
                       }
                     }}>

@@ -510,18 +510,27 @@ export default function Policies({ isDark }: { isDark: boolean }) {
     );
   }
 
-  // Counts per status — for the quick-filter KPI cards
-  const activeCount       = mockPolicies.filter(p => p.status === "Sold/Issued").length;
+  // Counts per status — for the quick-filter KPI cards.
+  // "Active" folds Sold/Issued + Approved together because both are policies currently
+  // in force from the agency's day-to-day perspective (issued = bound + paid; approved =
+  // underwriting-approved and about to bind). Splitting them across two cards buries the
+  // signal — one merged card is what the sales team actually looks at.
+  const activeCount       = mockPolicies.filter(p => p.status === "Sold/Issued" || p.status === "Approved").length;
   const renewalsCount     = mockPolicies.filter(p => p.status === "Upcoming Renewals").length;
-  const actionReqCount    = mockPolicies.filter(p => p.status === "Pending/Action Req.").length;
-  const statusSummary: { key: string; label: string; sub: string; count: number }[] = [
+  // "Action Required" folds together every status that requires the agent to do something:
+  // Pending/Action Req. (explicit), Add'l Insured Request (outstanding request), and
+  // Incomplete (submission still missing info). One card, one clear queue of what to work on.
+  const actionReqCount    = mockPolicies.filter(p =>
+    p.status === "Pending/Action Req." || p.status === "Add'l Insured Request" || p.status === "Incomplete"
+  ).length;
+  const statusSummary: { keys: string[]; label: string; sub: string; count: number }[] = [
     // "Total Policies" (All Statuses) intentionally removed — Active / Upcoming Renewals /
     // Action Required are the actionable signals; a total of every policy doesn't drive any
     // decision. The Start-a-Quote CTA tile (rendered before this map) now completes a clean
     // 4-tile row alongside the 3 status breakdowns.
-    { key: "Sold/Issued",         label: "Active",             sub: "Currently in force",   count: activeCount         },
-    { key: "Upcoming Renewals",   label: "Upcoming Renewals",  sub: "Next 30 days",         count: renewalsCount       },
-    { key: "Pending/Action Req.", label: "Action Required",    sub: "Needs your attention", count: actionReqCount      },
+    { keys: ["Sold/Issued", "Approved"],                                            label: "Sold & Approved",    sub: "Currently in force",   count: activeCount   },
+    { keys: ["Upcoming Renewals"],                                                  label: "Upcoming Renewals",  sub: "Next 30 days",         count: renewalsCount },
+    { keys: ["Pending/Action Req.", "Add'l Insured Request", "Incomplete"],         label: "Action Required",    sub: "Needs your attention", count: actionReqCount },
   ];
 
   return (
@@ -774,18 +783,16 @@ export default function Policies({ isDark }: { isDark: boolean }) {
           </div>
         </button>
         {statusSummary.map((s) => {
-          // "Total Policies" (All Statuses) is the unfiltered state — clicking it clears the
-          // status filter entirely; never apply it as a literal status (no row would match).
-          // A card is "active" when ONLY its status is in the filter set (single-status quick-filter).
-          const isAllCard = s.key === "All Statuses";
-          const active = !isAllCard && statusFilter.size === 1 && statusFilter.has(s.key);
+          // A card is "active" when the filter set is exactly its keys — supports both
+          // single-status cards (Renewals, Action Required) and multi-status cards (Active
+          // = Sold/Issued + Approved).
+          const active = statusFilter.size === s.keys.length && s.keys.every(k => statusFilter.has(k));
           return (
             <button
-              key={s.key}
+              key={s.label}
               onClick={() => {
-                if (isAllCard)        setStatusFilter(new Set());          // clear filter — show everything
-                else if (active)      setStatusFilter(new Set());          // toggle off — clear filter
-                else                  setStatusFilter(new Set([s.key]));   // set single-status quick filter
+                if (active) setStatusFilter(new Set());              // toggle off — clear filter
+                else        setStatusFilter(new Set(s.keys));        // apply this card's status set
                 setPage(1);
               }}
               className="rounded-2xl px-5 py-4 text-left cursor-pointer transition-all"
@@ -794,16 +801,15 @@ export default function Policies({ isDark }: { isDark: boolean }) {
                 border: `1px solid ${active ? c.accent : c.border}`,
               }}
               onMouseEnter={e => {
-                // Background tint + border darken — a bare border-color shift on
-                // a 1px line was basically invisible.
+                // Hover on the inactive card only nudges the border darker — no bg tint,
+                // so the transition into the active state (purple border, still cardBg
+                // background) is clean and doesn't leave a stuck gray fill.
                 if (!active) {
-                  e.currentTarget.style.background = c.hoverBg;
                   e.currentTarget.style.borderColor = c.borderStrong;
                 }
               }}
               onMouseLeave={e => {
                 if (!active) {
-                  e.currentTarget.style.background = c.cardBg;
                   e.currentTarget.style.borderColor = c.border;
                 }
               }}
