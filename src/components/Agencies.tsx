@@ -291,39 +291,157 @@ const mockAgencies: Agency[] = [
 ];
 
 // ── ITC (accounting) records ─────────────────────────────────────────────
-// Super-admin-only surface — shows whether an agency is registered in the
-// downstream ITC accounting system and lets an admin edit the record. A
+// Super-admin-only surface — mirrors the downstream ITC producer record
+// (ViewProducer API). Field set matches the AddProducer / EditProducer
+// payloads so the Norbielink UI stays 1:1 with what ITC round-trips. A
 // `null` value means the agency exists in Norbielink but has NOT been
-// registered in ITC yet (empty state / "Add to ITC" affordance).
+// registered in ITC yet (empty state).
 type ITCStatus = "Active" | "Suspended" | "Terminated" | "Pending";
-type PaymentTerms = "Net 15" | "Net 30" | "Net 45" | "Net 60";
+type AgentBroker = "Agent" | "Broker";
+type Tax1099Type = "Individual" | "Corporation" | "Partnership" | "LLC";
 
 interface ITCRecord {
-  itcCode: string;
+  // Producer
+  producerCode: string;
+  agentOrBroker: AgentBroker;
+  shortName: string;
+  name: string;
+  dba: string;
   status: ITCStatus;
-  effectiveDate: string;      // MM/DD/YYYY
-  terminationDate: string | null;
-  commissionRate: number;     // percent, e.g. 12.5
-  paymentTerms: PaymentTerms;
-  accountBalance: number;     // dollars, negative = agency owes
-  lastPaymentDate: string;
-  bankAccountMasked: string;  // e.g. "****4521"
-  notes: string;
+
+  // Contact
+  address: string;
+  city: string;
+  state: string;
+  zip: string;
+  telephone: string;
+  email: string;
+  accountingEmail: string;
+  statementEmail: string;
+
+  // Appointment & compliance
+  appointmentDate: string;   // MM/DD/YYYY
+  licenseNo: string;
+  licenseExpires: string;
+  eoPolicyNo: string;
+  eoPolicyExpires: string;
+  taxId: string;
+  tax1099Type: Tax1099Type;
+  tax1099Name: string;
+
+  // Preferences
+  emailStatements: boolean;
+  directDeposits: boolean;
+  directDepositsCommissionOnly: boolean;
+  farmersAgent: boolean;
+  smartChoiceAgent: boolean;
+  piibAgent: boolean;
+
+  // Consolidated Billing
+  useConsolidatedBillingId: boolean;
+  consolidatedBillingId: string;
+  isConsolidatedBillingProducer: boolean;
+
+  // Affiliation
+  isAffiliatedWith: boolean;
+  affiliatedWithId: string;
+  isAffiliationMain: boolean;
+  subProducerName: string;
 }
 
 const INITIAL_ITC_RECORDS: Record<string, ITCRecord | null> = {
-  ACME01:  { itcCode: "ITC-ACME-01924", status: "Active",    effectiveDate: "03/24/2026", terminationDate: null,          commissionRate: 12.5, paymentTerms: "Net 30", accountBalance: 4820.15,  lastPaymentDate: "04/18/2026", bankAccountMasked: "****4521", notes: "Auto-pay enrolled. Primary contact: Jason Smith." },
-  SUMIT22: { itcCode: "ITC-SUMIT-00447", status: "Active",    effectiveDate: "01/12/2024", terminationDate: null,          commissionRate: 11.0, paymentTerms: "Net 30", accountBalance: 1120.00,  lastPaymentDate: "04/22/2026", bankAccountMasked: "****9033", notes: "Wire transfers preferred." },
-  PION33:  null, // Not registered in ITC — demo empty state
-  LAKE04:  { itcCode: "ITC-LAKE-02110",  status: "Active",    effectiveDate: "08/02/2023", terminationDate: null,          commissionRate: 13.0, paymentTerms: "Net 45", accountBalance: -215.40,  lastPaymentDate: "03/28/2026", bankAccountMasked: "****1276", notes: "Small carryover; expected to clear by next cycle." },
-  RIDG05:  { itcCode: "ITC-RIDG-00832",  status: "Suspended", effectiveDate: "11/15/2022", terminationDate: null,          commissionRate: 12.5, paymentTerms: "Net 30", accountBalance: 15200.75, lastPaymentDate: "12/10/2025", bankAccountMasked: "****6641", notes: "Suspended pending 2025 statement review. Contact accounting before reactivating." },
-  HARB06:  null,
-  MIDL07:  { itcCode: "ITC-MIDL-00201",  status: "Pending",   effectiveDate: "04/01/2026", terminationDate: null,          commissionRate: 11.5, paymentTerms: "Net 30", accountBalance: 0,        lastPaymentDate: "—",         bankAccountMasked: "****—",     notes: "New producer. Awaiting first premium disbursement." },
-  COAS08:  null,
-  APEX09:  { itcCode: "ITC-APEX-01880",  status: "Active",    effectiveDate: "06/14/2024", terminationDate: null,          commissionRate: 13.5, paymentTerms: "Net 30", accountBalance: 8930.42,  lastPaymentDate: "04/20/2026", bankAccountMasked: "****3717", notes: "" },
-  KEYS10:  { itcCode: "ITC-KEYS-01455",  status: "Active",    effectiveDate: "09/03/2023", terminationDate: null,          commissionRate: 12.0, paymentTerms: "Net 45", accountBalance: 2210.00,  lastPaymentDate: "04/15/2026", bankAccountMasked: "****8802", notes: "" },
-  BLUE11:  null,
-  IRON12:  { itcCode: "ITC-IRON-02033",  status: "Active",    effectiveDate: "02/28/2025", terminationDate: null,          commissionRate: 14.0, paymentTerms: "Net 30", accountBalance: 5400.10,  lastPaymentDate: "04/24/2026", bankAccountMasked: "****5590", notes: "" },
+  ACME01: {
+    producerCode: "AC192", agentOrBroker: "Agent", shortName: "AC192", name: "ACME INSURANCE AGENCY", dba: "", status: "Active",
+    address: "1111 6th Ave", city: "Des Moines", state: "IA", zip: "50314",
+    telephone: "5152221000", email: "jason@acmeins.com", accountingEmail: "d.kim@acmeins.com", statementEmail: "d.kim@acmeins.com",
+    appointmentDate: "03/24/2026", licenseNo: "LC-88210", licenseExpires: "03/24/2028",
+    eoPolicyNo: "EO-4421", eoPolicyExpires: "03/24/2027", taxId: "121222334455", tax1099Type: "LLC", tax1099Name: "Acme Insurance Agency LLC",
+    emailStatements: true, directDeposits: true, directDepositsCommissionOnly: false,
+    farmersAgent: false, smartChoiceAgent: true, piibAgent: false,
+    useConsolidatedBillingId: false, consolidatedBillingId: "", isConsolidatedBillingProducer: false,
+    isAffiliatedWith: true, affiliatedWithId: "ACRS01", isAffiliationMain: false, subProducerName: "",
+  },
+  SUMIT22: {
+    producerCode: "SU447", agentOrBroker: "Agent", shortName: "SU447", name: "SUMMIT SOLUTIONS INC", dba: "Summit Sol", status: "Active",
+    address: "200 N Michigan", city: "Chicago", state: "IL", zip: "60601",
+    telephone: "3125550100", email: "m.chen@summitsol.com", accountingEmail: "billing@summitsol.com", statementEmail: "billing@summitsol.com",
+    appointmentDate: "01/12/2024", licenseNo: "LC-22110", licenseExpires: "01/15/2027",
+    eoPolicyNo: "EO-1120", eoPolicyExpires: "01/15/2027", taxId: "930011223", tax1099Type: "Corporation", tax1099Name: "Summit Solutions Inc",
+    emailStatements: true, directDeposits: false, directDepositsCommissionOnly: false,
+    farmersAgent: false, smartChoiceAgent: false, piibAgent: false,
+    useConsolidatedBillingId: false, consolidatedBillingId: "", isConsolidatedBillingProducer: true,
+    isAffiliatedWith: false, affiliatedWithId: "", isAffiliationMain: false, subProducerName: "",
+  },
+  PION33: null, // Not registered in ITC — demo empty state
+  LAKE04: {
+    producerCode: "LK211", agentOrBroker: "Broker", shortName: "LK211", name: "LAKEFRONT COVERAGE", dba: "", status: "Active",
+    address: "820 Lakefront Blvd", city: "Denver", state: "CO", zip: "80203",
+    telephone: "3035551010", email: "o.bennett@lakefrontcov.com", accountingEmail: "", statementEmail: "",
+    appointmentDate: "08/02/2023", licenseNo: "LC-11245", licenseExpires: "08/02/2027",
+    eoPolicyNo: "EO-9911", eoPolicyExpires: "08/02/2026", taxId: "845123765", tax1099Type: "Corporation", tax1099Name: "Lakefront Coverage",
+    emailStatements: true, directDeposits: true, directDepositsCommissionOnly: true,
+    farmersAgent: false, smartChoiceAgent: false, piibAgent: true,
+    useConsolidatedBillingId: false, consolidatedBillingId: "", isConsolidatedBillingProducer: false,
+    isAffiliatedWith: false, affiliatedWithId: "", isAffiliationMain: false, subProducerName: "",
+  },
+  RIDG05: {
+    producerCode: "RI083", agentOrBroker: "Agent", shortName: "RI083", name: "RIDGELINE INSURANCE", dba: "", status: "Suspended",
+    address: "445 Ridgeway Dr", city: "Des Moines", state: "IA", zip: "50310",
+    telephone: "5155552020", email: "n.avery@ridgelineins.com", accountingEmail: "n.avery@ridgelineins.com", statementEmail: "n.avery@ridgelineins.com",
+    appointmentDate: "11/15/2022", licenseNo: "LC-33902", licenseExpires: "11/15/2026",
+    eoPolicyNo: "EO-2210", eoPolicyExpires: "11/15/2025", taxId: "223456781", tax1099Type: "Individual", tax1099Name: "Nicole Avery",
+    emailStatements: true, directDeposits: true, directDepositsCommissionOnly: false,
+    farmersAgent: true, smartChoiceAgent: false, piibAgent: false,
+    useConsolidatedBillingId: false, consolidatedBillingId: "", isConsolidatedBillingProducer: false,
+    isAffiliatedWith: false, affiliatedWithId: "", isAffiliationMain: false, subProducerName: "",
+  },
+  HARB06: null,
+  MIDL07: {
+    producerCode: "MD020", agentOrBroker: "Agent", shortName: "MD020", name: "MIDLAND INSURANCE PARTNERS", dba: "", status: "Pending",
+    address: "77 Main St", city: "Wichita", state: "KS", zip: "67202",
+    telephone: "3165550707", email: "contact@midlandins.com", accountingEmail: "", statementEmail: "",
+    appointmentDate: "04/01/2026", licenseNo: "LC-77801", licenseExpires: "04/01/2028",
+    eoPolicyNo: "EO-4408", eoPolicyExpires: "04/01/2027", taxId: "556789012", tax1099Type: "LLC", tax1099Name: "Midland Insurance Partners LLC",
+    emailStatements: false, directDeposits: false, directDepositsCommissionOnly: false,
+    farmersAgent: false, smartChoiceAgent: true, piibAgent: false,
+    useConsolidatedBillingId: false, consolidatedBillingId: "", isConsolidatedBillingProducer: false,
+    isAffiliatedWith: false, affiliatedWithId: "", isAffiliationMain: false, subProducerName: "",
+  },
+  COAS08: null,
+  APEX09: {
+    producerCode: "AP188", agentOrBroker: "Agent", shortName: "AP188", name: "APEX RISK ADVISORS", dba: "", status: "Active",
+    address: "500 Congress Ave", city: "Austin", state: "TX", zip: "78701",
+    telephone: "5125559090", email: "b.carlson@apexrisk.com", accountingEmail: "billing@apexrisk.com", statementEmail: "billing@apexrisk.com",
+    appointmentDate: "06/14/2024", licenseNo: "LC-55621", licenseExpires: "06/14/2027",
+    eoPolicyNo: "EO-8801", eoPolicyExpires: "06/14/2027", taxId: "743210987", tax1099Type: "Corporation", tax1099Name: "Apex Risk Advisors",
+    emailStatements: true, directDeposits: true, directDepositsCommissionOnly: false,
+    farmersAgent: false, smartChoiceAgent: false, piibAgent: false,
+    useConsolidatedBillingId: true, consolidatedBillingId: "CB-9902", isConsolidatedBillingProducer: false,
+    isAffiliatedWith: false, affiliatedWithId: "", isAffiliationMain: false, subProducerName: "Apex-Central",
+  },
+  KEYS10: {
+    producerCode: "KY145", agentOrBroker: "Broker", shortName: "KY145", name: "KEYSTONE UNDERWRITERS", dba: "", status: "Active",
+    address: "18 Market St", city: "Philadelphia", state: "PA", zip: "19107",
+    telephone: "2155551045", email: "ops@keystone-uw.com", accountingEmail: "", statementEmail: "",
+    appointmentDate: "09/03/2023", licenseNo: "LC-90112", licenseExpires: "09/03/2026",
+    eoPolicyNo: "EO-6620", eoPolicyExpires: "09/03/2026", taxId: "334567890", tax1099Type: "Corporation", tax1099Name: "Keystone Underwriters",
+    emailStatements: true, directDeposits: false, directDepositsCommissionOnly: false,
+    farmersAgent: false, smartChoiceAgent: false, piibAgent: false,
+    useConsolidatedBillingId: false, consolidatedBillingId: "", isConsolidatedBillingProducer: false,
+    isAffiliatedWith: false, affiliatedWithId: "", isAffiliationMain: false, subProducerName: "",
+  },
+  BLUE11: null,
+  IRON12: {
+    producerCode: "IR203", agentOrBroker: "Agent", shortName: "IR203", name: "IRONBRIDGE INSURANCE GROUP", dba: "", status: "Active",
+    address: "9 Founders Way", city: "Boston", state: "MA", zip: "02110",
+    telephone: "6175551212", email: "info@ironbridge.com", accountingEmail: "acct@ironbridge.com", statementEmail: "acct@ironbridge.com",
+    appointmentDate: "02/28/2025", licenseNo: "LC-44412", licenseExpires: "02/28/2028",
+    eoPolicyNo: "EO-3341", eoPolicyExpires: "02/28/2027", taxId: "998765432", tax1099Type: "LLC", tax1099Name: "Ironbridge Insurance Group LLC",
+    emailStatements: true, directDeposits: true, directDepositsCommissionOnly: false,
+    farmersAgent: false, smartChoiceAgent: false, piibAgent: true,
+    useConsolidatedBillingId: false, consolidatedBillingId: "", isConsolidatedBillingProducer: false,
+    isAffiliatedWith: false, affiliatedWithId: "", isAffiliationMain: false, subProducerName: "",
+  },
 };
 
 /* ─── Extended mock detail data ─────────────────────────────────────────── */
@@ -339,6 +457,7 @@ interface AgencyDetail extends Agency {
   taxId: string;
   phone: string;
   tollFree: string;
+  npn: string;             // National Producer Number — persists to agency_details on Register
   licenseNo: string;
   licenseExp: string;
   eoPolicyNo: string;
@@ -353,9 +472,9 @@ interface AgencyDetail extends Agency {
 }
 
 const mockDetails: Record<string, Partial<AgencyDetail>> = {
-  "1": { website: "www.acmeins.com",      street: "1111 6th Ave",   zip: "50314", apptDate: "03/24/2026", contact: "Jason Smith",      contactPhone: "650-768-0850", contactEmail: "jason@acmeins.com",     bizType: "LLC",            taxId: "121222334455", phone: "515-222-1000", tollFree: "",             licenseNo: "LC-88210", licenseExp: "03/24/2026", eoPolicyNo: "EO-4421", eoExp: "03/24/2026", agencyBill: true,  directBill: true,  premiumFin: true,  agencyType: "Retail",     affiliations: ["AAA/ACG (AC364)", "Acrisure"], workersComp: ["AIG", "AmTrust"], badges: ["Strategic Partner", "VIP"] },
-  "2": { website: "www.summitsol.com",    street: "200 N Michigan",  zip: "60601", apptDate: "01/15/2025", contact: "Maria Chen",       contactPhone: "312-555-0190", contactEmail: "m.chen@summitsol.com",  bizType: "Corporation",    taxId: "930011223",   phone: "312-555-0100", tollFree: "800-555-0100", licenseNo: "LC-22110", licenseExp: "01/15/2027", eoPolicyNo: "EO-1120", eoExp: "01/15/2027", agencyBill: true,  directBill: false, premiumFin: true,  agencyType: "Wholesale",  affiliations: ["Acrisure", "Acceptance"], workersComp: ["CNA"], badges: ["DreamTeam"] },
-  "3": { website: "",                     street: "",                zip: "",      apptDate: "06/01/2024", contact: "Tom Lawson",       contactPhone: "",             contactEmail: "",                      bizType: "Sole Proprietor",taxId: "456789012",   phone: "",             tollFree: "",             licenseNo: "LC-77001", licenseExp: "06/01/2026", eoPolicyNo: "EO-7701", eoExp: "06/01/2026", agencyBill: false, directBill: true,  premiumFin: false, agencyType: "Retail",     affiliations: ["Farmers", "ISU"], workersComp: ["GUARD", "Zenith"], badges: [] },
+  "1": { website: "www.acmeins.com",      street: "1111 6th Ave",   zip: "50314", apptDate: "03/24/2026", contact: "Jason Smith",      contactPhone: "650-768-0850", contactEmail: "jason@acmeins.com",     bizType: "LLC",            taxId: "121222334455", phone: "515-222-1000", tollFree: "",             npn: "17482910", licenseNo: "LC-88210", licenseExp: "03/24/2026", eoPolicyNo: "EO-4421", eoExp: "03/24/2026", agencyBill: true,  directBill: true,  premiumFin: true,  agencyType: "Retail",     affiliations: ["AAA/ACG (AC364)", "Acrisure"], workersComp: ["AIG", "AmTrust"], badges: ["Strategic Partner", "VIP"] },
+  "2": { website: "www.summitsol.com",    street: "200 N Michigan",  zip: "60601", apptDate: "01/15/2025", contact: "Maria Chen",       contactPhone: "312-555-0190", contactEmail: "m.chen@summitsol.com",  bizType: "Corporation",    taxId: "930011223",   phone: "312-555-0100", tollFree: "800-555-0100", npn: "20911345", licenseNo: "LC-22110", licenseExp: "01/15/2027", eoPolicyNo: "EO-1120", eoExp: "01/15/2027", agencyBill: true,  directBill: false, premiumFin: true,  agencyType: "Wholesale",  affiliations: ["Acrisure", "Acceptance"], workersComp: ["CNA"], badges: ["DreamTeam"] },
+  "3": { website: "",                     street: "",                zip: "",      apptDate: "06/01/2024", contact: "Tom Lawson",       contactPhone: "",             contactEmail: "",                      bizType: "Sole Proprietor",taxId: "456789012",   phone: "",             tollFree: "",             npn: "",         licenseNo: "LC-77001", licenseExp: "06/01/2026", eoPolicyNo: "EO-7701", eoExp: "06/01/2026", agencyBill: false, directBill: true,  premiumFin: false, agencyType: "Retail",     affiliations: ["Farmers", "ISU"], workersComp: ["GUARD", "Zenith"], badges: [] },
 };
 
 function getDetail(a: Agency): AgencyDetail {
@@ -373,6 +492,7 @@ function getDetail(a: Agency): AgencyDetail {
     taxId:         d.taxId         ?? "",
     phone:         d.phone         ?? "000-000-0000",
     tollFree:      d.tollFree      ?? "",
+    npn:           d.npn           ?? "",
     licenseNo:     d.licenseNo     ?? "",
     licenseExp:    d.licenseExp    ?? "03/24/2026",
     eoPolicyNo:    d.eoPolicyNo    ?? "",
@@ -617,6 +737,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
   const [eWebsite,    setEWebsite]    = useState(agency.website);
   const [ePhone,      setEPhone]      = useState(agency.phone);
   const [eTollFree,   setETollFree]   = useState(agency.tollFree);
+  const [eNpn,        setENpn]        = useState(agency.npn);
   const [eLicNo,      setELicNo]      = useState(agency.licenseNo);
   const [eLicExp,     setELicExp]     = useState(agency.licenseExp);
   const [eEoNo,       setEEoNo]       = useState(agency.eoPolicyNo);
@@ -2966,7 +3087,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
               <div />
               <LabelValue label="License Number"  value={agency.licenseNo || "—"} />
               <LabelValue label="Expiration Date" value={agency.licenseExp} />
-              <div />
+              <LabelValue label="NPN"             value={agency.npn || "—"} />
               <LabelValue label="E&O Policy #"    value={agency.eoPolicyNo || "—"} />
               <LabelValue label="Expiration Date" value={agency.eoExp} />
               <div />
@@ -3390,7 +3511,12 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                   ? <LockedInput value={eLicExp || "—"} />
                   : <DatePicker value={eLicExp} onChange={setELicExp} inputStyle={inputStyle} c={c} btnGrad={btnGrad} font={font} />}
               </div>
-              <div />
+              <div>
+                <label style={labelStyle}>NPN:</label>
+                {clientLocked
+                  ? <LockedInput value={eNpn || "—"} />
+                  : <input value={eNpn} onChange={e => setENpn(e.target.value)} placeholder="National Producer Number" style={inputStyle} />}
+              </div>
             </div>
 
             {/* E&O */}
@@ -5253,11 +5379,24 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
              dashboard and clashed with the rest of the detail view. */}
         {detailTab === "accounting" && (() => {
           const record = itcRecords?.[agency.code] ?? null;
-          const fmtMoney = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD" });
           const statusColor = (s: ITCStatus) => s === "Active" ? "#10B981"
             : s === "Suspended" ? "#F59E0B"
             : s === "Terminated" ? "#EF4444"
             : "#6366F1";
+
+          const SectionHeader = ({ title, first }: { title: string; first?: boolean }) => (
+            <div className={first ? "mb-4" : "mt-8 pt-6 mb-4"} style={first ? undefined : { borderTop: `1px solid ${c.border}` }}>
+              <p className="text-[11px] font-bold uppercase tracking-wider" style={{ ...font, color: c.muted, letterSpacing: "0.08em" }}>{title}</p>
+            </div>
+          );
+
+          const YesNo = ({ v }: { v: boolean }) => (
+            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11.5px] font-semibold"
+              style={{ background: v ? "rgba(16,185,129,0.10)" : (isDark ? "rgba(255,255,255,0.06)" : "#F3F4F6"), color: v ? "#10B981" : c.muted }}>
+              <span className="w-1.5 h-1.5 rounded-full" style={{ background: v ? "#10B981" : (isDark ? "rgba(255,255,255,0.35)" : "#9CA3AF") }} />
+              {v ? "Yes" : "No"}
+            </span>
+          );
 
           // ── Empty state ──
           if (!record && !itcEditing) {
@@ -5269,7 +5408,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                     <AlertCircle className="w-9 h-9 mx-auto mb-3" style={{ color: c.muted }} strokeWidth={1.5} />
                     <p className="text-[15px] font-bold mb-1.5" style={{ ...font, color: c.text }}>Not registered in ITC</p>
                     <p className="text-[12.5px] leading-relaxed max-w-[520px] mx-auto" style={{ ...font, color: c.muted }}>
-                      <b>{agency.name}</b> exists in Norbielink but has no ITC accounting record yet. New producers land here first — the record is created after onboarding completes downstream.
+                      <b>{agency.name}</b> exists in Norbielink but has no ITC producer record yet. New agencies are pushed to ITC via <span style={{ fontFamily: "monospace", fontSize: 12 }}>AddProducer</span> after onboarding completes.
                     </p>
                   </div>
                 </div>
@@ -5280,6 +5419,12 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
           // ── Edit mode ──
           if (itcEditing && itcDraft) {
             const set = <K extends keyof ITCRecord>(k: K, v: ITCRecord[K]) => setItcDraft(prev => prev ? { ...prev, [k]: v } : prev);
+            const YesNoSelect = <K extends keyof ITCRecord>({ k }: { k: K }) => (
+              <select value={String(itcDraft[k])} onChange={e => set(k, (e.target.value === "true") as ITCRecord[K])} style={selectStyle}>
+                <option value="true">Yes</option>
+                <option value="false">No</option>
+              </select>
+            );
             return (
               <div className="flex-1 overflow-y-auto pb-6">
                 <div className="rounded-2xl p-6 mb-6" style={{ background: c.cardBg, border: `1px solid ${c.border}` }}>
@@ -5304,53 +5449,95 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-6 mb-6">
-                    <div>
-                      <label style={labelStyle}>ITC Producer Code:</label>
-                      <input value={itcDraft.itcCode} onChange={e => set("itcCode", e.target.value)} style={inputStyle} />
-                    </div>
-                    <div>
-                      <label style={labelStyle}>Status:</label>
+                  <SectionHeader title="Producer" first />
+                  <div className="grid grid-cols-3 gap-6">
+                    <div><label style={labelStyle}>Producer Code:</label>
+                      <input value={itcDraft.producerCode} onChange={e => set("producerCode", e.target.value)} style={inputStyle} /></div>
+                    <div><label style={labelStyle}>Agent / Broker:</label>
+                      <select value={itcDraft.agentOrBroker} onChange={e => set("agentOrBroker", e.target.value as AgentBroker)} style={selectStyle}>
+                        {(["Agent","Broker"] as AgentBroker[]).map(s => <option key={s} value={s}>{s}</option>)}
+                      </select></div>
+                    <div><label style={labelStyle}>Status:</label>
                       <select value={itcDraft.status} onChange={e => set("status", e.target.value as ITCStatus)} style={selectStyle}>
                         {(["Active","Suspended","Terminated","Pending"] as ITCStatus[]).map(s => <option key={s} value={s}>{s}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <label style={labelStyle}>Payment Terms:</label>
-                      <select value={itcDraft.paymentTerms} onChange={e => set("paymentTerms", e.target.value as PaymentTerms)} style={selectStyle}>
-                        {(["Net 15","Net 30","Net 45","Net 60"] as PaymentTerms[]).map(s => <option key={s} value={s}>{s}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <label style={labelStyle}>Effective Date:</label>
-                      <input value={itcDraft.effectiveDate} onChange={e => set("effectiveDate", e.target.value)} placeholder="MM/DD/YYYY" style={inputStyle} />
-                    </div>
-                    <div>
-                      <label style={labelStyle}>Termination Date:</label>
-                      <input value={itcDraft.terminationDate ?? ""} onChange={e => set("terminationDate", e.target.value || null)} placeholder="—" style={inputStyle} />
-                    </div>
-                    <div>
-                      <label style={labelStyle}>Commission Rate (%):</label>
-                      <input type="number" step="0.1" value={itcDraft.commissionRate} onChange={e => set("commissionRate", Number(e.target.value) || 0)} style={inputStyle} />
-                    </div>
-                    <div>
-                      <label style={labelStyle}>Account Balance ($):</label>
-                      <input type="number" step="0.01" value={itcDraft.accountBalance} onChange={e => set("accountBalance", Number(e.target.value) || 0)} style={inputStyle} />
-                    </div>
-                    <div>
-                      <label style={labelStyle}>Last Payment Date:</label>
-                      <input value={itcDraft.lastPaymentDate} onChange={e => set("lastPaymentDate", e.target.value)} placeholder="MM/DD/YYYY" style={inputStyle} />
-                    </div>
-                    <div>
-                      <label style={labelStyle}>Bank Account (masked):</label>
-                      <input value={itcDraft.bankAccountMasked} onChange={e => set("bankAccountMasked", e.target.value)} placeholder="****0000" style={inputStyle} />
-                    </div>
+                      </select></div>
+                    <div><label style={labelStyle}>Short Name:</label>
+                      <input value={itcDraft.shortName} onChange={e => set("shortName", e.target.value)} style={inputStyle} /></div>
+                    <div className="col-span-2"><label style={labelStyle}>Name:</label>
+                      <input value={itcDraft.name} onChange={e => set("name", e.target.value)} style={inputStyle} /></div>
+                    <div className="col-span-3"><label style={labelStyle}>DBA:</label>
+                      <input value={itcDraft.dba} onChange={e => set("dba", e.target.value)} style={inputStyle} /></div>
                   </div>
 
-                  <div>
-                    <label style={labelStyle}>Notes:</label>
-                    <textarea value={itcDraft.notes} onChange={e => set("notes", e.target.value)}
-                      rows={3} style={{ ...inputStyle, resize: "none" }} />
+                  <SectionHeader title="Contact" />
+                  <div className="grid grid-cols-6 gap-6">
+                    <div className="col-span-6"><label style={labelStyle}>Address:</label>
+                      <input value={itcDraft.address} onChange={e => set("address", e.target.value)} style={inputStyle} /></div>
+                    <div className="col-span-3"><label style={labelStyle}>City:</label>
+                      <input value={itcDraft.city} onChange={e => set("city", e.target.value)} style={inputStyle} /></div>
+                    <div className="col-span-1"><label style={labelStyle}>State:</label>
+                      <input value={itcDraft.state} onChange={e => set("state", e.target.value)} maxLength={2} style={inputStyle} /></div>
+                    <div className="col-span-2"><label style={labelStyle}>Zip:</label>
+                      <input value={itcDraft.zip} onChange={e => set("zip", e.target.value)} style={inputStyle} /></div>
+                    <div className="col-span-2"><label style={labelStyle}>Telephone:</label>
+                      <input value={itcDraft.telephone} onChange={e => set("telephone", e.target.value)} style={inputStyle} /></div>
+                    <div className="col-span-4"><label style={labelStyle}>Email:</label>
+                      <input value={itcDraft.email} onChange={e => set("email", e.target.value)} style={inputStyle} /></div>
+                    <div className="col-span-3"><label style={labelStyle}>Accounting Email:</label>
+                      <input value={itcDraft.accountingEmail} onChange={e => set("accountingEmail", e.target.value)} style={inputStyle} /></div>
+                    <div className="col-span-3"><label style={labelStyle}>Statement Email:</label>
+                      <input value={itcDraft.statementEmail} onChange={e => set("statementEmail", e.target.value)} style={inputStyle} /></div>
+                  </div>
+
+                  <SectionHeader title="Appointment & Compliance" />
+                  <div className="grid grid-cols-3 gap-6">
+                    <div><label style={labelStyle}>Appointment Date:</label>
+                      <input value={itcDraft.appointmentDate} onChange={e => set("appointmentDate", e.target.value)} placeholder="MM/DD/YYYY" style={inputStyle} /></div>
+                    <div><label style={labelStyle}>License No:</label>
+                      <input value={itcDraft.licenseNo} onChange={e => set("licenseNo", e.target.value)} style={inputStyle} /></div>
+                    <div><label style={labelStyle}>License Expires:</label>
+                      <input value={itcDraft.licenseExpires} onChange={e => set("licenseExpires", e.target.value)} placeholder="MM/DD/YYYY" style={inputStyle} /></div>
+                    <div><label style={labelStyle}>E&amp;O Policy No:</label>
+                      <input value={itcDraft.eoPolicyNo} onChange={e => set("eoPolicyNo", e.target.value)} style={inputStyle} /></div>
+                    <div><label style={labelStyle}>E&amp;O Expires:</label>
+                      <input value={itcDraft.eoPolicyExpires} onChange={e => set("eoPolicyExpires", e.target.value)} placeholder="MM/DD/YYYY" style={inputStyle} /></div>
+                    <div /> {/* spacer */}
+                    <div><label style={labelStyle}>Tax ID:</label>
+                      <input value={itcDraft.taxId} onChange={e => set("taxId", e.target.value)} style={inputStyle} /></div>
+                    <div><label style={labelStyle}>1099 Type:</label>
+                      <select value={itcDraft.tax1099Type} onChange={e => set("tax1099Type", e.target.value as Tax1099Type)} style={selectStyle}>
+                        {(["Individual","Corporation","Partnership","LLC"] as Tax1099Type[]).map(s => <option key={s} value={s}>{s}</option>)}
+                      </select></div>
+                    <div><label style={labelStyle}>1099 Name:</label>
+                      <input value={itcDraft.tax1099Name} onChange={e => set("tax1099Name", e.target.value)} style={inputStyle} /></div>
+                  </div>
+
+                  <SectionHeader title="Preferences" />
+                  <div className="grid grid-cols-3 gap-6">
+                    <div><label style={labelStyle}>Email Statements:</label><YesNoSelect k="emailStatements" /></div>
+                    <div><label style={labelStyle}>Direct Deposits:</label><YesNoSelect k="directDeposits" /></div>
+                    <div><label style={labelStyle}>Direct Deposits (Commission Only):</label><YesNoSelect k="directDepositsCommissionOnly" /></div>
+                    <div><label style={labelStyle}>Farmers Agent:</label><YesNoSelect k="farmersAgent" /></div>
+                    <div><label style={labelStyle}>Smart Choice Agent:</label><YesNoSelect k="smartChoiceAgent" /></div>
+                    <div><label style={labelStyle}>PIIB Agent:</label><YesNoSelect k="piibAgent" /></div>
+                  </div>
+
+                  <SectionHeader title="Consolidated Billing" />
+                  <div className="grid grid-cols-3 gap-6">
+                    <div><label style={labelStyle}>Use Consolidated Billing ID:</label><YesNoSelect k="useConsolidatedBillingId" /></div>
+                    <div><label style={labelStyle}>Consolidated Billing ID:</label>
+                      <input value={itcDraft.consolidatedBillingId} onChange={e => set("consolidatedBillingId", e.target.value)} style={inputStyle} /></div>
+                    <div><label style={labelStyle}>Is Consolidated Billing Producer:</label><YesNoSelect k="isConsolidatedBillingProducer" /></div>
+                  </div>
+
+                  <SectionHeader title="Affiliation" />
+                  <div className="grid grid-cols-3 gap-6">
+                    <div><label style={labelStyle}>Is Affiliated With:</label><YesNoSelect k="isAffiliatedWith" /></div>
+                    <div><label style={labelStyle}>Affiliated With ID:</label>
+                      <input value={itcDraft.affiliatedWithId} onChange={e => set("affiliatedWithId", e.target.value)} style={inputStyle} /></div>
+                    <div><label style={labelStyle}>Is Affiliation Main:</label><YesNoSelect k="isAffiliationMain" /></div>
+                    <div className="col-span-3"><label style={labelStyle}>Sub-Producer Name:</label>
+                      <input value={itcDraft.subProducerName} onChange={e => set("subProducerName", e.target.value)} style={inputStyle} /></div>
                   </div>
                 </div>
               </div>
@@ -5366,6 +5553,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                 {record.status}
               </span>
             );
+            const fullAddr = [record.address, [record.city, record.state].filter(Boolean).join(", "), record.zip].filter(Boolean).join(" · ");
             return (
               <div className="flex-1 overflow-y-auto pb-6">
                 <div className="rounded-2xl p-8 mb-8" style={{ background: c.cardBg, border: `1px solid ${c.border}` }}>
@@ -5379,28 +5567,81 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                       <Pencil className="w-3.5 h-3.5" />Edit
                     </button>
                   </div>
+
+                  <SectionHeader title="Producer" first />
                   <div className="grid grid-cols-3 gap-x-12 gap-y-6">
-                    <LabelValue label="ITC Producer Code" value={record.itcCode} />
+                    <LabelValue label="Producer Code" value={record.producerCode} />
+                    <LabelValue label="Agent / Broker" value={record.agentOrBroker} />
                     <div>
                       <p className="text-[13px] font-semibold mb-2" style={{ ...font, color: c.text }}>Status:</p>
                       {statusBadge}
                     </div>
-                    <LabelValue label="Payment Terms" value={record.paymentTerms} />
-                    <LabelValue label="Effective Date" value={record.effectiveDate} />
-                    <LabelValue label="Termination Date" value={record.terminationDate ?? "—"} />
-                    <LabelValue label="Commission Rate" value={`${record.commissionRate.toFixed(1)}%`} />
-                    <LabelValue label="Account Balance" value={
-                      <span style={{ color: record.accountBalance < 0 ? "#EF4444" : c.muted }}>{fmtMoney(record.accountBalance)}</span>
-                    } />
-                    <LabelValue label="Last Payment" value={record.lastPaymentDate} />
-                    <LabelValue label="Bank Account" value={record.bankAccountMasked} />
-                  </div>
-                  {record.notes && (
-                    <div className="mt-8 pt-6" style={{ borderTop: `1px solid ${c.border}` }}>
-                      <p className="text-[13px] font-semibold mb-1" style={{ ...font, color: c.text }}>Notes:</p>
-                      <p className="text-[13px] leading-relaxed" style={{ ...font, color: c.muted }}>{record.notes}</p>
+                    <LabelValue label="Short Name" value={record.shortName || "—"} />
+                    <div className="col-span-2">
+                      <p className="text-[13px] font-semibold mb-1" style={{ ...font, color: c.text }}>Name:</p>
+                      <p className="text-[13px]" style={{ ...font, color: c.muted }}>{record.name}</p>
                     </div>
-                  )}
+                    <div className="col-span-3">
+                      <p className="text-[13px] font-semibold mb-1" style={{ ...font, color: c.text }}>DBA:</p>
+                      <p className="text-[13px]" style={{ ...font, color: c.muted }}>{record.dba || "—"}</p>
+                    </div>
+                  </div>
+
+                  <SectionHeader title="Contact" />
+                  <div className="grid grid-cols-3 gap-x-12 gap-y-6">
+                    <div className="col-span-3">
+                      <p className="text-[13px] font-semibold mb-1" style={{ ...font, color: c.text }}>Address:</p>
+                      <p className="text-[13px]" style={{ ...font, color: c.muted }}>{fullAddr || "—"}</p>
+                    </div>
+                    <LabelValue label="Telephone" value={record.telephone || "—"} />
+                    <div className="col-span-2">
+                      <p className="text-[13px] font-semibold mb-1" style={{ ...font, color: c.text }}>Email:</p>
+                      <p className="text-[13px]" style={{ ...font, color: c.muted }}>{record.email || "—"}</p>
+                    </div>
+                    <LabelValue label="Accounting Email" value={record.accountingEmail || "—"} />
+                    <LabelValue label="Statement Email" value={record.statementEmail || "—"} />
+                  </div>
+
+                  <SectionHeader title="Appointment & Compliance" />
+                  <div className="grid grid-cols-3 gap-x-12 gap-y-6">
+                    <LabelValue label="Appointment Date" value={record.appointmentDate} />
+                    <LabelValue label="License No" value={record.licenseNo || "—"} />
+                    <LabelValue label="License Expires" value={record.licenseExpires || "—"} />
+                    <LabelValue label="E&O Policy No" value={record.eoPolicyNo || "—"} />
+                    <LabelValue label="E&O Expires" value={record.eoPolicyExpires || "—"} />
+                    <div /> {/* spacer */}
+                    <LabelValue label="Tax ID" value={record.taxId || "—"} />
+                    <LabelValue label="1099 Type" value={record.tax1099Type} />
+                    <LabelValue label="1099 Name" value={record.tax1099Name || "—"} />
+                  </div>
+
+                  <SectionHeader title="Preferences" />
+                  <div className="grid grid-cols-3 gap-x-12 gap-y-6">
+                    <LabelValue label="Email Statements"                    value={<YesNo v={record.emailStatements} />} />
+                    <LabelValue label="Direct Deposits"                     value={<YesNo v={record.directDeposits} />} />
+                    <LabelValue label="Direct Deposits (Commission Only)"   value={<YesNo v={record.directDepositsCommissionOnly} />} />
+                    <LabelValue label="Farmers Agent"                       value={<YesNo v={record.farmersAgent} />} />
+                    <LabelValue label="Smart Choice Agent"                  value={<YesNo v={record.smartChoiceAgent} />} />
+                    <LabelValue label="PIIB Agent"                          value={<YesNo v={record.piibAgent} />} />
+                  </div>
+
+                  <SectionHeader title="Consolidated Billing" />
+                  <div className="grid grid-cols-3 gap-x-12 gap-y-6">
+                    <LabelValue label="Use Consolidated Billing ID"        value={<YesNo v={record.useConsolidatedBillingId} />} />
+                    <LabelValue label="Consolidated Billing ID"            value={record.consolidatedBillingId || "—"} />
+                    <LabelValue label="Is Consolidated Billing Producer"   value={<YesNo v={record.isConsolidatedBillingProducer} />} />
+                  </div>
+
+                  <SectionHeader title="Affiliation" />
+                  <div className="grid grid-cols-3 gap-x-12 gap-y-6">
+                    <LabelValue label="Is Affiliated With"      value={<YesNo v={record.isAffiliatedWith} />} />
+                    <LabelValue label="Affiliated With ID"      value={record.affiliatedWithId || "—"} />
+                    <LabelValue label="Is Affiliation Main"     value={<YesNo v={record.isAffiliationMain} />} />
+                    <div className="col-span-3">
+                      <p className="text-[13px] font-semibold mb-1" style={{ ...font, color: c.text }}>Sub-Producer Name:</p>
+                      <p className="text-[13px]" style={{ ...font, color: c.muted }}>{record.subProducerName || "—"}</p>
+                    </div>
+                  </div>
                 </div>
               </div>
             );
@@ -7708,6 +7949,7 @@ export type AgencyDraft = {
   contact: string; email: string;
   bizType: string; taxId: string; website: string;
   phone: string; tollFree: string;
+  npn: string;
   licenseNo: string; licenseExp: string;
   eoPolicyNo: string; eoExp: string;
   agencyBill: boolean; directBill: boolean; premiumFin: boolean;
@@ -7743,6 +7985,7 @@ function AddAgencyForm({ isDark, onSaveForLater, onDiscard, initialDraft, c, btn
   const [website, setWebsite]         = useState(initialDraft?.website ?? "");
   const [phone, setPhone]             = useState(initialDraft?.phone ?? "");
   const [tollFree, setTollFree]       = useState(initialDraft?.tollFree ?? "");
+  const [npn, setNpn]                 = useState(initialDraft?.npn ?? "");
   const [licenseNo, setLicenseNo]     = useState(initialDraft?.licenseNo ?? "");
   const [licenseExp, setLicenseExp]   = useState(initialDraft?.licenseExp ?? "03/24/2026");
   const [eoPolicyNo, setEoPolicyNo]   = useState(initialDraft?.eoPolicyNo ?? "");
@@ -7893,7 +8136,7 @@ function AddAgencyForm({ isDark, onSaveForLater, onDiscard, initialDraft, c, btn
     sameAddress, mCountry, mStreet, mCity, mState, mZip,
     status, apptDate, contact, email,
     bizType, taxId, website, phone, tollFree,
-    licenseNo, licenseExp, eoPolicyNo, eoExp,
+    npn, licenseNo, licenseExp, eoPolicyNo, eoExp,
     agencyBill, directBill, premiumFin,
     affiliations: Array.from(affiliations), workersComp: Array.from(workersComp),
     badges: Array.from(badges),
@@ -8294,7 +8537,7 @@ function AddAgencyForm({ isDark, onSaveForLater, onDiscard, initialDraft, c, btn
             <div />
           </div>
 
-          {/* License + Expiry */}
+          {/* License + Expiry + NPN */}
           <div className="grid grid-cols-3 gap-6 mb-6">
             <div>
               <label style={labelStyle}>License Number:</label>
@@ -8307,7 +8550,12 @@ function AddAgencyForm({ isDark, onSaveForLater, onDiscard, initialDraft, c, btn
               <label style={labelStyle}>Expiration Date:</label>
               <DatePicker value={licenseExp} onChange={setLicenseExp} inputStyle={inputStyle} c={c as any} btnGrad={btnGrad} font={font} />
             </div>
-            <div />
+            <div>
+              <label style={labelStyle}>NPN:</label>
+              <input value={npn}
+                onChange={e => setNpn(e.target.value)}
+                placeholder="National Producer Number" style={inputStyle} inputMode="numeric" />
+            </div>
           </div>
 
           {/* E&O Policy + Expiry */}
