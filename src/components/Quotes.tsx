@@ -205,6 +205,12 @@ export default function Quotes({ isDark }: { isDark: boolean }) {
   });
 
   const sorted = [...filtered].sort((a, b) => {
+    // Group by status when a multi-status card is active (e.g. "Sold & Approved",
+    // "Action Required"). Rows with the same status cluster together; within each
+    // group the user's chosen column sort still applies below.
+    if (statusFilter.size > 1 && a.status !== b.status) {
+      return a.status < b.status ? -1 : 1;
+    }
     let av: string | number = ""; let bv: string | number = "";
     if (sortKey === "createdDate")         { av = new Date(a.created).getTime();   bv = new Date(b.created).getTime(); }
     else if (sortKey === "effectiveDate")  { av = new Date(a.effective).getTime(); bv = new Date(b.effective).getTime(); }
