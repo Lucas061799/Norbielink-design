@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Lightbulb, ClipboardCheck, ChevronRight, Sparkles } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Lightbulb, ClipboardCheck, ChevronRight, Sparkles, ExternalLink, X } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 // 3×3 dot grid — the "apps" affordance shown in the design; lucide's LayoutGrid
@@ -162,6 +162,7 @@ export default function Marketplace({ isDark = false }: MarketplaceProps) {
   const tileHover = isDark ? "rgba(166,20,195,0.10)" : "rgba(166,20,195,0.06)";
 
   const [filter, setFilter] = useState<"All" | PromoCategory>("All");
+  const [inlandOpen, setInlandOpen] = useState(false);
   // Hero is HIGHLIGHTS[0] and stays fixed regardless of filter. The rest of
   // the list is what the tabs toggle. "All" bypasses the category check.
   const visibleMinis = HIGHLIGHTS.slice(1).filter(
@@ -265,6 +266,7 @@ export default function Marketplace({ isDark = false }: MarketplaceProps) {
               return (
                 <button
                   key={cat.label}
+                  onClick={cat.label === "Inland Marine" ? () => setInlandOpen(true) : undefined}
                   className="group flex flex-col items-center justify-center gap-3 rounded-2xl transition-all cursor-pointer"
                   style={{
                     background: cardBg,
@@ -583,6 +585,7 @@ export default function Marketplace({ isDark = false }: MarketplaceProps) {
         </aside>
       </div>
 
+      <InlandMarineModal open={inlandOpen} onClose={() => setInlandOpen(false)} />
     </div>
   );
 }
@@ -634,5 +637,179 @@ function QuickCard({ icon, title, subtitle, surface, border, heading, muted }: Q
       </div>
       <ChevronRight className="w-4 h-4 flex-shrink-0" style={{ color: "#A614C3" }} strokeWidth={2.25} />
     </a>
+  );
+}
+
+interface InlandMarineModalProps {
+  open: boolean;
+  onClose: () => void;
+}
+
+// Modal opened from the Inland Marine tile. Structure mirrors the legacy
+// index.html #inlandModal: a hero Marketplace card (btis) with partner logos,
+// two direct-portal cards (USLI, Great American), then a "New offering"
+// divider and a Farm & Agriculture Equipment portal card that funnels into
+// the same shop-flow.
+function InlandMarineModal({ open, onClose }: InlandMarineModalProps) {
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  const cardStyle: React.CSSProperties = {
+    border: "1px solid #E5E7EB",
+    borderRadius: 10,
+    padding: "0 16px",
+    height: 72,
+    background: "#ffffff",
+    display: "flex",
+    alignItems: "center",
+    gap: 25,
+    cursor: "pointer",
+    transition: "border-color 0.15s ease",
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ background: "rgba(0,0,0,0.45)", fontFamily: "var(--font-montserrat), Montserrat, sans-serif" }}
+      onClick={onClose}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          background: "#ffffff",
+          border: "1px solid #E5E7EB",
+          borderRadius: 16,
+          boxShadow: "0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)",
+          width: 512,
+          maxWidth: "calc(100% - 32px)",
+          maxHeight: "calc(100vh - 40px)",
+          overflowY: "auto",
+        }}
+      >
+        {/* Header */}
+        <div style={{ padding: "29px 26px 16px", borderBottom: "1px solid #F3F4F6", display: "flex", flexDirection: "column", gap: 19 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ padding: "4px 14px", border: "1.5px solid #A614C3", borderRadius: 15, color: "#A614C3", fontWeight: 500, fontSize: 12, lineHeight: "14px" }}>
+              Inland Marine
+            </span>
+            <button
+              onClick={onClose}
+              aria-label="Close"
+              style={{ background: "none", border: "none", cursor: "pointer", color: "#9CA3AF", width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
+            >
+              <X size={20} strokeWidth={1.8} />
+            </button>
+          </div>
+          <h3 style={{ fontWeight: 400, fontSize: 24, lineHeight: "28px", color: "#101828", margin: 0 }}>
+            Where would you like to shop?
+          </h3>
+        </div>
+
+        {/* Body */}
+        <div style={{ padding: "16px 20px 29px", display: "flex", flexDirection: "column", gap: 14 }}>
+          {/* Marketplace hero card */}
+          <div
+            style={{ border: "1px solid #E5E7EB", borderRadius: 15, padding: 22, background: "#ffffff", display: "flex", flexDirection: "column", gap: 11, cursor: "pointer", transition: "border-color 0.15s ease" }}
+            onMouseEnter={e => (e.currentTarget.style.borderColor = "#A614C3")}
+            onMouseLeave={e => (e.currentTarget.style.borderColor = "#E5E7EB")}
+          >
+            <div style={{ display: "flex", gap: 18, paddingLeft: 6, alignItems: "flex-start" }}>
+              <div style={{ width: 80, height: 80, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/vendor-logos/btis.png" alt="btis" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
+              </div>
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", minHeight: 80 }}>
+                <div style={{ fontWeight: 400, fontSize: 18, lineHeight: "26px", color: "#101828" }}>Inland Marine Marketplace</div>
+                <div style={{ fontWeight: 400, fontSize: 12, lineHeight: "16px", color: "#4A5565", marginTop: 2 }}>One app. Multiple quotes. Get options from Great American and Rivet.</div>
+              </div>
+              <ExternalLink size={19} color="#E3E3E3" strokeWidth={1.8} style={{ flexShrink: 0, marginTop: 15 }} />
+            </div>
+            <hr style={{ border: 0, borderTop: "1px solid #E5E7EB", margin: 0 }} />
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", alignItems: "center", justifyItems: "center", height: 50, transform: "translateY(3px)" }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/vendor-logos/levanta.png" alt="Levanta" style={{ maxHeight: 34, objectFit: "contain" }} />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/vendor-logos/rivet.png" alt="Rivet" style={{ maxHeight: 30, objectFit: "contain" }} />
+            </div>
+          </div>
+
+          {/* USLI portal card */}
+          <div
+            style={cardStyle}
+            onMouseEnter={e => (e.currentTarget.style.borderColor = "#A614C3")}
+            onMouseLeave={e => (e.currentTarget.style.borderColor = "#E5E7EB")}
+          >
+            <div style={{ width: 88, height: 50, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/vendor-logos/usli.png" alt="USLI" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
+            </div>
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", gap: 2 }}>
+              <div style={{ fontWeight: 400, fontSize: 14.5, lineHeight: "18px", color: "#101828" }}>Inland Marine</div>
+              <div style={{ fontWeight: 400, fontSize: 12, lineHeight: "16px", color: "#4A5565" }}>Quote directly in the USLI portal.</div>
+            </div>
+            <ExternalLink size={19} color="#E3E3E3" strokeWidth={1.8} style={{ flexShrink: 0 }} />
+          </div>
+
+          {/* Great American portal card */}
+          <div
+            style={cardStyle}
+            onMouseEnter={e => (e.currentTarget.style.borderColor = "#A614C3")}
+            onMouseLeave={e => (e.currentTarget.style.borderColor = "#E5E7EB")}
+          >
+            <div style={{ width: 88, height: 50, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/vendor-logos/great-american.png" alt="Great American" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
+            </div>
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", gap: 2 }}>
+              <div style={{ fontWeight: 400, fontSize: 14.5, lineHeight: "18px", color: "#101828" }}>Inland Marine</div>
+              <div style={{ fontWeight: 400, fontSize: 12, lineHeight: "16px", color: "#4A5565" }}>Quote directly in the Great American portal.</div>
+            </div>
+            <ExternalLink size={19} color="#E3E3E3" strokeWidth={1.8} style={{ flexShrink: 0 }} />
+          </div>
+
+          {/* NEW OFFERING divider */}
+          <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "2px 0" }}>
+            <span style={{ fontWeight: 700, fontSize: 10.5, color: "#ffffff", background: "#79c879", letterSpacing: "1px", padding: "3px 10px", borderRadius: 3, textTransform: "uppercase" }}>
+              New offering
+            </span>
+            <span style={{ flex: 1, height: 1, background: "#E5E7EB" }} />
+          </div>
+
+          {/* Farm & Agriculture portal card */}
+          <div
+            style={cardStyle}
+            onMouseEnter={e => (e.currentTarget.style.borderColor = "#A614C3")}
+            onMouseLeave={e => (e.currentTarget.style.borderColor = "#E5E7EB")}
+          >
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: "#ffffff", border: "1px solid #E5E7EB", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <span
+                className="material-symbols-outlined"
+                style={{
+                  fontSize: 24,
+                  fontVariationSettings: "'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24",
+                  background: "linear-gradient(135deg, #5C2ED4 0%, #A614C3 65%, #A614C3 100%)",
+                  WebkitBackgroundClip: "text",
+                  backgroundClip: "text",
+                  color: "transparent",
+                }}
+              >
+                agriculture
+              </span>
+            </div>
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", gap: 2 }}>
+              <div style={{ fontWeight: 400, fontSize: 14.5, lineHeight: "18px", color: "#101828" }}>Farm &amp; Agriculture Equipment</div>
+              <div style={{ fontWeight: 400, fontSize: 12, lineHeight: "16px", color: "#4A5565" }}>Coverage for farm and agricultural equipment.</div>
+            </div>
+            <ExternalLink size={19} color="#E3E3E3" strokeWidth={1.8} style={{ flexShrink: 0 }} />
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
