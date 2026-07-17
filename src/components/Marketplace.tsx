@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Lightbulb, ClipboardCheck, ChevronRight, Sparkles, ExternalLink, X } from "lucide-react";
+import { Lightbulb, ClipboardCheck, ChevronRight, Sparkles, ExternalLink, X, User, Home, Key, HeartHandshake, Trophy, Heart, Briefcase } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 // 3×3 dot grid — the "apps" affordance shown in the design; lucide's LayoutGrid
@@ -37,7 +37,6 @@ const CATEGORIES: { label: string; icon: string; noDark?: boolean }[] = [
   { label: "Professional Liability",       icon: "Professional Liability" },
   { label: "Cannabis",                     icon: "Cannabis" },
   { label: "Home Based Business",          icon: "Home Based Business" },
-  { label: "Non-Profit",                   icon: "Non-Profit" },
   { label: "Pollution Liability",          icon: "Pollution" },
   { label: "Builders Risk",                icon: "Builders Risk" },
   { label: "Inland Marine",                icon: "Inland Marine" },
@@ -46,6 +45,10 @@ const CATEGORIES: { label: string; icon: string; noDark?: boolean }[] = [
   { label: "Vacant Risks",                 icon: "Vacant Risks" },
   { label: "Special Events",               icon: "Special Events", noDark: true },
   { label: "Truckers GL",                  icon: "Truckers GL" },
+  // Personal + Affinity are placeholder rows for new lines of business. Icons reuse
+  // existing art (Home Based Business / Non-Profit) until dedicated icons ship.
+  { label: "Personal Lines",               icon: "Home Based Business" },
+  { label: "Affinity Lines",               icon: "Non-Profit" },
 ];
 
 type PromoCategory = "Products" | "Contests" | "Promotions" | "Learning";
@@ -163,6 +166,8 @@ export default function Marketplace({ isDark = false }: MarketplaceProps) {
 
   const [filter, setFilter] = useState<"All" | PromoCategory>("All");
   const [inlandOpen, setInlandOpen] = useState(false);
+  const [personalOpen, setPersonalOpen] = useState(false);
+  const [affinityOpen, setAffinityOpen] = useState(false);
   // Hero is HIGHLIGHTS[0] and stays fixed regardless of filter. The rest of
   // the list is what the tabs toggle. "All" bypasses the category check.
   const visibleMinis = HIGHLIGHTS.slice(1).filter(
@@ -266,7 +271,12 @@ export default function Marketplace({ isDark = false }: MarketplaceProps) {
               return (
                 <button
                   key={cat.label}
-                  onClick={cat.label === "Inland Marine" ? () => setInlandOpen(true) : undefined}
+                  onClick={
+                    cat.label === "Inland Marine"   ? () => setInlandOpen(true)
+                    : cat.label === "Personal Lines" ? () => setPersonalOpen(true)
+                    : cat.label === "Affinity Lines" ? () => setAffinityOpen(true)
+                    : undefined
+                  }
                   className="group flex flex-col items-center justify-center gap-3 rounded-2xl transition-all cursor-pointer"
                   style={{
                     background: cardBg,
@@ -586,6 +596,18 @@ export default function Marketplace({ isDark = false }: MarketplaceProps) {
       </div>
 
       <InlandMarineModal open={inlandOpen} onClose={() => setInlandOpen(false)} />
+      <PortalListModal
+        open={personalOpen}
+        onClose={() => setPersonalOpen(false)}
+        pill="Personal Lines"
+        cards={PERSONAL_LINES_CARDS}
+      />
+      <PortalListModal
+        open={affinityOpen}
+        onClose={() => setAffinityOpen(false)}
+        pill="Affinity Lines"
+        cards={AFFINITY_LINES_CARDS}
+      />
     </div>
   );
 }
@@ -808,6 +830,158 @@ function InlandMarineModal({ open, onClose }: InlandMarineModalProps) {
             </div>
             <ExternalLink size={19} color="#E3E3E3" strokeWidth={1.8} style={{ flexShrink: 0 }} />
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Shop-flow popup for personal / affinity lines ─────────────────────────
+// Both tiles open the same layout: pill header + "Where would you like to
+// shop?" question + a vertical list of portal cards. Ported from the legacy
+// site (norbielink-legacy-view.vercel.app) with the app's design tokens.
+interface PortalCard {
+  title: string;
+  desc: string;
+  Icon?: LucideIcon;
+  // Optional escape hatch for icons whose Lucide equivalent doesn't render right
+  // with a gradient stroke (e.g. the `h.01` dot-window trick paints nothing when
+  // the stroke is `url(#…)` because the sub-pixel path has no bounding box).
+  customIcon?: React.ReactNode;
+}
+
+// Building icon with proper `<circle>` windows so the gradient stroke actually
+// renders — matches the legacy .portal-icon-badge Condominium icon.
+const CondoBuildingIcon = (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
+    stroke="url(#portalIconGradient)" strokeWidth={1.75}
+    strokeLinecap="round" strokeLinejoin="round">
+    <rect x="4" y="2" width="16" height="20" rx="2" />
+    <path d="M9 22v-4h6v4" />
+    {/* Windows painted as solid-purple filled circles (gradient fill on 1.6px
+        circles gets swallowed by SVG's per-element bounding box math, so use
+        the gradient endpoint color instead). */}
+    {[6, 10, 14].map(y => [8, 12, 16].map(x => (
+      <circle key={`${x}-${y}`} cx={x} cy={y} r="0.9" fill="#A614C3" stroke="none" />
+    )))}
+  </svg>
+);
+
+const PERSONAL_LINES_CARDS: PortalCard[] = [
+  { title: "Personal Lines",          desc: "Homeowners, families, and individual policyholders.",   Icon: User },
+  { title: "Rental Dwellings",        desc: "Landlords, property owners, and real estate investors.", Icon: Home },
+  { title: "Renters Coverage (HO4)",  desc: "Apartment renters, tenants, and young professionals.",  Icon: Key },
+  { title: "Condominium Unit Owners", desc: "Condo owners, co-op residents & townhome buyers.",      customIcon: CondoBuildingIcon },
+];
+
+const AFFINITY_LINES_CARDS: PortalCard[] = [
+  { title: "Non-Profit",             desc: "Foundations, religious orgs & community groups.",     Icon: HeartHandshake },
+  { title: "Sport Teams",            desc: "Youth leagues, adult rec teams, and tournaments.",    Icon: Trophy },
+  { title: "Charities",              desc: "501(c)(3)s, food banks, and fundraising orgs.",       Icon: Heart },
+  { title: "Business Associations",  desc: "Chambers, trade groups, and professional networks.",  Icon: Briefcase },
+];
+
+interface PortalListModalProps {
+  open: boolean;
+  onClose: () => void;
+  pill: string;
+  cards: PortalCard[];
+}
+
+function PortalListModal({ open, onClose, pill, cards }: PortalListModalProps) {
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ background: "rgba(0,0,0,0.45)", fontFamily: "var(--font-montserrat), Montserrat, sans-serif" }}
+      onClick={onClose}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          background: "#ffffff",
+          border: "1px solid #E5E7EB",
+          borderRadius: 16,
+          boxShadow: "0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)",
+          width: 512,
+          maxWidth: "calc(100% - 32px)",
+          maxHeight: "calc(100vh - 40px)",
+          overflowY: "auto",
+        }}
+      >
+        {/* Header */}
+        <div style={{ padding: "29px 26px 16px", borderBottom: "1px solid #F3F4F6", display: "flex", flexDirection: "column", gap: 19 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ padding: "4px 14px", border: "1.5px solid #A614C3", borderRadius: 15, color: "#A614C3", fontWeight: 500, fontSize: 12, lineHeight: "14px" }}>
+              {pill}
+            </span>
+            <button
+              onClick={onClose}
+              aria-label="Close"
+              style={{ background: "none", border: "none", cursor: "pointer", color: "#9CA3AF", width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
+            >
+              <X size={20} strokeWidth={1.8} />
+            </button>
+          </div>
+          <h3 style={{ fontWeight: 400, fontSize: 24, lineHeight: "28px", color: "#101828", margin: 0 }}>
+            Where would you like to shop?
+          </h3>
+        </div>
+
+        {/* Body — portal cards. Gradient defs sit once inside a zero-size SVG at
+            the top so every icon below can reference url(#portalIconGradient) —
+            matches the legacy .portal-icon-badge icon stroke gradient. */}
+        <div style={{ padding: "16px 20px 29px", display: "flex", flexDirection: "column", gap: 12 }}>
+          <svg width="0" height="0" style={{ position: "absolute" }} aria-hidden="true">
+            <defs>
+              <linearGradient id="portalIconGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#5C2ED4" />
+                <stop offset="65%" stopColor="#A614C3" />
+                <stop offset="100%" stopColor="#A614C3" />
+              </linearGradient>
+            </defs>
+          </svg>
+          {cards.map(({ title, desc, Icon, customIcon }) => (
+            <div
+              key={title}
+              style={{
+                border: "1px solid #E5E7EB",
+                borderRadius: 12,
+                padding: "14px 16px",
+                background: "#ffffff",
+                display: "flex",
+                alignItems: "center",
+                gap: 14,
+                cursor: "pointer",
+                transition: "border-color 0.15s ease",
+              }}
+              onMouseEnter={e => (e.currentTarget.style.borderColor = "#A614C3")}
+              onMouseLeave={e => (e.currentTarget.style.borderColor = "#E5E7EB")}
+            >
+              <div style={{
+                width: 44, height: 44, flexShrink: 0, borderRadius: 12,
+                background: "#ffffff", border: "1px solid #E5E7EB",
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                {customIcon
+                  ? customIcon
+                  : Icon ? <Icon size={22} stroke="url(#portalIconGradient)" strokeWidth={1.75} /> : null}
+              </div>
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+                <div style={{ fontWeight: 500, fontSize: 14.5, lineHeight: "18px", color: "#101828" }}>{title}</div>
+                <div style={{ fontWeight: 400, fontSize: 12, lineHeight: "16px", color: "#4A5565" }}>{desc}</div>
+              </div>
+              <ExternalLink size={19} color="#E3E3E3" strokeWidth={1.8} style={{ flexShrink: 0 }} />
+            </div>
+          ))}
         </div>
       </div>
     </div>
