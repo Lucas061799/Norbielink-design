@@ -26,7 +26,10 @@ interface MarketplaceProps {
 
 // Left-column tiles. `icon` is the base filename in /public/insurance-icons/;
 // dark variant is inferred as "<icon> Dark.png" unless `noDark` is true.
-const CATEGORIES: { label: string; icon: string; noDark?: boolean }[] = [
+// `isNew` opts the tile into a "New" pill badge in the top-right corner —
+// currently on the three shop-flow tiles (Inland Marine + the two newly-
+// added personal/affinity lines).
+const CATEGORIES: { label: string; icon: string; noDark?: boolean; isNew?: boolean }[] = [
   { label: "Contractor General Liability", icon: "General Liability" },
   { label: "Worker's Comp",                icon: "Workers Comp", noDark: true },
   { label: "Non-Contractors GL/BOP",       icon: "Business Owners" },
@@ -39,7 +42,7 @@ const CATEGORIES: { label: string; icon: string; noDark?: boolean }[] = [
   { label: "Home Based Business",          icon: "Home Based Business" },
   { label: "Pollution Liability",          icon: "Pollution" },
   { label: "Builders Risk",                icon: "Builders Risk" },
-  { label: "Inland Marine",                icon: "Inland Marine" },
+  { label: "Inland Marine",                icon: "Inland Marine",           isNew: true },
   { label: "Boat/Marina Contractors GL",   icon: "Marine Contractors" },
   { label: "Cyber Risk",                   icon: "Cyber" },
   { label: "Vacant Risks",                 icon: "Vacant Risks" },
@@ -47,8 +50,8 @@ const CATEGORIES: { label: string; icon: string; noDark?: boolean }[] = [
   { label: "Truckers GL",                  icon: "Truckers GL" },
   // Personal + Affinity are placeholder rows for new lines of business. Icons reuse
   // existing art (Home Based Business / Non-Profit) until dedicated icons ship.
-  { label: "Personal Lines",               icon: "Home Based Business" },
-  { label: "Affinity Lines",               icon: "Non-Profit" },
+  { label: "Personal Lines",               icon: "Home Based Business",     isNew: true },
+  { label: "Affinity Lines",               icon: "Non-Profit",              isNew: true },
 ];
 
 type PromoCategory = "Products" | "Contests" | "Promotions" | "Learning";
@@ -277,7 +280,7 @@ export default function Marketplace({ isDark = false }: MarketplaceProps) {
                     : cat.label === "Affinity Lines" ? () => setAffinityOpen(true)
                     : undefined
                   }
-                  className="group flex flex-col items-center justify-center gap-3 rounded-2xl transition-all cursor-pointer"
+                  className="group flex flex-col items-center justify-center gap-3 rounded-2xl transition-all cursor-pointer relative"
                   style={{
                     background: cardBg,
                     border: `1px solid ${border}`,
@@ -295,6 +298,30 @@ export default function Marketplace({ isDark = false }: MarketplaceProps) {
                     e.currentTarget.style.boxShadow = "none";
                   }}
                 >
+                  {cat.isNew && (
+                    <span
+                      style={{
+                        position: "absolute",
+                        // Center of the badge sits on the top-right rounded corner.
+                        // Tile has rounded-2xl (16px radius); nudging the badge
+                        // half-out both top and right anchors it visually on the arc.
+                        top: -9,
+                        right: -8,
+                        fontFamily: "var(--font-montserrat), Montserrat, sans-serif",
+                        fontSize: 9,
+                        fontWeight: 700,
+                        color: "#fff",
+                        background: "linear-gradient(90deg,#5C2ED4 0%,#A614C3 65%)",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.1em",
+                        padding: "3px 8px",
+                        borderRadius: 9999,
+                        boxShadow: "0 1px 3px rgba(166,20,195,0.35)",
+                      }}
+                    >
+                      New
+                    </span>
+                  )}
                   <span
                     className="flex items-center justify-center rounded-full flex-shrink-0"
                     style={{
@@ -768,8 +795,10 @@ function InlandMarineModal({ open, onClose }: InlandMarineModalProps) {
             onMouseLeave={e => (e.currentTarget.style.borderColor = "#E5E7EB")}
           >
             <div style={{ width: 88, height: 50, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              {/* Fixed render height so USLI and Great American read as equally-sized
+                  logos regardless of their differing natural pixel dimensions. */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/vendor-logos/usli.png" alt="USLI" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
+              <img src="/vendor-logos/usli.png" alt="USLI" style={{ height: 42, width: "auto", maxWidth: "100%", objectFit: "contain" }} />
             </div>
             <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", gap: 2 }}>
               <div style={{ fontWeight: 400, fontSize: 14.5, lineHeight: "18px", color: "#101828" }}>Inland Marine</div>
@@ -786,7 +815,7 @@ function InlandMarineModal({ open, onClose }: InlandMarineModalProps) {
           >
             <div style={{ width: 88, height: 50, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/vendor-logos/great-american.png" alt="Great American" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
+              <img src="/vendor-logos/great-american.png" alt="Great American" style={{ height: 42, width: "auto", maxWidth: "100%", objectFit: "contain" }} />
             </div>
             <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", gap: 2 }}>
               <div style={{ fontWeight: 400, fontSize: 14.5, lineHeight: "18px", color: "#101828" }}>Inland Marine</div>
