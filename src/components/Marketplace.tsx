@@ -48,10 +48,10 @@ const CATEGORIES: { label: string; icon: string; noDark?: boolean; isNew?: boole
   { label: "Vacant Risks",                 icon: "Vacant Risks" },
   { label: "Special Events",               icon: "Special Events", noDark: true },
   { label: "Truckers GL",                  icon: "Truckers GL" },
-  // Personal + Affinity are placeholder rows for new lines of business. Icons reuse
-  // existing art (Home Based Business / Non-Profit) until dedicated icons ship.
-  { label: "Personal Lines",               icon: "Home Based Business",     isNew: true },
-  { label: "Affinity Lines",               icon: "Non-Profit",              isNew: true },
+  // Both have dedicated art now. `noDark: true` because only the light variants
+  // exist so far — remove that flag once "<icon> Dark.png" ships.
+  { label: "Personal Lines",               icon: "Personal Lines",          isNew: true, noDark: true },
+  { label: "Affinity Lines",               icon: "Affinity Lines",          isNew: true, noDark: true },
 ];
 
 type PromoCategory = "Products" | "Contests" | "Promotions" | "Learning";
