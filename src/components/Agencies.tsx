@@ -10093,7 +10093,10 @@ export default function Agencies({ isDark, clientMode = false }: { isDark: boole
               const activeKey = tab === "users" ? usersStatKey
                                : tab === "affiliations" ? affStatKey
                                : filterStatus;
-              const clickable = card.key !== "New";
+              // "New" is intentionally disabled on the Users / Agencies tabs (no filter
+              // logic wired), but under Affiliations it's a functional filter (agencies
+              // active in the last 12 months), so let it click through there.
+              const clickable = card.key !== "New" || tab === "affiliations";
               // "All" acts as a neutral "reset" — clickable, but never shows
               // the active gradient border regardless of which tab.
               const active = clickable && card.key !== "All" && activeKey === card.key;
@@ -10628,6 +10631,21 @@ export default function Agencies({ isDark, clientMode = false }: { isDark: boole
 
       {/* Affiliations tab content — master/detail layout */}
       {tab === "affiliations" && (() => {
+        // KPI-card status filter — `affStatKey` is set when the user taps one of the
+        // Total / New / Appointed / Unappointed cards. Reused here to narrow the
+        // agencies inside each affiliation row (and drop rows that empty out).
+        // `cutoff` / `parseLast` are redeclared locally because the KPI IIFE that
+        // originally defined them isn't in scope from this block.
+        const now = new Date();
+        const cutoff = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+        const parseLast = (s: string) => { const d = new Date(s); return isNaN(d.getTime()) ? new Date(0) : d; };
+        const statusMatches = (a: Agency) => {
+          if (affStatKey === "All")         return true;
+          if (affStatKey === "New")         return parseLast(a.lastLogin) >= cutoff;
+          if (affStatKey === "Appointed")   return a.status === "Appointed";
+          if (affStatKey === "Unappointed") return a.status === "Unappointed";
+          return true;
+        };
         const affMap = new Map<string, Agency[]>();
         for (const a of allAgencies) {
           for (const aff of a.affiliations) {
@@ -10637,7 +10655,11 @@ export default function Agencies({ isDark, clientMode = false }: { isDark: boole
         }
         const q = search.trim().toLowerCase();
         const allAffRows = Array.from(affMap.entries())
-          .map(([name, ags]) => ({ name, agencies: ags, count: ags.length }))
+          .map(([name, ags]) => {
+            const kept = ags.filter(statusMatches);
+            return { name, agencies: kept, count: kept.length };
+          })
+          .filter(r => r.count > 0) // drop affiliations that emptied out under the KPI filter
           .filter(r => !q || r.name.toLowerCase().includes(q) || r.agencies.some(a => a.name.toLowerCase().includes(q)))
           .sort((a, b) => a.name.localeCompare(b.name));
         // When user has multi-selected via the filter, narrow the list and (for 2+) show a combined view on the right.
