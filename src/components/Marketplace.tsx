@@ -48,10 +48,9 @@ const CATEGORIES: { label: string; icon: string; noDark?: boolean; isNew?: boole
   { label: "Vacant Risks",                 icon: "Vacant Risks" },
   { label: "Special Events",               icon: "Special Events", noDark: true },
   { label: "Truckers GL",                  icon: "Truckers GL" },
-  // Both have dedicated art now. `noDark: true` because only the light variants
-  // exist so far — remove that flag once "<icon> Dark.png" ships.
-  { label: "Personal Lines",               icon: "Personal Lines",          isNew: true, noDark: true },
-  { label: "Affinity Lines",               icon: "Affinity Lines",          isNew: true, noDark: true },
+  // Dedicated light + dark art shipped for both.
+  { label: "Personal Lines",               icon: "Personal Lines",          isNew: true },
+  { label: "Affinity Lines",               icon: "Affinity Lines",          isNew: true },
 ];
 
 type PromoCategory = "Products" | "Contests" | "Promotions" | "Learning";
