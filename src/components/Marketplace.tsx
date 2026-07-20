@@ -798,7 +798,7 @@ function InlandMarineModal({ open, onClose }: InlandMarineModalProps) {
               {/* Fixed render height so USLI and Great American read as equally-sized
                   logos regardless of their differing natural pixel dimensions. */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/vendor-logos/usli.png" alt="USLI" style={{ height: 42, width: "auto", maxWidth: "100%", objectFit: "contain" }} />
+              <img src="/vendor-logos/usli.png" alt="USLI" style={{ height: 32, width: "auto", maxWidth: "100%", objectFit: "contain" }} />
             </div>
             <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", gap: 2 }}>
               <div style={{ fontWeight: 400, fontSize: 14.5, lineHeight: "18px", color: "#101828" }}>Inland Marine</div>
@@ -815,7 +815,7 @@ function InlandMarineModal({ open, onClose }: InlandMarineModalProps) {
           >
             <div style={{ width: 88, height: 50, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/vendor-logos/great-american.png" alt="Great American" style={{ height: 42, width: "auto", maxWidth: "100%", objectFit: "contain" }} />
+              <img src="/vendor-logos/great-american.png" alt="Great American" style={{ height: 32, width: "auto", maxWidth: "100%", objectFit: "contain" }} />
             </div>
             <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", gap: 2 }}>
               <div style={{ fontWeight: 400, fontSize: 14.5, lineHeight: "18px", color: "#101828" }}>Inland Marine</div>
@@ -826,7 +826,7 @@ function InlandMarineModal({ open, onClose }: InlandMarineModalProps) {
 
           {/* NEW OFFERING divider */}
           <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "2px 0" }}>
-            <span style={{ fontWeight: 700, fontSize: 10.5, color: "#ffffff", background: "#79c879", letterSpacing: "1px", padding: "3px 10px", borderRadius: 3, textTransform: "uppercase" }}>
+            <span style={{ fontWeight: 700, fontSize: 10.5, color: "#ffffff", background: "linear-gradient(90deg,#5C2ED4 0%,#A614C3 65%)", letterSpacing: "1px", padding: "3px 10px", borderRadius: 3, textTransform: "uppercase" }}>
               New offering
             </span>
             <span style={{ flex: 1, height: 1, background: "#E5E7EB" }} />
