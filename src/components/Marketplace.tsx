@@ -50,7 +50,7 @@ const CATEGORIES: { label: string; icon: string; noDark?: boolean; isNew?: boole
   { label: "Truckers GL",                  icon: "Truckers GL" },
   // Dedicated light + dark art shipped for both.
   { label: "Personal Lines",               icon: "Personal Lines",          isNew: true },
-  { label: "Affinity Lines",               icon: "Affinity Lines",          isNew: true },
+  { label: "Non-Profit Risks",             icon: "Affinity Lines",          isNew: true },
 ];
 
 type PromoCategory = "Products" | "Contests" | "Promotions" | "Learning";
@@ -276,7 +276,7 @@ export default function Marketplace({ isDark = false }: MarketplaceProps) {
                   onClick={
                     cat.label === "Inland Marine"   ? () => setInlandOpen(true)
                     : cat.label === "Personal Lines" ? () => setPersonalOpen(true)
-                    : cat.label === "Affinity Lines" ? () => setAffinityOpen(true)
+                    : cat.label === "Non-Profit Risks" ? () => setAffinityOpen(true)
                     : undefined
                   }
                   className="group flex flex-col items-center justify-center gap-3 rounded-2xl transition-all cursor-pointer relative"
@@ -631,7 +631,7 @@ export default function Marketplace({ isDark = false }: MarketplaceProps) {
       <PortalListModal
         open={affinityOpen}
         onClose={() => setAffinityOpen(false)}
-        pill="Affinity Lines"
+        pill="Non-Profit Risks"
         cards={AFFINITY_LINES_CARDS}
       />
     </div>
@@ -896,7 +896,6 @@ const CondoBuildingIcon = (
 );
 
 const PERSONAL_LINES_CARDS: PortalCard[] = [
-  { title: "Personal Lines",          desc: "Homeowners, families, and individual policyholders.",   Icon: User },
   { title: "Rental Dwellings",        desc: "Landlords, property owners, and real estate investors.", Icon: Home },
   { title: "Renters Coverage (HO4)",  desc: "Apartment renters, tenants, and young professionals.",  Icon: Key },
   { title: "Condominium Unit Owners", desc: "Condo owners, co-op residents & townhome buyers.",      customIcon: CondoBuildingIcon },
