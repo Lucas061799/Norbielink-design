@@ -171,10 +171,36 @@ function DatePicker({ value, onChange, inputStyle, c, btnGrad, font }: {
   );
 }
 
-type SearchBy = "Policy Number" | "Submission ID" | "Named Insured";
-type View = "search" | "form" | "success";
+type SearchBy = "Select" | "Policy Number" | "DBA" | "Applicant Name" | "Bond Number";
+type View = "search" | "results" | "form" | "success";
 
-const SEARCH_OPTIONS: SearchBy[] = ["Policy Number", "Submission ID", "Named Insured"];
+// Mock results table returned after a "find a policy" search. Static list so
+// every search resolves to the same set — this is a design mock, not a real
+// lookup. Row shape mirrors the legacy view's policy grid so a real backend
+// can drop in without touching the render.
+interface SearchResult {
+  submissionId: string;
+  policyNumber: string;
+  applicant: string;
+  lob: string;
+  dba: string;
+  status: "Bound" | "Cancelled" | "Pending";
+  effective: string;
+}
+const SEARCH_RESULTS: SearchResult[] = [
+  { submissionId: "VIC00003362",     policyNumber: "7038911131",     applicant: "Pizza Club LLC, Pizza Club BT LLC",      lob: "Victor",         dba: "--",                                status: "Cancelled", effective: "07/19/2026" },
+  { submissionId: "VIC00003355",     policyNumber: "P102117404",     applicant: "MONTICELLO STAFFING LLC",                lob: "Victor",         dba: "--",                                status: "Bound",     effective: "07/20/2026" },
+  { submissionId: "QMWC0750104-E47", policyNumber: "WCB11144570800", applicant: "SB DE Production Test 2 LLC",            lob: "Worker's Comp",  dba: "SB DE Production Test 2 LLC",       status: "Bound",     effective: "05/11/2026" },
+  { submissionId: "QMWC0748621-E43", policyNumber: "WCB11144570700", applicant: "SB PA Production Test 3",                lob: "Worker's Comp",  dba: "SB PA Production Test 3",           status: "Bound",     effective: "05/29/2026" },
+  { submissionId: "QMWC0754121-E48", policyNumber: "WCB11144570600", applicant: "SB Test 2 LLC",                          lob: "Worker's Comp",  dba: "SB Test 2 LLC",                     status: "Bound",     effective: "05/11/2026" },
+  { submissionId: "QMWC0638232-E1",  policyNumber: "CWC03611900",    applicant: "OJM RENOVATIONS LLC",                    lob: "Worker's Comp",  dba: "OJM RENOVATIONS",                   status: "Cancelled", effective: "09/26/2025" },
+  { submissionId: "QMWC0583874-E1",  policyNumber: "CWC01145503",    applicant: "DG Construction LLC",                    lob: "Worker's Comp",  dba: "DG Construction",                   status: "Cancelled", effective: "09/11/2025" },
+  { submissionId: "QMWC0583845-E1",  policyNumber: "CWC01144203",    applicant: "DRYWALL SOLUTIONS LTD (A Corp)",         lob: "Worker's Comp",  dba: "DRYWALL SOLUTIONS LTD",             status: "Cancelled", effective: "09/11/2025" },
+  { submissionId: "QMWC0579022-E2",  policyNumber: "CWC01115103",    applicant: "Liam Russell",                           lob: "Worker's Comp",  dba: "R Pro Marlin Plumbing",             status: "Cancelled", effective: "09/06/2025" },
+  { submissionId: "QMWC0579023-E2",  policyNumber: "CWC01114603",    applicant: "WHITE GRAPE PAINTING INC",               lob: "Worker's Comp",  dba: "WHITE GRAPE PAINTING INC",          status: "Cancelled", effective: "09/06/2025" },
+];
+
+const SEARCH_OPTIONS: SearchBy[] = ["Select", "Policy Number", "DBA", "Applicant Name", "Bond Number"];
 const LOBS = [
   "General Liability", "Worker's Comp", "Commercial Auto", "Property",
   "Professional Liability", "Cyber Liability", "Builder's Risk", "Bonds",
@@ -231,10 +257,17 @@ export default function Endorsements({ isDark }: { isDark: boolean }) {
 
   const handleSearch = () => {
     if (!searchValue.trim()) return;
-    // Mock: always "not found" — goes to form view
+    // Mock: always resolves to the static SEARCH_RESULTS list. A real backend
+    // would filter by (searchBy, searchValue) and populate `results` here.
+    setView("results");
+  };
+
+  // Row click on the results table → prefill the endorsement form and open it.
+  const handleSelectResult = (r: SearchResult) => {
+    setPolicyNumber(r.policyNumber);
+    setNamedInsured(r.applicant);
+    setEffectiveDate(r.effective);
     setView("form");
-    if (searchBy === "Policy Number") setPolicyNumber(searchValue);
-    if (searchBy === "Named Insured") setNamedInsured(searchValue);
   };
 
   const handleSubmit = () => {
@@ -243,7 +276,10 @@ export default function Endorsements({ isDark }: { isDark: boolean }) {
   };
 
   const handleBack = () => {
-    setView("search");
+    // If the user got to the form by picking a row on the results table, drop
+    // them back on that table so they can pick a different policy without
+    // re-typing their search.
+    setView(searchValue.trim() ? "results" : "search");
   };
 
   const toggleLob = (v: string) => {
@@ -288,7 +324,7 @@ export default function Endorsements({ isDark }: { isDark: boolean }) {
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto" style={{ paddingBottom: 48 }}>
-        {view === "search" && (
+        {(view === "search" || view === "results") && (
           <div className="flex flex-col gap-6">
           {/* Top stroke is painted as a 4px-tall background-image at the top of the card
               instead of a child div. The card's rounded-2xl naturally clips the gradient
@@ -365,6 +401,7 @@ export default function Endorsements({ isDark }: { isDark: boolean }) {
             </div>
           </div>
 
+          {view === "search" && (<>
           {/* How it works */}
           <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
             {[
@@ -439,6 +476,71 @@ export default function Endorsements({ isDark }: { isDark: boolean }) {
               );
             })}
           </div>
+          </>)}
+
+          {view === "results" && (<>
+            {/* Results table — the persistent search card above already gives the user
+                a way to change the query, so we skip the "Results for X — N matches"
+                summary row.
+
+                Sort arrows + status chip mirror the Policies / Quotes list styling so
+                the results here read as part of the same table system. */}
+            <div className="rounded-2xl overflow-hidden"
+              style={{ background: c.cardBg, border: `1px solid ${c.border}`, boxShadow: isDark ? "none" : "0 1px 3px rgba(15,23,42,0.04)" }}>
+              <div className="grid px-6 py-3 gap-4"
+                style={{ gridTemplateColumns: "1.3fr 1.2fr 1.6fr 1fr 1.4fr 0.9fr 0.9fr", borderBottom: `1px solid ${c.border}`, background: c.mutedBg }}>
+                {["Submission ID", "Policy Number", "Applicant", "LOB", "DBA", "Status", "Effective"].map(h => (
+                  <div key={h} className="flex items-center text-[11px] font-bold uppercase tracking-wider"
+                    style={{ fontFamily: FONT, color: c.muted }}>
+                    {h}
+                    <span className="inline-flex ml-0.5">
+                      <svg width="14" height="9" viewBox="0 0 14 9" fill="none">
+                        <path d="M4 8V1M4 1L2 3M4 1L6 3" stroke={c.sub} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M10 1V8M10 8L8 6M10 8L12 6" stroke={c.sub} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </span>
+                  </div>
+                ))}
+              </div>
+              {SEARCH_RESULTS.map((r, i, arr) => {
+                // Colored dot per status; chip itself uses the neutral bg so it
+                // reads as part of the Policies / Quotes chip family. Bound uses
+                // the brand teal (matches Policies' Sold/Issued dot).
+                const statusDot = r.status === "Bound"     ? "#73C9B7"  // brand teal
+                                : r.status === "Pending"   ? "#F59E0B"  // amber
+                                :                            "#EF4444"; // red — Cancelled
+                return (
+                  <button key={r.submissionId + "-" + i} onClick={() => handleSelectResult(r)}
+                    className="grid px-6 py-3.5 items-center gap-4 transition-colors w-full text-left"
+                    style={{
+                      gridTemplateColumns: "1.3fr 1.2fr 1.6fr 1fr 1.4fr 0.9fr 0.9fr",
+                      borderBottom: i !== arr.length - 1 ? `1px solid ${c.border}` : "none",
+                      background: "transparent",
+                      fontFamily: FONT,
+                      cursor: "pointer",
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+                    onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                    <div className="text-[12px] font-semibold" style={{ color: c.text }}>{r.submissionId}</div>
+                    <div className="text-[12px]" style={{ color: c.text }}>{r.policyNumber}</div>
+                    <div className="text-[12px]" style={{ color: c.text }}>{r.applicant}</div>
+                    <div className="text-[12px]" style={{ color: c.muted }}>{r.lob}</div>
+                    <div className="text-[12px]" style={{ color: c.muted }}>{r.dba}</div>
+                    <div className="flex items-center">
+                      <span
+                        className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-[3px] rounded-md whitespace-nowrap"
+                        style={{ fontFamily: FONT, background: c.mutedBg, color: c.text, border: `1px solid ${c.border}` }}
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: statusDot }} />
+                        {r.status}
+                      </span>
+                    </div>
+                    <div className="text-[12px]" style={{ color: c.muted }}>{r.effective}</div>
+                  </button>
+                );
+              })}
+            </div>
+          </>)}
           </div>
         )}
 
