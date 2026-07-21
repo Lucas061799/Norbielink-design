@@ -49,7 +49,7 @@ const CATEGORIES: { label: string; icon: string; noDark?: boolean; isNew?: boole
   { label: "Special Events",               icon: "Special Events", noDark: true },
   { label: "Truckers GL",                  icon: "Truckers GL" },
   // Dedicated light + dark art shipped for both.
-  { label: "Personal Property",            icon: "Personal Lines",          isNew: true },
+  { label: "Personal Lines",               icon: "Personal Lines",          isNew: true },
   { label: "Non-Profit Risks",             icon: "Affinity Lines",          isNew: true },
 ];
 
@@ -275,7 +275,7 @@ export default function Marketplace({ isDark = false }: MarketplaceProps) {
                   key={cat.label}
                   onClick={
                     cat.label === "Inland Marine"   ? () => setInlandOpen(true)
-                    : cat.label === "Personal Property" ? () => setPersonalOpen(true)
+                    : cat.label === "Personal Lines" ? () => setPersonalOpen(true)
                     : cat.label === "Non-Profit Risks" ? () => setAffinityOpen(true)
                     : undefined
                   }
@@ -625,7 +625,7 @@ export default function Marketplace({ isDark = false }: MarketplaceProps) {
       <PortalListModal
         open={personalOpen}
         onClose={() => setPersonalOpen(false)}
-        pill="Personal Property"
+        pill="Personal Lines"
         cards={PERSONAL_LINES_CARDS}
       />
       <PortalListModal
