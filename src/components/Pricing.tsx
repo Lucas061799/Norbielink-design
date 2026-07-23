@@ -64,6 +64,9 @@ const TIERS: Tier[] = [
       "Award-Winning Support",
       "Knowledge Base Access",
       "Basic Reporting",
+      "Enhanced security with MFA",
+      "Faster than the legacy view",
+      "One place for Endorsement Requests",
     ],
   },
   {
@@ -89,9 +92,9 @@ const TIERS: Tier[] = [
   {
     key: "business",
     name: "Business",
-    monthly: "$25",
-    annual:  "$300",
-    priceSubtext: "per agency/month · Billed annually ($300/year)",
+    monthly: "$12.42",
+    annual:  "$149",
+    priceSubtext: "per agency/month · Billed annually ($149/year)",
     cta: "Start Free Trial",
     priceChip: "Free Trial Available",
     badge: { label: "Most popular", tone: "gold" },
