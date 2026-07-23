@@ -63,7 +63,6 @@ const TIERS: Tier[] = [
       "Quote & Policy Management",
       "Award-Winning Support",
       "Knowledge Base Access",
-      "Basic Reporting",
       "Enhanced security with MFA",
       "Faster than the legacy view",
       "One place for Endorsement Requests",
