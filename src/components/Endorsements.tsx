@@ -442,10 +442,14 @@ export default function Endorsements({ isDark }: { isDark: boolean }) {
                     <div className="text-[12px]" style={{ color: c.text }}>{r.applicant}</div>
                     <div className="text-[12px]" style={{ color: c.muted }}>{r.lob}</div>
                     <div className="text-[12px]" style={{ color: c.muted }}>{r.dba}</div>
-                    <div className="flex items-center justify-start">
+                    <div className="flex items-center">
+                      {/* Matches the Policies table status pill (neutral chip
+                          + border + colored dot + dark text). Shifted -21px
+                          so the STATUS text sits flush with the header text,
+                          not offset by the pill's border+padding+dot+gap. */}
                       <span
-                        className="inline-flex items-center gap-1.5 text-[11px] font-medium py-[3px] rounded-md whitespace-nowrap"
-                        style={{ fontFamily: FONT, background: c.mutedBg, color: c.text, border: `1px solid ${c.border}`, paddingLeft: 8, paddingRight: 10, marginLeft: -9 }}
+                        className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-[3px] rounded-md whitespace-nowrap"
+                        style={{ fontFamily: FONT, background: c.mutedBg, color: c.text, border: `1px solid ${c.border}`, marginLeft: -21 }}
                       >
                         <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: statusDot }} />
                         {r.status}
