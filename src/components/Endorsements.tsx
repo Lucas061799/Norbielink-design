@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Search, ChevronDown, X, Send, ClipboardList, Clock, CheckCircle2 } from "lucide-react";
+import { Search, ChevronDown, X, Send, ClipboardList, Clock, CheckCircle2, Check } from "lucide-react";
 import EndorsementIntake from "./EndorsementIntake";
 
 const FONT = "var(--font-montserrat), Montserrat, sans-serif";
@@ -35,6 +35,17 @@ const SEARCH_RESULTS: SearchResult[] = [
   { submissionId: "QMWC0583845-E1",  policyNumber: "CWC01144203",    applicant: "DRYWALL SOLUTIONS LTD (A Corp)",         lob: "Worker's Comp",  dba: "DRYWALL SOLUTIONS LTD",             status: "Incomplete",            effective: "09/11/2025" },
   { submissionId: "QMWC0579022-E2",  policyNumber: "CWC01115103",    applicant: "Liam Russell",                           lob: "Worker's Comp",  dba: "R Pro Marlin Plumbing",             status: "Cancelled",             effective: "09/06/2025" },
   { submissionId: "QMWC0579023-E2",  policyNumber: "CWC01114603",    applicant: "WHITE GRAPE PAINTING INC",               lob: "Worker's Comp",  dba: "WHITE GRAPE PAINTING INC",          status: "Bound",                 effective: "09/06/2025" },
+  { submissionId: "QMWC0612344-E1",  policyNumber: "CWC02233401",    applicant: "Harbor Marine Co.",                      lob: "Worker's Comp",  dba: "Harbor Marine",                     status: "Bound",                 effective: "08/22/2025" },
+  { submissionId: "QMWC0620011-E1",  policyNumber: "CWC02241802",    applicant: "Sunrise Bakery LLC",                     lob: "Worker's Comp",  dba: "Sunrise Bakery",                    status: "Bound",                 effective: "08/15/2025" },
+  { submissionId: "QMWC0611893-E1",  policyNumber: "CWC02220505",    applicant: "Metro Construction Inc",                 lob: "Worker's Comp",  dba: "Metro Construction",                status: "Incomplete",            effective: "08/01/2025" },
+  { submissionId: "VIC00003401",     policyNumber: "7038933210",     applicant: "Acme Logistics LLC",                     lob: "Victor",         dba: "Acme Logistics",                    status: "Bound",                 effective: "07/28/2025" },
+  { submissionId: "QMWC0599221-E1",  policyNumber: "CWC02015902",    applicant: "Redwood Landscaping",                    lob: "Worker's Comp",  dba: "Redwood Landscaping",               status: "Submission Incomplete", effective: "07/15/2025" },
+  { submissionId: "QMWC0587123-E1",  policyNumber: "CWC01988307",    applicant: "Beacon Roofing Group",                   lob: "Worker's Comp",  dba: "Beacon Roofing",                    status: "Bound",                 effective: "06/30/2025" },
+  { submissionId: "QMWC0575840-E1",  policyNumber: "CWC01875501",    applicant: "Silverline Plumbing Corp",               lob: "Worker's Comp",  dba: "Silverline Plumbing",               status: "Cancelled",             effective: "06/12/2025" },
+  { submissionId: "VIC00003388",     policyNumber: "P102998214",     applicant: "Northgate Property Mgmt",                lob: "Victor",         dba: "Northgate PM",                      status: "Incomplete",            effective: "05/24/2025" },
+  { submissionId: "QMWC0564012-E1",  policyNumber: "CWC01712208",    applicant: "Everglade Cleaning Svcs",                lob: "Worker's Comp",  dba: "Everglade Cleaning",                status: "Bound",                 effective: "05/10/2025" },
+  { submissionId: "QMWC0552911-E1",  policyNumber: "CWC01640904",    applicant: "Peak Performance HVAC",                  lob: "Worker's Comp",  dba: "Peak HVAC",                         status: "Cancelled",             effective: "04/25/2025" },
+  { submissionId: "QMWC0548023-E1",  policyNumber: "CWC01592013",    applicant: "Bluewater Marine Contractors",           lob: "Worker's Comp",  dba: "Bluewater Marine",                  status: "Submission Incomplete", effective: "04/09/2025" },
 ];
 
 const SEARCH_OPTIONS: SearchBy[] = ["Select", "Policy Number", "DBA", "Applicant Name", "Bond Number"];
@@ -61,6 +72,11 @@ export default function Endorsements({ isDark }: { isDark: boolean }) {
   const [statusFilter, setStatusFilter] = useState<Set<PolicyStatus>>(new Set());
   const [statusFilterOpen, setStatusFilterOpen] = useState(false);
 
+  // Pagination — matches the Policies table footer (10 / 20 / 50 per page).
+  const [page, setPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [pageSizeOpen, setPageSizeOpen] = useState(false);
+
   const c = {
     text:         isDark ? "#F9FAFB" : "#1F2937",
     muted:        isDark ? "#8B8FA8" : "#6B7280",
@@ -75,7 +91,7 @@ export default function Endorsements({ isDark }: { isDark: boolean }) {
     ? "radial-gradient(171.32% 99.33% at 33.13% -9%, #282550 0%, #191735 55.82%, rgba(0,0,0,0.3) 74%, rgba(0,0,0,0) 100%), linear-gradient(88.34deg, #5C2ED4 0.11%, #A614C3 63.8%)"
     : "linear-gradient(90deg,#5C2ED4 0%,#A614C3 65%)";
 
-  const closeAll = () => { setSearchByOpen(false); setStatusFilterOpen(false); };
+  const closeAll = () => { setSearchByOpen(false); setStatusFilterOpen(false); setPageSizeOpen(false); };
 
   const toggleStatus = (s: PolicyStatus) => {
     setStatusFilter(prev => {
@@ -83,10 +99,16 @@ export default function Endorsements({ isDark }: { isDark: boolean }) {
       if (next.has(s)) next.delete(s); else next.add(s);
       return next;
     });
+    setPage(1); // reset to first page whenever the filter changes
   };
   const filteredResults = statusFilter.size > 0
     ? SEARCH_RESULTS.filter(r => statusFilter.has(r.status))
     : SEARCH_RESULTS;
+  const totalPages   = Math.max(1, Math.ceil(filteredResults.length / itemsPerPage));
+  const currentPage  = Math.min(page, totalPages);
+  const pagedResults = filteredResults.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const rangeStart   = filteredResults.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1;
+  const rangeEnd     = Math.min(currentPage * itemsPerPage, filteredResults.length);
 
   const handleSearch = () => {
     if (!searchValue.trim()) return;
@@ -169,14 +191,17 @@ export default function Endorsements({ isDark }: { isDark: boolean }) {
       )}
 
       {view !== "form" && (
-      <div className="flex-1 min-h-0 overflow-y-auto" style={{ paddingBottom: 48 }}>
+      <div
+        className={view === "results" ? "flex-1 min-h-0 flex flex-col" : "flex-1 min-h-0 overflow-y-auto"}
+        style={view === "results" ? undefined : { paddingBottom: 48 }}
+      >
         {(view === "search" || view === "results") && (
-          <div className="flex flex-col gap-6">
+          <div className={view === "results" ? "flex flex-col gap-3 flex-1 min-h-0" : "flex flex-col gap-6"}>
           {/* Top stroke is painted as a 4px-tall background-image at the top of the card
               instead of a child div. The card's rounded-2xl naturally clips the gradient
               to a real 16px corner — a child div with border-radius would get clamped to
               ~2px because the browser caps corner radius at half the element's height. */}
-          <div className="rounded-2xl"
+          <div className="rounded-2xl flex-shrink-0"
             style={{
               backgroundColor: c.cardBg,
               backgroundImage: "linear-gradient(90deg,#5C2ED4 0%,#A614C3 65%)",
@@ -188,9 +213,13 @@ export default function Endorsements({ isDark }: { isDark: boolean }) {
               borderBottom: `1px solid ${c.border}`,
               boxShadow: isDark ? "none" : "0 1px 3px rgba(15,23,42,0.04)",
             }}>
-            <div className="px-8 py-8">
-              <div className="text-[15px] font-semibold mb-1" style={{ color: c.text }}>Find a policy to endorse</div>
-              <div className="text-[13px] mb-6" style={{ color: c.muted }}>Search by policy number, submission ID, or insured name.</div>
+            <div className={view === "results" ? "px-6 py-4" : "px-8 py-8"}>
+              {view !== "results" && (
+                <>
+                  <div className="text-[15px] font-semibold mb-1" style={{ color: c.text }}>Find a policy to endorse</div>
+                  <div className="text-[13px] mb-6" style={{ color: c.muted }}>Search by policy number, submission ID, or insured name.</div>
+                </>
+              )}
 
               <div className="flex items-end gap-3" onClick={e => e.stopPropagation()}>
                 <div className="flex-1" style={{ maxWidth: 240 }}>
@@ -331,9 +360,12 @@ export default function Endorsements({ isDark }: { isDark: boolean }) {
 
                 Sort arrows + status chip mirror the Policies / Quotes list styling so
                 the results here read as part of the same table system. */}
-            <div className="rounded-2xl overflow-hidden"
+            <div className="rounded-2xl overflow-hidden flex flex-col flex-1 min-h-0"
               style={{ background: c.cardBg, border: `1px solid ${c.border}`, boxShadow: isDark ? "none" : "0 1px 3px rgba(15,23,42,0.04)" }}>
-              <div className="grid px-6 py-3 gap-4"
+              {/* Header + body share ONE scroll context so column widths stay
+                  aligned when the body scrolls (Policies pattern). */}
+              <div className="flex-1 min-h-0 overflow-y-auto">
+              <div className="grid px-6 py-3 gap-4 sticky top-0 z-10"
                 style={{ gridTemplateColumns: "1.3fr 1.2fr 1.6fr 1fr 1.4fr 0.9fr 0.9fr", borderBottom: `1px solid ${c.border}`, background: c.mutedBg }}>
                 {["Submission ID", "Policy Number", "Applicant", "LOB", "DBA", "Status", "Effective"].map(h => {
                   const isStatus = h === "Status";
@@ -417,7 +449,7 @@ export default function Endorsements({ isDark }: { isDark: boolean }) {
                   );
                 })}
               </div>
-              {filteredResults.map((r, i, arr) => {
+              {pagedResults.map((r, i, arr) => {
                 // Colored dot per status; chip itself uses the neutral bg so it
                 // reads as part of the Policies / Quotes chip family. Bound uses
                 // the brand teal (matches Policies' Sold/Issued dot).
@@ -464,6 +496,100 @@ export default function Endorsements({ isDark }: { isDark: boolean }) {
                   No policies match this filter.
                 </div>
               )}
+              </div>{/* /scroll body */}
+
+              {/* Pagination footer — pinned at the bottom of the card. */}
+              {(() => {
+                const atFirst = currentPage === 1;
+                const atLast  = currentPage === totalPages;
+                return (
+                  <div
+                    className="flex items-center justify-between gap-3 px-5 py-3 flex-wrap"
+                    style={{ borderTop: `1px solid ${c.softDivider}` }}
+                    onClick={e => e.stopPropagation()}
+                  >
+                    <span className="text-[11.5px]" style={{ fontFamily: FONT, color: c.muted }}>
+                      {rangeStart} – {rangeEnd} of {filteredResults.length} {filteredResults.length === 1 ? "policy" : "policies"}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <div className="relative">
+                        <button
+                          onClick={() => { closeAll(); setPageSizeOpen(o => !o); }}
+                          className="flex items-center gap-1.5 pl-2.5 pr-2 py-1.5 rounded-lg cursor-pointer transition-colors text-[11.5px] font-medium"
+                          style={{ fontFamily: FONT, background: c.cardBg, border: `1px solid ${c.border}`, color: c.text }}
+                          onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+                          onMouseLeave={e => (e.currentTarget.style.background = c.cardBg)}
+                        >
+                          1 – {itemsPerPage}
+                          <ChevronDown className="w-3 h-3 transition-transform duration-200" style={{ opacity: 0.6, transform: pageSizeOpen ? "rotate(180deg)" : "rotate(0deg)" }} />
+                        </button>
+                        {pageSizeOpen && (
+                          <div
+                            className="absolute right-0 z-30 rounded-lg overflow-hidden py-1 min-w-[110px]"
+                            style={{
+                              bottom: "calc(100% + 6px)",
+                              background: c.cardBg,
+                              border: `1px solid ${c.border}`,
+                              boxShadow: "0 12px 28px rgba(15,23,42,0.10), 0 4px 8px rgba(15,23,42,0.04)",
+                            }}
+                          >
+                            {[10, 20, 50].map(n => {
+                              const active = itemsPerPage === n;
+                              return (
+                                <button
+                                  key={n}
+                                  onClick={() => { setItemsPerPage(n); setPage(1); setPageSizeOpen(false); }}
+                                  className="w-full px-2.5 py-1.5 text-left text-[11.5px] flex items-center gap-2 cursor-pointer transition-colors"
+                                  style={{ fontFamily: FONT, color: active ? "#A614C3" : c.text, fontWeight: active ? 600 : 500, background: "transparent" }}
+                                  onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+                                  onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                                >
+                                  <Check className="w-3 h-3 flex-shrink-0" style={{ opacity: active ? 1 : 0, color: "#A614C3" }} />
+                                  <span className="whitespace-nowrap">1 – {n}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => setPage(p => Math.max(1, p - 1))}
+                        disabled={atFirst}
+                        className="text-[11.5px] font-medium px-3 py-1.5 rounded-lg transition-colors"
+                        style={{
+                          fontFamily: FONT,
+                          border: `1px solid ${c.border}`,
+                          color: c.text,
+                          background: c.cardBg,
+                          opacity: atFirst ? 0.5 : 1,
+                          cursor: atFirst ? "not-allowed" : "pointer",
+                        }}
+                        onMouseEnter={e => { if (!atFirst) e.currentTarget.style.background = c.hoverBg; }}
+                        onMouseLeave={e => (e.currentTarget.style.background = c.cardBg)}
+                      >
+                        Previous
+                      </button>
+                      <button
+                        onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                        disabled={atLast}
+                        className="text-[11.5px] font-medium px-3 py-1.5 rounded-lg transition-colors"
+                        style={{
+                          fontFamily: FONT,
+                          border: `1px solid ${c.border}`,
+                          color: c.text,
+                          background: c.cardBg,
+                          opacity: atLast ? 0.5 : 1,
+                          cursor: atLast ? "not-allowed" : "pointer",
+                        }}
+                        onMouseEnter={e => { if (!atLast) e.currentTarget.style.background = c.hoverBg; }}
+                        onMouseLeave={e => (e.currentTarget.style.background = c.cardBg)}
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           </>)}
           </div>
