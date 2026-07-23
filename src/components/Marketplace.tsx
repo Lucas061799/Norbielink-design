@@ -778,49 +778,6 @@ function InlandMarineModal({ open, onClose }: InlandMarineModalProps) {
               </div>
               <ExternalLink size={19} color="#E3E3E3" strokeWidth={1.8} style={{ flexShrink: 0, marginTop: 15 }} />
             </div>
-            <hr style={{ border: 0, borderTop: "1px solid #E5E7EB", margin: 0 }} />
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", alignItems: "center", justifyItems: "center", height: 50, transform: "translateY(3px)" }}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/vendor-logos/levanta.png" alt="Levanta" style={{ maxHeight: 34, objectFit: "contain" }} />
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/vendor-logos/rivet.png" alt="Rivet" style={{ maxHeight: 30, objectFit: "contain" }} />
-            </div>
-          </div>
-
-          {/* USLI portal card */}
-          <div
-            style={cardStyle}
-            onMouseEnter={e => (e.currentTarget.style.borderColor = "#A614C3")}
-            onMouseLeave={e => (e.currentTarget.style.borderColor = "#E5E7EB")}
-          >
-            <div style={{ width: 88, height: 50, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-              {/* Fixed render height so USLI and Great American read as equally-sized
-                  logos regardless of their differing natural pixel dimensions. */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/vendor-logos/usli.png" alt="USLI" style={{ height: 32, width: "auto", maxWidth: "100%", objectFit: "contain" }} />
-            </div>
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", gap: 2 }}>
-              <div style={{ fontWeight: 400, fontSize: 14.5, lineHeight: "18px", color: "#101828" }}>Inland Marine</div>
-              <div style={{ fontWeight: 400, fontSize: 12, lineHeight: "16px", color: "#4A5565" }}>Quote directly in the USLI portal.</div>
-            </div>
-            <ExternalLink size={19} color="#E3E3E3" strokeWidth={1.8} style={{ flexShrink: 0 }} />
-          </div>
-
-          {/* Great American portal card */}
-          <div
-            style={cardStyle}
-            onMouseEnter={e => (e.currentTarget.style.borderColor = "#A614C3")}
-            onMouseLeave={e => (e.currentTarget.style.borderColor = "#E5E7EB")}
-          >
-            <div style={{ width: 88, height: 50, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/vendor-logos/great-american.png" alt="Great American" style={{ height: 32, width: "auto", maxWidth: "100%", objectFit: "contain" }} />
-            </div>
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", gap: 2 }}>
-              <div style={{ fontWeight: 400, fontSize: 14.5, lineHeight: "18px", color: "#101828" }}>Inland Marine</div>
-              <div style={{ fontWeight: 400, fontSize: 12, lineHeight: "16px", color: "#4A5565" }}>Quote directly in the Great American portal.</div>
-            </div>
-            <ExternalLink size={19} color="#E3E3E3" strokeWidth={1.8} style={{ flexShrink: 0 }} />
           </div>
 
           {/* NEW OFFERING divider */}
