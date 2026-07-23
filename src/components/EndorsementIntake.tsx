@@ -1,18 +1,39 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { ArrowLeft, Check, ChevronDown, FileText, Paperclip, Plus, X } from "lucide-react";
+import {
+  ArrowLeft, Check, ChevronDown, ChevronRight, Clock, FileText, Paperclip, Plus, Save, Send, Trash2, X,
+} from "lucide-react";
 import { DatePicker } from "./DatePicker";
 
 const FONT = "var(--font-montserrat), Montserrat, sans-serif";
 
-// Restyled port of the "Structured Endorsement Intake" prototype. The prototype
-// used a 3-column shell (nav + form + gate) with amber/beige colors and phase
-// pills — we collapsed it to the app's single-card pattern (search card style)
-// with tabs on top and a slim requirements-count footer, then dropped all the
-// dev-scaffolding chrome (phase badges, "reusable grid" hints, deferred tiles).
+// Structured Endorsement Intake — feature-complete port of the prototype
+// (norbielink_endorsement_prototype.html) restyled to the -design app
+// language.
+//
+// Content and behavior come 1:1 from the prototype:
+//   • 3-column shell: left page nav (grouped, with phase pills + mini
+//     hints, "Deferred" items shown disabled), center card (eyebrow +
+//     title + subtitle + fields), right rail (Carrier context + Ready-
+//     to-submit gate with live checklist).
+//   • Contact Info — single-source contact page that replaces the old
+//     "email address" + "phone number" endorsement tiles (per Sean).
+//   • MCP 65 — carrier-conditional CNA callout with a Strata forms-
+//     library link (Felicia's rule).
+//   • Class Code / Payroll — reusable grid, Elastic-style typeahead,
+//     nothing pre-fills (agent supplies every value), "Remove" greys
+//     out payroll/headcount, "+ Add line" for multiple changes.
+//   • Live submit gate: per-page required fields + "at least one of a
+//     group" rule + carrier-conditional; clicking a checklist item
+//     scrolls to that field. Submit stays disabled until zero left.
+//
+// Style substitutions from prototype → app:
+//   amber → razz-purple (#A614C3), Inter → Montserrat, beige paper →
+//   white, .card → rounded-2xl + razz 3px top stroke (search-card
+//   pattern), colors from the app palette (#1F2937 / #6B7280 / #E5E7EB).
 
-type IntakePage = "contact" | "mcp65" | "puc" | "classcode";
+type EndorsementType = "contact" | "mcp65" | "puc" | "classcode";
 type Carrier = "amtrust" | "clearspring" | "cna";
 
 interface SelectedPolicy {
@@ -20,21 +41,23 @@ interface SelectedPolicy {
   applicant: string;
   submissionId?: string;
   effective?: string;
+  lob?: string;
+  dba?: string;
+  status?: string;
 }
 
-interface Requirement { label: string; done: boolean }
 interface ClassCodeRow { id: number; action: "Add" | "Edit" | "Remove"; code: string; payroll: string; ft: string; pt: string }
 
 const CLASS_CODES: { code: string; desc: string }[] = [
-  { code: "5190", desc: "Electrical wiring — within buildings" },
+  { code: "5190", desc: "Electrical wiring – within buildings" },
   { code: "5140", desc: "Electrical apparatus installation" },
-  { code: "5403", desc: "Carpentry — dwellings, 3 stories or less" },
-  { code: "5645", desc: "Carpentry — detached dwellings" },
+  { code: "5403", desc: "Carpentry – dwellings, 3 stories or less" },
+  { code: "5645", desc: "Carpentry – detached dwellings" },
   { code: "5474", desc: "Painting NOC & shop operations" },
-  { code: "5551", desc: "Roofing — all kinds" },
-  { code: "8742", desc: "Salespersons / collectors — outside" },
+  { code: "5551", desc: "Roofing – all kinds" },
+  { code: "8742", desc: "Salespersons / collectors – outside" },
   { code: "8810", desc: "Clerical office employees NOC" },
-  { code: "9014", desc: "Buildings — operation by contractors" },
+  { code: "9014", desc: "Buildings – operation by contractors" },
   { code: "6217", desc: "Excavation & grading NOC" },
 ];
 
@@ -51,12 +74,38 @@ const CARRIERS: { key: Carrier; label: string }[] = [
   { key: "cna",         label: "CNA" },
 ];
 
-const PAGES: { key: IntakePage; label: string; title: string; subtitle: string }[] = [
-  { key: "contact",   label: "Contact Info",         title: "Contact Info",         subtitle: "Update the insured or agency contact on file. At least one contact field is required." },
-  { key: "mcp65",     label: "MCP 65",               title: "MCP 65 Filing",        subtitle: "Motor Carrier Permit filing. Carrier-specific requirements appear automatically." },
-  { key: "puc",       label: "PUC Filing",           title: "PUC Filing",           subtitle: "Public Utilities Commission filing request." },
-  { key: "classcode", label: "Class Code / Payroll", title: "Class Code / Payroll", subtitle: "Add, remove, or edit class codes and payroll for the policy." },
+type Phase = "simple" | "medium" | "complex";
+interface NavItem { key: EndorsementType | null; label: string; mini: string; disabled?: boolean }
+const NAV: { label: string; phase: Phase; items: NavItem[] }[] = [
+  {
+    label: "Phase 1 · Test batch", phase: "simple",
+    items: [
+      { key: "contact",   label: "Contact Info",  mini: "3 fields" },
+      { key: "mcp65",     label: "MCP 65",        mini: "carrier rule" },
+      { key: "puc",       label: "PUC Filing",    mini: "2 fields" },
+    ],
+  },
+  {
+    label: "Phase 1 · Core", phase: "medium",
+    items: [
+      { key: "classcode", label: "Class Code / Payroll", mini: "reusable grid" },
+    ],
+  },
+  {
+    label: "Deferred", phase: "complex",
+    items: [
+      { key: null, label: "Location", mini: "reuses grid", disabled: true },
+      { key: null, label: "Entity",   mini: "reuses grid", disabled: true },
+    ],
+  },
 ];
+
+const PAGE_META: Record<EndorsementType, { crumb: string; title: string; subtitle: string }> = {
+  contact:   { crumb: "Phase 1 · Simple", title: "Contact Info",         subtitle: "Update the insured or agency contact on file. At least one contact field is required to submit." },
+  mcp65:     { crumb: "Phase 1 · Simple", title: "MCP 65",               subtitle: "Motor Carrier Permit filing. Carrier-specific requirements appear automatically." },
+  puc:       { crumb: "Phase 1 · Simple", title: "PUC Filing",           subtitle: "Public Utilities Commission filing request." },
+  classcode: { crumb: "Phase 1 · Core · reusable across Location & Entity", title: "Class Code / Payroll", subtitle: "Add, remove, or edit class codes and payroll. This grid is the building block that Location and Entity endorsements reuse." },
+};
 
 interface Props {
   selectedPolicy: SelectedPolicy;
@@ -66,10 +115,11 @@ interface Props {
 }
 
 export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, isDark }: Props) {
-  const [page, setPage] = useState<IntakePage>("contact");
+  const [type, setType] = useState<EndorsementType>("contact");
   const [carrier, setCarrier] = useState<Carrier>("amtrust");
   const [carrierOpen, setCarrierOpen] = useState(false);
 
+  // Per-type form state
   const [contactEff, setContactEff] = useState("");
   const [contactType, setContactType] = useState("");
   const [contactTypeOpen, setContactTypeOpen] = useState(false);
@@ -77,16 +127,13 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
   const [contactLast, setContactLast] = useState("");
   const [contactPhone, setContactPhone] = useState("");
   const [contactEmail, setContactEmail] = useState("");
-  const [contactNotes, setContactNotes] = useState("");
 
   const [mcpEff, setMcpEff] = useState("");
   const [mcpNumber, setMcpNumber] = useState("");
   const [mcpFormAttached, setMcpFormAttached] = useState(false);
-  const [mcpNotes, setMcpNotes] = useState("");
 
   const [pucEff, setPucEff] = useState("");
   const [pucNumber, setPucNumber] = useState("");
-  const [pucNotes, setPucNotes] = useState("");
 
   const [ccEff, setCcEff] = useState("");
   const [ccRows, setCcRows] = useState<ClassCodeRow[]>([
@@ -99,36 +146,56 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
   const [ccState, setCcState] = useState("");
   const [ccStateOpen, setCcStateOpen] = useState(false);
   const [ccZip, setCcZip] = useState("");
-  const [ccNotes, setCcNotes] = useState("");
   const nextRowId = useRef(3);
 
+  const [notes, setNotes] = useState("");
+  const [fileAttached, setFileAttached] = useState(false);
+  const [draftSaved, setDraftSaved] = useState(false);
+
+  // Field refs for the "click checklist item → scroll to field" behavior
+  const fieldRefs = useRef<Record<string, HTMLElement | null>>({});
+  const setRef = (key: string) => (el: HTMLElement | null) => { fieldRefs.current[key] = el; };
+  const focusRef = (key: string) => {
+    const el = fieldRefs.current[key];
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      const focusable = el.querySelector("input, textarea, select, button") as HTMLElement | null;
+      focusable?.focus();
+    }
+  };
+
   const c = {
-    text:         isDark ? "#F9FAFB" : "#1F2937",
-    muted:        isDark ? "#8B8FA8" : "#6B7280",
-    sub:          isDark ? "#6B7280" : "#9CA3AF",
-    cardBg:       isDark ? "#191D35" : "#fff",
-    border:       isDark ? "rgba(255,255,255,0.08)" : "#E5E7EB",
-    borderStrong: isDark ? "rgba(255,255,255,0.18)" : "#D1D5DB",
-    mutedBg:      isDark ? "rgba(255,255,255,0.03)" : "#F9FAFB",
-    hoverBg:      isDark ? "rgba(255,255,255,0.04)" : "#F5F3FF",
-    inputBg:      isDark ? "rgba(255,255,255,0.05)" : "#fff",
-    activeBg:     isDark ? "rgba(166,20,195,0.20)" : "rgba(166,20,195,0.10)",
-    softBg:       isDark ? "rgba(166,20,195,0.12)" : "rgba(166,20,195,0.06)",
-    softBorder:   isDark ? "rgba(166,20,195,0.28)" : "rgba(166,20,195,0.20)",
-    doneText:     isDark ? "#34D399" : "#059669",
-    razz:         "#A614C3",
+    text:       isDark ? "#F9FAFB" : "#1F2937",
+    bodyText:   isDark ? "#C5CAD8" : "#4B5563",
+    muted:      isDark ? "#8B8FA8" : "#6B7280",
+    sub:        isDark ? "#6B7280" : "#9CA3AF",
+    cardBg:     isDark ? "#191D35" : "#ffffff",
+    border:     isDark ? "rgba(255,255,255,0.08)" : "#E5E7EB",
+    softDivider:isDark ? "rgba(255,255,255,0.05)" : "#F3F4F6",
+    inputBg:    isDark ? "rgba(255,255,255,0.05)" : "#ffffff",
+    hoverBg:    isDark ? "rgba(255,255,255,0.04)" : "#F5F3FF",
+    mutedBg:    isDark ? "rgba(255,255,255,0.03)" : "#F9FAFB",
+    helperBg:   isDark ? "rgba(255,255,255,0.03)" : "#FAF9F5",
+    softBg:     isDark ? "rgba(166,20,195,0.14)" : "rgba(166,20,195,0.08)",
+    softBorder: isDark ? "rgba(166,20,195,0.30)" : "rgba(166,20,195,0.22)",
+    razz:       "#A614C3",
+    green:      isDark ? "#34D399" : "#059669",
+    greenBg:    isDark ? "rgba(16,185,129,0.15)" : "rgba(16,185,129,0.10)",
+    greenBorder:isDark ? "rgba(16,185,129,0.30)" : "rgba(16,185,129,0.22)",
+    amber:      "#B45309",
+    amberBg:    isDark ? "rgba(245,158,11,0.15)" : "rgba(245,158,11,0.10)",
+    warnBg:     isDark ? "rgba(239,68,68,0.10)" : "#FEF2F2",
+    warnBorder: isDark ? "rgba(239,68,68,0.30)" : "#FECACA",
   };
   const font = { fontFamily: FONT } as React.CSSProperties;
-  const btnGrad = isDark
-    ? "radial-gradient(171.32% 99.33% at 33.13% -9%, #282550 0%, #191735 55.82%, rgba(0,0,0,0.3) 74%, rgba(0,0,0,0) 100%), linear-gradient(88.34deg, #5C2ED4 0.11%, #A614C3 63.8%)"
-    : "linear-gradient(90deg,#5C2ED4 0%,#A614C3 65%)";
+  const razzGrad = "linear-gradient(90deg,#5C2ED4 0%,#A614C3 65%)";
 
   const inputStyle: React.CSSProperties = {
     fontFamily: FONT,
     background: c.inputBg,
     border: `1px solid ${c.border}`,
     color: c.text,
-    padding: "10px 14px",
+    padding: "9px 12px",
     borderRadius: 10,
     fontSize: 13,
     width: "100%",
@@ -136,7 +203,7 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
   };
   const labelStyle: React.CSSProperties = {
     fontFamily: FONT,
-    color: c.muted,
+    color: c.text,
     fontSize: 13,
     fontWeight: 500,
     marginBottom: 6,
@@ -145,522 +212,828 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
 
   const closeAll = () => { setCarrierOpen(false); setContactTypeOpen(false); setCcStateOpen(false); };
 
-  const meta = PAGES.find(p => p.key === page)!;
-
-  // ─── requirements engine
+  // ─── requirements engine (matches prototype's live submit-gate)
+  interface Requirement { label: string; done: boolean; refKey: string }
   const requirements = useMemo<Requirement[]>(() => {
-    const R = (label: string, done: boolean): Requirement => ({ label, done });
-    switch (page) {
+    const R = (label: string, done: boolean, refKey: string): Requirement => ({ label, done, refKey });
+    switch (type) {
       case "contact": {
         const anyContact = [contactFirst, contactLast, contactPhone, contactEmail].some(v => v.trim());
         return [
-          R("Effective date",             !!contactEff.trim()),
-          R("Contact type",               !!contactType.trim()),
-          R("At least one contact field", anyContact),
+          R("Effective date",             !!contactEff.trim(),          "contact-eff"),
+          R("Contact type",               !!contactType.trim(),         "contact-type"),
+          R("At least one contact field", anyContact,                   "contact-any"),
         ];
       }
       case "mcp65": {
         const base = [
-          R("Effective date", !!mcpEff.trim()),
-          R("MCP 65 number",  !!mcpNumber.trim()),
+          R("Effective date", !!mcpEff.trim(),    "mcp-eff"),
+          R("MCP 65 number",  !!mcpNumber.trim(), "mcp-num"),
         ];
-        if (carrier === "cna") base.push(R("CNA MCP 65 form attached", mcpFormAttached));
+        if (carrier === "cna") base.push(R("CNA MCP 65 form attached", mcpFormAttached, "mcp-form"));
         return base;
       }
       case "puc":
         return [
-          R("Effective date",    !!pucEff.trim()),
-          R("PUC filing number", !!pucNumber.trim()),
+          R("Effective date",    !!pucEff.trim(),    "puc-eff"),
+          R("PUC filing number", !!pucNumber.trim(), "puc-num"),
         ];
       case "classcode": {
         const rowReqs: Requirement[] = ccRows.flatMap((r, i) => {
           const line = i + 1;
-          const items: Requirement[] = [R(`Class code (line ${line})`, !!r.code.trim())];
+          const items: Requirement[] = [R(`Class code (line ${line})`, !!r.code.trim(), `cc-code-${r.id}`)];
           if (r.action !== "Remove") {
-            items.push(R(`Payroll (line ${line})`, !!r.payroll.trim()));
-            items.push(R(`FT (line ${line})`,      r.ft.trim().length > 0));
-            items.push(R(`PT (line ${line})`,      r.pt.trim().length > 0));
+            items.push(R(`Payroll (line ${line})`, !!r.payroll.trim(), `cc-pay-${r.id}`));
+            items.push(R(`FT (line ${line})`,      r.ft.trim().length > 0, `cc-ft-${r.id}`));
+            items.push(R(`PT (line ${line})`,      r.pt.trim().length > 0, `cc-pt-${r.id}`));
           }
           return items;
         });
         return [
-          R("Effective date",    !!ccEff.trim()),
+          R("Effective date",    !!ccEff.trim(),    "cc-eff"),
           ...rowReqs,
-          R("Reason for change", !!ccReason.trim()),
-          R("Location address",  !!ccAddress.trim()),
-          R("City",              !!ccCity.trim()),
-          R("State",             !!ccState.trim()),
-          R("Zip",               !!ccZip.trim()),
+          R("Reason for change", !!ccReason.trim(), "cc-reason"),
+          R("Location address",  !!ccAddress.trim(),"cc-addr"),
+          R("City",              !!ccCity.trim(),   "cc-city"),
+          R("State",             !!ccState.trim(),  "cc-state"),
+          R("Zip",               !!ccZip.trim(),    "cc-zip"),
         ];
       }
     }
   }, [
-    page, carrier,
+    type, carrier,
     contactEff, contactType, contactFirst, contactLast, contactPhone, contactEmail,
     mcpEff, mcpNumber, mcpFormAttached,
     pucEff, pucNumber,
     ccEff, ccRows, ccReason, ccAddress, ccCity, ccState, ccZip,
   ]);
   const outstanding = requirements.filter(r => !r.done).length;
+  const submitReady = outstanding === 0;
 
-  // ─── small render helpers
-  const req = <span style={{ color: "#EF4444", fontWeight: 700, marginLeft: 3 }}>*</span>;
-  const opt = <span style={{ color: c.sub, fontWeight: 400, fontSize: 11, marginLeft: 6 }}>optional</span>;
+  // Per-page completion for the left-nav progress indicators.
+  const isTypeDone = (t: EndorsementType): boolean => {
+    switch (t) {
+      case "contact": {
+        const anyContact = [contactFirst, contactLast, contactPhone, contactEmail].some(v => v.trim());
+        return !!contactEff.trim() && !!contactType.trim() && anyContact;
+      }
+      case "mcp65":
+        return !!mcpEff.trim() && !!mcpNumber.trim() && (carrier !== "cna" || mcpFormAttached);
+      case "puc":
+        return !!pucEff.trim() && !!pucNumber.trim();
+      case "classcode": {
+        const rowsOk = ccRows.every(r => !!r.code.trim() && (r.action === "Remove" || (!!r.payroll.trim() && !!r.ft.trim() && !!r.pt.trim())));
+        return !!ccEff.trim() && rowsOk && !!ccReason.trim() && !!ccAddress.trim() && !!ccCity.trim() && !!ccState.trim() && !!ccZip.trim();
+      }
+    }
+  };
+  const isTypeStarted = (t: EndorsementType): boolean => {
+    switch (t) {
+      case "contact":   return [contactEff, contactType, contactFirst, contactLast, contactPhone, contactEmail].some(v => v.trim());
+      case "mcp65":     return !!mcpEff.trim() || !!mcpNumber.trim() || mcpFormAttached;
+      case "puc":       return !!pucEff.trim() || !!pucNumber.trim();
+      case "classcode": return !!ccEff.trim() || ccRows.some(r => r.code.trim() || r.payroll.trim() || r.ft.trim() || r.pt.trim()) || !!ccReason.trim() || !!ccAddress.trim() || !!ccCity.trim() || !!ccState.trim() || !!ccZip.trim();
+    }
+  };
+  const activeTypes: EndorsementType[] = ["contact", "mcp65", "puc", "classcode"];
+  const pagesDone = activeTypes.filter(isTypeDone).length;
+  const totalPct = Math.round((pagesDone / activeTypes.length) * 100);
 
-  const uploadZone = (attached: boolean, onAttach: () => void) => (
-    <label
-      className="flex flex-col items-center justify-center rounded-xl cursor-pointer transition-colors"
+  const handleSaveDraft = () => { setDraftSaved(true); setTimeout(() => setDraftSaved(false), 2200); };
+
+  // ─── helpers
+  const SectionLabel = ({ children, first }: { children: React.ReactNode; first?: boolean }) => (
+    <div
       style={{
-        background: attached ? c.softBg : "transparent",
-        border: `1.5px dashed ${attached ? c.razz : c.borderStrong}`,
-        minHeight: 92,
-        padding: 14,
+        fontFamily: FONT,
+        fontSize: 12,
+        fontWeight: 700,
+        color: c.text,
+        textTransform: "uppercase",
+        letterSpacing: "0.05em",
+        margin: first ? "6px 0 8px" : "22px 0 8px",
+        paddingTop: first ? 0 : 16,
+        borderTop: first ? "none" : `1px solid ${c.softDivider}`,
       }}
-      onClick={onAttach}
-      onMouseEnter={e => { e.currentTarget.style.background = c.hoverBg; e.currentTarget.style.borderColor = c.razz; }}
-      onMouseLeave={e => { e.currentTarget.style.background = attached ? c.softBg : "transparent"; e.currentTarget.style.borderColor = attached ? c.razz : c.borderStrong; }}
     >
-      <Paperclip className="w-4 h-4 mb-1.5" style={{ color: c.razz }} />
-      <span className="text-[12.5px] font-medium" style={{ fontFamily: FONT, color: c.text }}>
-        {attached ? "Document attached" : "Drag a file here or click to browse"}
-      </span>
-      <span className="text-[11px] mt-0.5" style={{ fontFamily: FONT, color: c.muted }}>PDF, JPG, PNG · Max 10MB</span>
-    </label>
+      {children}
+    </div>
   );
 
+  const Helper = ({ children, warn }: { children: React.ReactNode; warn?: boolean }) => (
+    <div
+      style={{
+        fontFamily: FONT,
+        fontSize: 12.5,
+        color: c.muted,
+        margin: "0 0 12px",
+        padding: "9px 12px",
+        background: warn ? c.warnBg : c.helperBg,
+        border: `1px solid ${warn ? c.warnBorder : c.border}`,
+        borderRadius: 8,
+      }}
+    >
+      {children}
+    </div>
+  );
+
+  const req = <span style={{ color: "#EF4444", fontWeight: 700, marginLeft: 2 }}>*</span>;
+  const opt = <span style={{ color: c.sub, fontWeight: 400, fontSize: 11, marginLeft: 6 }}>optional</span>;
+
+  const Field = ({ label, children, required, optional, hint, refKey }: {
+    label?: React.ReactNode; children: React.ReactNode; required?: boolean; optional?: boolean;
+    hint?: React.ReactNode; refKey?: string;
+  }) => (
+    <div style={{ margin: "14px 0" }} ref={refKey ? setRef(refKey) : undefined}>
+      {label && (
+        <label style={labelStyle}>
+          {label}{required && req}{optional && opt}
+        </label>
+      )}
+      {children}
+      {hint && <div style={{ fontFamily: FONT, fontSize: 11.5, color: c.muted, marginTop: 4 }}>{hint}</div>}
+    </div>
+  );
+
+  // Rendered as its own card outside the form card (see center column).
+  const supportingDetailFields = () => (
+    <>
+      <Field label="Additional comment" optional>
+        <textarea value={notes} onChange={e => setNotes(e.target.value)}
+          placeholder="Anything the underwriter should know…"
+          rows={3}
+          style={{ ...inputStyle, resize: "vertical", minHeight: 72, fontFamily: FONT }} />
+      </Field>
+      <Field label="Upload supporting document" optional>
+        <label
+          className="flex flex-col items-center justify-center cursor-pointer transition-colors"
+          style={{
+            background: fileAttached ? c.softBg : c.helperBg,
+            border: `1.5px dashed ${fileAttached ? c.razz : c.border}`,
+            borderRadius: 10,
+            padding: 16,
+            textAlign: "center",
+            color: c.muted,
+            fontSize: 13,
+          }}
+          onClick={() => setFileAttached(true)}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = c.razz; e.currentTarget.style.color = c.text; }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = fileAttached ? c.razz : c.border; e.currentTarget.style.color = c.muted; }}
+        >
+          <Paperclip className="w-4 h-4 mb-1.5" style={{ color: c.razz }} />
+          <span style={{ fontFamily: FONT, fontSize: 13, fontWeight: 500, color: c.text }}>
+            {fileAttached ? "Document attached" : "Drag a file here or click to browse"}
+          </span>
+          <span style={{ fontFamily: FONT, fontSize: 11, color: c.muted, marginTop: 2 }}>PDF, JPG, PNG · Max 10MB</span>
+        </label>
+      </Field>
+    </>
+  );
+
+  // ─── page renderers (content copied 1:1 from the prototype)
   const renderContact = () => (
     <>
-      <div className="grid gap-4" style={{ gridTemplateColumns: "1fr 1fr" }}>
-        <div>
-          <label style={labelStyle}>Effective date {req}</label>
-          <DatePicker value={contactEff} onChange={setContactEff} inputStyle={inputStyle} c={c} btnGrad={btnGrad} font={font} />
+      <Field label="Effective date" required refKey="contact-eff">
+        <div style={{ maxWidth: 260 }}>
+          <DatePicker value={contactEff} onChange={setContactEff} inputStyle={inputStyle} c={c} btnGrad={razzGrad} font={font} />
         </div>
-        <div>
-          <label style={labelStyle}>Contact type {req}</label>
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => { closeAll(); setContactTypeOpen(o => !o); }}
-              className="w-full flex items-center justify-between"
-              style={{ ...inputStyle, cursor: "pointer", textAlign: "left", color: contactType ? c.text : c.sub }}
-            >
-              <span>{contactType || "Select…"}</span>
-              <ChevronDown className={`w-4 h-4 transition-transform ${contactTypeOpen ? "rotate-180" : ""}`} style={{ color: c.muted }} />
-            </button>
-            {contactTypeOpen && (
-              <div className="absolute left-0 right-0 top-full mt-1 z-20 rounded-lg shadow-lg overflow-hidden" style={{ background: c.cardBg, border: `1px solid ${c.border}` }}>
-                {["Insured", "Agent"].map(o => (
-                  <button
-                    key={o}
-                    onClick={() => { setContactType(o); setContactTypeOpen(false); }}
-                    className="w-full text-left px-3 py-2 text-[13px] transition-colors"
-                    style={{ fontFamily: FONT, color: c.text }}
-                    onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
-                    onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
-                  >{o}</button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+      </Field>
 
-      <div className="grid gap-4 mt-4" style={{ gridTemplateColumns: "1fr 1fr" }}>
-        <div>
-          <label style={labelStyle}>First name {opt}</label>
+      <Helper>Are you updating the <b style={{ color: c.text }}>insured</b> or the <b style={{ color: c.text }}>agency</b> contact information?</Helper>
+
+      <Field label="Contact type" required refKey="contact-type">
+        <div style={{ maxWidth: 260 }} className="relative">
+          <button type="button" onClick={() => { closeAll(); setContactTypeOpen(o => !o); }}
+            className="w-full flex items-center justify-between"
+            style={{ ...inputStyle, cursor: "pointer", textAlign: "left", color: contactType ? c.text : c.sub }}>
+            <span>{contactType || "Select…"}</span>
+            <ChevronDown className={`w-4 h-4 transition-transform ${contactTypeOpen ? "rotate-180" : ""}`} style={{ color: c.muted }} />
+          </button>
+          {contactTypeOpen && (
+            <div className="absolute left-0 right-0 top-full mt-1 z-20 rounded-lg shadow-lg overflow-hidden" style={{ background: c.cardBg, border: `1px solid ${c.border}` }}>
+              {["Insured", "Agent"].map(o => (
+                <button key={o} onClick={() => { setContactType(o); setContactTypeOpen(false); }}
+                  className="w-full text-left px-3 py-2 text-[13px] transition-colors"
+                  style={{ fontFamily: FONT, color: c.text }}
+                  onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+                  onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                >{o}</button>
+              ))}
+            </div>
+          )}
+        </div>
+      </Field>
+
+      <div className="grid grid-cols-2 gap-3.5" ref={setRef("contact-any")}>
+        <Field label="First name" optional>
           <input value={contactFirst} onChange={e => setContactFirst(e.target.value)} placeholder="Sean" style={inputStyle} />
-        </div>
-        <div>
-          <label style={labelStyle}>Last name {opt}</label>
+        </Field>
+        <Field label="Last name" optional>
           <input value={contactLast} onChange={e => setContactLast(e.target.value)} placeholder="Byrne" style={inputStyle} />
-        </div>
-        <div>
-          <label style={labelStyle}>Phone {opt}</label>
+        </Field>
+        <Field label="Phone" optional>
           <input value={contactPhone} onChange={e => setContactPhone(e.target.value)} placeholder="916-772-9200" style={inputStyle} />
-        </div>
-        <div>
-          <label style={labelStyle}>Email {opt}</label>
-          <input type="email" value={contactEmail} onChange={e => setContactEmail(e.target.value)} placeholder="sbyrne@example.com" style={inputStyle} />
-        </div>
+        </Field>
+        <Field label="Email" optional>
+          <input type="email" value={contactEmail} onChange={e => setContactEmail(e.target.value)} placeholder="sbyrne@btisinc.com" style={inputStyle} />
+        </Field>
       </div>
 
-      <div className="text-[12px] mt-3" style={{ color: c.muted, fontFamily: FONT }}>
-        At least one of first name, last name, phone, or email is required.
-      </div>
+      <Helper warn>
+        <span style={{ color: "#B91C1C", fontWeight: 600 }}>⚠</span>{" "}
+        At least one of first name, last name, phone, or email must be completed to submit.
+      </Helper>
 
-      {renderSupporting(contactNotes, setContactNotes)}
+      
     </>
   );
 
   const renderMcp65 = () => (
     <>
-      <div className="grid gap-4" style={{ gridTemplateColumns: "1fr 1fr" }}>
-        <div>
-          <label style={labelStyle}>Effective date {req}</label>
-          <DatePicker value={mcpEff} onChange={setMcpEff} inputStyle={inputStyle} c={c} btnGrad={btnGrad} font={font} />
+      <Field label="Effective date" required refKey="mcp-eff">
+        <div style={{ maxWidth: 260 }}>
+          <DatePicker value={mcpEff} onChange={setMcpEff} inputStyle={inputStyle} c={c} btnGrad={razzGrad} font={font} />
         </div>
-        <div>
-          <label style={labelStyle}>MCP 65 number {req}</label>
-          <input inputMode="numeric" value={mcpNumber} onChange={e => setMcpNumber(e.target.value)} placeholder="e.g. 0123456" style={inputStyle} />
-        </div>
-      </div>
+      </Field>
 
+      {/* Carrier-conditional callout — restyled to match the app's helper-box
+          pattern (soft gray bg, thin border, muted text) with a razz text link
+          for the forms-library action. No heavy color fill. */}
       {carrier === "cna" && (
         <div
-          className="mt-4 rounded-xl px-4 py-3 flex items-start gap-3"
-          style={{ background: c.softBg, border: `1px solid ${c.softBorder}`, fontFamily: FONT }}
+          ref={setRef("mcp-form")}
+          style={{
+            margin: "14px 0",
+            padding: "10px 12px",
+            borderRadius: 8,
+            background: c.helperBg,
+            border: `1px solid ${c.border}`,
+            borderLeft: `3px solid ${c.razz}`,
+            fontFamily: FONT,
+          }}
         >
-          <FileText className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: c.razz }} />
-          <div className="flex-1 min-w-0">
-            <div className="text-[13px] font-semibold" style={{ color: c.text }}>CNA requires the MCP 65 form on file</div>
-            <div className="text-[12px] mt-0.5" style={{ color: c.muted }}>
-              CNA only allows an MCP 65 when a commercial auto policy is in force with them.
-            </div>
+          <div style={{ fontSize: 12.5, color: c.muted, lineHeight: 1.5 }}>
+            <span style={{ color: c.text, fontWeight: 600 }}>CNA requirement.</span>{" "}
+            CNA only allows an MCP 65 when a commercial auto policy is in force with them, and requires a specific form attached.
           </div>
           <button
             type="button"
             onClick={() => setMcpFormAttached(v => !v)}
-            className="text-[12px] font-semibold px-3 py-1.5 rounded-lg transition-colors flex-shrink-0"
-            style={{
-              fontFamily: FONT,
-              color: mcpFormAttached ? "#fff" : c.razz,
-              background: mcpFormAttached ? c.razz : "transparent",
-              border: `1px solid ${c.razz}`,
-              cursor: "pointer",
-            }}
+            className="inline-flex items-center gap-1 mt-1.5 transition-opacity hover:opacity-70"
+            style={{ fontFamily: FONT, fontSize: 12.5, fontWeight: 600, color: c.razz, background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
           >
-            {mcpFormAttached ? "✓ Attached" : "Attach from library"}
+            {mcpFormAttached ? (
+              <>
+                <Check className="w-3.5 h-3.5" strokeWidth={3} />
+                CNA MCP 65 form attached
+              </>
+            ) : (
+              <>
+                Open CNA MCP 65 form from the forms library
+                <ChevronRight className="w-3.5 h-3.5" />
+              </>
+            )}
           </button>
         </div>
       )}
 
-      {renderSupporting(mcpNotes, setMcpNotes)}
+      <Field label="MCP 65 number" required refKey="mcp-num">
+        <input inputMode="numeric" value={mcpNumber} onChange={e => setMcpNumber(e.target.value)} placeholder="e.g. 0123456" style={{ ...inputStyle, maxWidth: 260 }} />
+      </Field>
+
+      
     </>
   );
 
   const renderPuc = () => (
     <>
-      <div className="grid gap-4" style={{ gridTemplateColumns: "1fr 1fr" }}>
-        <div>
-          <label style={labelStyle}>Effective date {req}</label>
-          <DatePicker value={pucEff} onChange={setPucEff} inputStyle={inputStyle} c={c} btnGrad={btnGrad} font={font} />
+      <Field label="Effective date" required refKey="puc-eff">
+        <div style={{ maxWidth: 260 }}>
+          <DatePicker value={pucEff} onChange={setPucEff} inputStyle={inputStyle} c={c} btnGrad={razzGrad} font={font} />
         </div>
-        <div>
-          <label style={labelStyle}>PUC filing number {req}</label>
-          <input inputMode="numeric" value={pucNumber} onChange={e => setPucNumber(e.target.value)} style={inputStyle} />
-        </div>
-      </div>
-
-      {renderSupporting(pucNotes, setPucNotes)}
+      </Field>
+      <Field label="PUC filing number" required refKey="puc-num">
+        <input inputMode="numeric" value={pucNumber} onChange={e => setPucNumber(e.target.value)} style={{ ...inputStyle, maxWidth: 260 }} />
+      </Field>
+      
     </>
   );
 
   const renderClassCode = () => (
     <>
-      <div style={{ maxWidth: 260 }}>
-        <label style={labelStyle}>Effective date {req}</label>
-        <DatePicker value={ccEff} onChange={setCcEff} inputStyle={inputStyle} c={c} btnGrad={btnGrad} font={font} />
-      </div>
-
-      <div className="mt-6">
-        <div className="text-[13px] font-semibold mb-1.5" style={{ color: c.text, fontFamily: FONT }}>Class code changes</div>
-        <div className="text-[12px] mb-3" style={{ color: c.muted, fontFamily: FONT }}>
-          Choose <b style={{ color: c.text }}>Add</b>, <b style={{ color: c.text }}>Edit</b>, or <b style={{ color: c.text }}>Remove</b> per line. On <b style={{ color: c.text }}>Remove</b>, payroll and headcount aren&apos;t needed.
+      <Field label="Effective date" required refKey="cc-eff">
+        <div style={{ maxWidth: 260 }}>
+          <DatePicker value={ccEff} onChange={setCcEff} inputStyle={inputStyle} c={c} btnGrad={razzGrad} font={font} />
         </div>
+      </Field>
 
-        <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${c.border}`, background: c.cardBg }}>
-          <div
-            className="grid text-[11px] font-bold uppercase tracking-wider"
-            style={{
-              gridTemplateColumns: "110px 1.5fr 1fr 70px 70px 40px",
-              background: c.mutedBg,
-              color: c.muted,
-              borderBottom: `1px solid ${c.border}`,
-              fontFamily: FONT,
-            }}
-          >
-            {["Action", "Class code", "Payroll", "FT", "PT", ""].map((h, i) => (
-              <div key={i} className="px-3 py-2.5">{h}</div>
-            ))}
-          </div>
-          {ccRows.map((r, i) => (
-            <ClassCodeRowInput
-              key={r.id}
-              row={r}
-              isLast={i === ccRows.length - 1}
-              c={c}
-              onChange={patch => setCcRows(rows => rows.map(x => x.id === r.id ? { ...x, ...patch } : x))}
-              onRemove={() => setCcRows(rows => rows.length > 1 ? rows.filter(x => x.id !== r.id) : rows)}
-            />
+      <SectionLabel>Class code changes</SectionLabel>
+      <Helper>
+        Choose an action per line. On <b style={{ color: c.text }}>Remove</b>, payroll and employee counts grey out — only the class code is needed.
+        Use <b style={{ color: c.text }}>+ Add line</b> for multiple changes in one request.
+      </Helper>
+
+      <div className="overflow-hidden" style={{ border: `1px solid ${c.border}`, borderRadius: 10, marginTop: 6 }}>
+        <div className="grid"
+          style={{ gridTemplateColumns: "120px 1.5fr 1fr 70px 70px 36px", background: c.mutedBg, borderBottom: `1px solid ${c.border}`, fontFamily: FONT, fontSize: 11, fontWeight: 600, color: c.muted, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+          {["Action", "Class code", "Payroll", "FT", "PT", ""].map((h, i) => (
+            <div key={i} style={{ padding: "8px 10px" }}>{h}</div>
           ))}
         </div>
-        <button
-          type="button"
-          onClick={() => setCcRows(rows => [...rows, { id: nextRowId.current++, action: "Add", code: "", payroll: "", ft: "", pt: "" }])}
-          className="mt-3 inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-3 py-1.5 rounded-lg transition-colors"
-          style={{ fontFamily: FONT, color: c.razz, background: c.activeBg, border: `1px dashed ${c.softBorder}`, cursor: "pointer" }}
-        >
-          <Plus className="w-3.5 h-3.5" /> Add line
-        </button>
+        {ccRows.map((r, i) => (
+          <ClassCodeRowInput
+            key={r.id}
+            row={r}
+            isLast={i === ccRows.length - 1}
+            c={{ text: c.text, muted: c.muted, border: c.softDivider, cardBg: c.cardBg, hoverBg: c.hoverBg }}
+            registerRef={setRef}
+            onChange={patch => setCcRows(rows => rows.map(x => x.id === r.id ? { ...x, ...patch } : x))}
+            onRemove={() => setCcRows(rows => rows.length > 1 ? rows.filter(x => x.id !== r.id) : rows)}
+          />
+        ))}
       </div>
+      <button
+        type="button"
+        onClick={() => setCcRows(rows => [...rows, { id: nextRowId.current++, action: "Add", code: "", payroll: "", ft: "", pt: "" }])}
+        className="mt-2.5 inline-flex items-center gap-1.5 transition-colors"
+        style={{ fontFamily: FONT, fontSize: 13, fontWeight: 600, color: c.razz, background: c.softBg, border: `1px dashed ${c.softBorder}`, padding: "8px 14px", borderRadius: 8, cursor: "pointer" }}
+      >
+        <Plus className="w-3.5 h-3.5" /> Add line
+      </button>
 
-      <div className="mt-6">
-        <label style={labelStyle}>Reason for change {req}</label>
-        <textarea
-          value={ccReason}
-          onChange={e => setCcReason(e.target.value)}
-          placeholder="e.g. No longer have an office employee; added a low-wage electrical worker."
+      <SectionLabel>Reason for change</SectionLabel>
+      <Field
+        label={<>Reason {req} <span style={{ color: c.sub, fontWeight: 400, fontSize: 11, marginLeft: 6 }}>for additions, include duties &amp; operations for the class code</span></>}
+        refKey="cc-reason"
+      >
+        <textarea value={ccReason} onChange={e => setCcReason(e.target.value)}
+          placeholder="e.g. No longer have an office employee; added low-wage electrical worker."
           rows={3}
-          style={{ ...inputStyle, resize: "vertical", minHeight: 72, fontFamily: FONT }}
-        />
-      </div>
+          style={{ ...inputStyle, resize: "vertical", minHeight: 80, fontFamily: FONT }} />
+      </Field>
 
-      <div className="mt-6">
-        <div className="text-[13px] font-semibold mb-2" style={{ color: c.text, fontFamily: FONT }}>Location the changes apply to</div>
-        <label style={labelStyle}>Address {req}</label>
+      <SectionLabel>Location the changes apply to</SectionLabel>
+      <Field
+        label="Address" required
+        refKey="cc-addr"
+        hint={<><span style={{ color: c.razz }}>◈</span> Autofills from Google Address when a match is found</>}
+      >
         <input value={ccAddress} onChange={e => setCcAddress(e.target.value)} placeholder="587 Test St." style={inputStyle} />
-        <div className="text-[11px] mt-1" style={{ color: c.muted, fontFamily: FONT }}>Autofills from Google Address when a match is found.</div>
-
-        <div className="grid gap-4 mt-4" style={{ gridTemplateColumns: "2fr 1fr 1fr" }}>
-          <div>
-            <label style={labelStyle}>City {req}</label>
-            <input value={ccCity} onChange={e => setCcCity(e.target.value)} style={inputStyle} />
+      </Field>
+      <div className="grid gap-3.5" style={{ gridTemplateColumns: "2fr 1fr 1fr 0.8fr" }}>
+        <Field label="City" required refKey="cc-city">
+          <input value={ccCity} onChange={e => setCcCity(e.target.value)} style={inputStyle} />
+        </Field>
+        <Field label="State" required refKey="cc-state">
+          <div className="relative">
+            <button type="button" onClick={() => { closeAll(); setCcStateOpen(o => !o); }}
+              className="w-full flex items-center justify-between"
+              style={{ ...inputStyle, cursor: "pointer", textAlign: "left", color: ccState ? c.text : c.sub }}>
+              <span>{ccState || "Select…"}</span>
+              <ChevronDown className={`w-4 h-4 transition-transform ${ccStateOpen ? "rotate-180" : ""}`} style={{ color: c.muted }} />
+            </button>
+            {ccStateOpen && (
+              <div className="absolute left-0 right-0 top-full mt-1 z-20 rounded-lg shadow-lg overflow-hidden max-h-[240px] overflow-y-auto" style={{ background: c.cardBg, border: `1px solid ${c.border}` }}>
+                {STATES.map(s => (
+                  <button key={s} onClick={() => { setCcState(s); setCcStateOpen(false); }}
+                    className="w-full text-left px-3 py-2 text-[13px] transition-colors"
+                    style={{ fontFamily: FONT, color: c.text }}
+                    onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+                    onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>{s}</button>
+                ))}
+              </div>
+            )}
           </div>
-          <div>
-            <label style={labelStyle}>State {req}</label>
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => { closeAll(); setCcStateOpen(o => !o); }}
-                className="w-full flex items-center justify-between"
-                style={{ ...inputStyle, cursor: "pointer", textAlign: "left", color: ccState ? c.text : c.sub }}
-              >
-                <span>{ccState || "Select"}</span>
-                <ChevronDown className={`w-4 h-4 transition-transform ${ccStateOpen ? "rotate-180" : ""}`} style={{ color: c.muted }} />
-              </button>
-              {ccStateOpen && (
-                <div className="absolute left-0 right-0 top-full mt-1 z-20 rounded-lg shadow-lg overflow-hidden max-h-[240px] overflow-y-auto" style={{ background: c.cardBg, border: `1px solid ${c.border}` }}>
-                  {STATES.map(s => (
-                    <button key={s} onClick={() => { setCcState(s); setCcStateOpen(false); }}
-                      className="w-full text-left px-3 py-2 text-[13px] transition-colors"
-                      style={{ fontFamily: FONT, color: c.text }}
-                      onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
-                      onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>{s}</button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-          <div>
-            <label style={labelStyle}>Zip {req}</label>
-            <input inputMode="numeric" maxLength={5} value={ccZip} onChange={e => setCcZip(e.target.value)} style={inputStyle} />
-          </div>
-        </div>
+        </Field>
+        <Field label="Zip" required refKey="cc-zip">
+          <input inputMode="numeric" maxLength={5} value={ccZip} onChange={e => setCcZip(e.target.value)} style={inputStyle} />
+        </Field>
+        <div />
       </div>
 
-      {renderSupporting(ccNotes, setCcNotes)}
+      
     </>
   );
 
-  function renderSupporting(notes: string, setNotes: (v: string) => void) {
-    return (
-      <div className="mt-6 grid gap-4" style={{ gridTemplateColumns: "1fr 1fr" }}>
-        <div>
-          <label style={labelStyle}>Additional comment {opt}</label>
-          <textarea
-            value={notes}
-            onChange={e => setNotes(e.target.value)}
-            placeholder="Anything the underwriter should know…"
-            rows={3}
-            style={{ ...inputStyle, resize: "vertical", minHeight: 92, fontFamily: FONT }}
-          />
-        </div>
-        <div>
-          <label style={labelStyle}>Upload supporting document {opt}</label>
-          {uploadZone(false, () => {})}
-        </div>
-      </div>
-    );
-  }
+  const meta = PAGE_META[type];
+  const phasePillStyle = (p: Phase): React.CSSProperties => ({
+    fontFamily: FONT,
+    fontSize: 10,
+    fontWeight: 700,
+    padding: "1px 7px",
+    borderRadius: 20,
+    background: p === "simple" ? c.greenBg : p === "medium" ? c.softBg : c.mutedBg,
+    color:      p === "simple" ? c.green : p === "medium" ? c.razz : c.muted,
+  });
+
+  const statusDot = selectedPolicy.status === "Bound" ? "#73C9B7"
+                  : selectedPolicy.status === "Cancelled" ? "#EF4444"
+                  : "#F59E0B";
 
   return (
-    <div className="flex flex-col gap-4" onClick={closeAll}>
-      {/* ── Policy header — Back, policy info, and carrier context in one card */}
+    <div
+      className="flex flex-col flex-1 min-h-0 overflow-y-auto"
+      style={{
+        marginTop: -48,     // eat the mb-12 gap under the "Endorsements" h1
+        marginBottom: -48,  // eat main's paddingBottom so bg reaches the floor
+        marginLeft: -48,    // eat main's px-12 (left)
+        marginRight: -48,   // eat main's px-12 (right)
+      }}
+      onClick={closeAll}
+    >
+      {/* 3-column shell. Intake outer is the scroll container and it extends
+          past main's px-12 padding via negative left/right margins so the
+          sidebar bg tint reaches the app sidenav on one side and the
+          viewport edge on the other. */}
+      {/* ── Top strip: back link + policy identity + WC scope + status.
+          Groups all the page-context bits (previously scattered across
+          the left nav and center card header) in one strip above the
+          3-column grid. */}
       <div
-        className="rounded-2xl px-5 py-4 flex items-center gap-4 flex-wrap"
-        style={{ background: c.cardBg, border: `1px solid ${c.border}`, boxShadow: isDark ? "none" : "0 1px 3px rgba(15,23,42,0.04)" }}
+        className="flex items-center gap-4 flex-wrap"
+        style={{
+          padding: "24px 48px 20px",
+          borderBottom: `1px solid ${c.softDivider}`,
+        }}
         onClick={e => e.stopPropagation()}
       >
         <button
           type="button"
           onClick={onBack}
-          className="inline-flex items-center gap-1.5 text-[12.5px] font-medium px-3 py-1.5 rounded-lg transition-colors"
-          style={{ fontFamily: FONT, color: c.text, background: "transparent", border: `1px solid ${c.border}`, cursor: "pointer" }}
-          onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
-          onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+          className="inline-flex items-center gap-1.5 transition-opacity hover:opacity-70"
+          style={{ fontFamily: FONT, fontSize: 12, fontWeight: 500, color: c.muted, background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
         >
-          <ArrowLeft className="w-3.5 h-3.5" /> Back
+          <ArrowLeft className="w-3.5 h-3.5" /> Back to results
         </button>
-
-        <div className="flex-1 min-w-0">
-          <div className="flex items-baseline flex-wrap gap-x-2.5 gap-y-0.5">
-            <span className="text-[15px] font-bold" style={{ color: c.text, fontFamily: FONT, letterSpacing: "-0.01em" }}>{selectedPolicy.policyNumber}</span>
-            <span className="text-[13px]" style={{ color: c.muted, fontFamily: FONT }}>· {selectedPolicy.applicant}</span>
-            {selectedPolicy.submissionId && (
-              <span className="text-[11.5px]" style={{ color: c.sub, fontFamily: FONT }}>· {selectedPolicy.submissionId}</span>
-            )}
-          </div>
+        <div className="flex items-baseline gap-3 flex-wrap min-w-0 flex-1">
+          <span style={{ fontFamily: FONT, fontSize: 15, fontWeight: 600, color: c.text, letterSpacing: "-0.01em" }}>{selectedPolicy.applicant}</span>
+          <span style={{ fontFamily: FONT, fontSize: 12, color: c.muted }}>
+            Policy <span style={{ color: c.text, fontWeight: 600 }}>{selectedPolicy.policyNumber}</span>
+            {selectedPolicy.submissionId && <> · Sub <span style={{ color: c.text, fontWeight: 600 }}>{selectedPolicy.submissionId}</span></>}
+          </span>
         </div>
-
-        {/* Carrier context chip — inline instead of a whole right rail */}
-        <div className="relative flex-shrink-0" onClick={e => e.stopPropagation()}>
-          <span className="text-[11px] font-semibold mr-2" style={{ color: c.muted, fontFamily: FONT }}>ISSUING CARRIER</span>
-          <button
-            type="button"
-            onClick={() => { closeAll(); setCarrierOpen(o => !o); }}
-            className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-3 py-1.5 rounded-lg transition-colors"
-            style={{ fontFamily: FONT, color: c.text, background: c.mutedBg, border: `1px solid ${c.border}`, cursor: "pointer" }}
-            onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
-            onMouseLeave={e => (e.currentTarget.style.background = c.mutedBg)}
-          >
-            {CARRIERS.find(x => x.key === carrier)!.label}
-            <ChevronDown className={`w-3.5 h-3.5 transition-transform ${carrierOpen ? "rotate-180" : ""}`} style={{ color: c.muted }} />
-          </button>
-          {carrierOpen && (
-            <div className="absolute right-0 top-full mt-1 z-30 rounded-lg shadow-lg overflow-hidden" style={{ background: c.cardBg, border: `1px solid ${c.border}`, minWidth: 160 }}>
-              {CARRIERS.map(x => (
-                <button
-                  key={x.key}
-                  type="button"
-                  onClick={() => { setCarrier(x.key); setCarrierOpen(false); }}
-                  className="w-full text-left px-3 py-2 text-[13px] transition-colors"
-                  style={{ fontFamily: FONT, color: c.text, background: x.key === carrier ? c.activeBg : "transparent" }}
-                  onMouseEnter={e => { if (x.key !== carrier) e.currentTarget.style.background = c.hoverBg; }}
-                  onMouseLeave={e => { if (x.key !== carrier) e.currentTarget.style.background = "transparent"; }}
-                >{x.label}</button>
-              ))}
-            </div>
-          )}
-        </div>
+        <span
+          style={{
+            fontFamily: FONT, fontSize: 10.5, fontWeight: 700, color: "#fff",
+            background: razzGrad, letterSpacing: 1, padding: "3px 10px",
+            borderRadius: 3, textTransform: "uppercase",
+          }}
+        >Worker&apos;s Comp Endorsement</span>
+        {selectedPolicy.status && (
+          <span className="inline-flex items-center gap-1.5" style={{ fontFamily: FONT, fontSize: 11, fontWeight: 500, color: c.text, background: c.mutedBg, border: `1px solid ${c.border}`, padding: "3px 8px", borderRadius: 6 }}>
+            <span className="w-1.5 h-1.5 rounded-full" style={{ background: statusDot }} />
+            {selectedPolicy.status}
+          </span>
+        )}
       </div>
 
-      {/* ── Tabs (pill chips) */}
-      <div className="flex flex-wrap gap-2" onClick={e => e.stopPropagation()}>
-        {PAGES.map(p => {
-          const active = p.key === page;
-          return (
+      <div
+        className="grid items-stretch"
+        style={{
+          gridTemplateColumns: "300px 1fr 340px",
+          minHeight: 0,
+          flex: 1,
+        }}
+      >
+
+          {/* ── LEFT: sidebar — just progress + nav, no policy header
+              (moved to the top strip). */}
+          <div
+            style={{
+              borderRight: `1px solid ${c.border}`,
+              padding: "28px 32px 96px 32px",
+            }}
+          >
+          <nav
+            className="flex flex-col"
+            style={{ position: "sticky", top: 20, alignSelf: "flex-start" }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex flex-col">
+              {/* Progress — one small uppercase 11/700 label, same style as phase groups */}
+              <div style={{ padding: "0 6px 12px" }}>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span style={{ fontFamily: FONT, fontSize: 11, fontWeight: 700, color: c.muted, textTransform: "uppercase", letterSpacing: "0.07em" }}>Progress</span>
+                  <span style={{ fontFamily: FONT, fontSize: 11, fontWeight: 700, color: pagesDone === activeTypes.length ? c.green : c.razz }}>
+                    {pagesDone}<span style={{ color: c.muted, marginLeft: 3 }}>/ {activeTypes.length}</span>
+                  </span>
+                </div>
+                <div style={{ height: 3, background: c.softDivider, borderRadius: 999, overflow: "hidden" }}>
+                  <div style={{ width: `${totalPct}%`, height: "100%", background: pagesDone === activeTypes.length ? c.green : razzGrad, transition: "width 300ms ease" }} />
+                </div>
+              </div>
+
+            {NAV.map(g => (
+              <div key={g.label} style={{ marginBottom: 14 }}>
+                <div className="flex items-center gap-1.5 px-2.5 pb-1.5">
+                  {/* Phase headers use the same 11/700 uppercase as PROGRESS */}
+                  <span style={{ fontFamily: FONT, fontSize: 11, fontWeight: 700, color: c.muted, textTransform: "uppercase", letterSpacing: "0.07em" }}>{g.label}</span>
+                  <span style={phasePillStyle(g.phase)}>{g.phase}</span>
+                </div>
+                {g.items.map((it, i) => {
+                  const active = it.key === type;
+                  const disabled = !!it.disabled || it.key === null;
+                  const done     = !disabled && it.key ? isTypeDone(it.key) : false;
+                  const started  = !disabled && it.key ? isTypeStarted(it.key) && !done : false;
+                  // Carrier-conditional badge: MCP 65 gets an extra CNA rule
+                  // when carrier=CNA. Nav shows a small razz badge so switching
+                  // carriers visibly changes what's ahead of you.
+                  const carrierRule = it.key === "mcp65" && carrier === "cna";
+                  const statusEl = disabled ? (
+                    <span style={{ fontFamily: FONT, fontSize: 11, fontWeight: 500, color: c.sub }}>{it.mini}</span>
+                  ) : done ? (
+                    <span
+                      className="inline-flex items-center justify-center rounded-full"
+                      style={{ width: 16, height: 16, background: c.greenBg, color: c.green }}
+                      title="All required fields complete"
+                    >
+                      <Check className="w-2.5 h-2.5" strokeWidth={3.5} />
+                    </span>
+                  ) : started ? (
+                    <span
+                      className="rounded-full"
+                      style={{ width: 8, height: 8, background: c.razz, boxShadow: `0 0 0 3px ${c.softBg}` }}
+                      title="In progress"
+                    />
+                  ) : (
+                    <span
+                      className="rounded-full"
+                      style={{ width: 10, height: 10, background: "transparent", border: `1.5px solid ${c.border}` }}
+                      title="Not started"
+                    />
+                  );
+                  return (
+                    <button
+                      key={i}
+                      type="button"
+                      disabled={disabled}
+                      onClick={() => { if (it.key) setType(it.key); }}
+                      className="w-full flex items-center justify-between gap-2 transition-colors"
+                      style={{
+                        fontFamily: FONT,
+                        textAlign: "left",
+                        background: active ? c.softBg : "transparent",
+                        color: active ? c.razz : (disabled ? c.sub : c.text),
+                        padding: "8px 10px",
+                        border: "none",
+                        borderRadius: 8,
+                        fontSize: 13.5,
+                        fontWeight: active ? 600 : 500,
+                        cursor: disabled ? "not-allowed" : "pointer",
+                      }}
+                      onMouseEnter={e => { if (!disabled && !active) e.currentTarget.style.background = c.hoverBg; }}
+                      onMouseLeave={e => { if (!active) e.currentTarget.style.background = "transparent"; }}
+                    >
+                      <span className="min-w-0 truncate flex items-center gap-1.5">
+                        {it.label}
+                        {carrierRule && (
+                          <span
+                            style={{
+                              fontFamily: FONT, fontSize: 9.5, fontWeight: 700,
+                              color: "#fff", background: razzGrad,
+                              padding: "1px 6px", borderRadius: 3,
+                              textTransform: "uppercase", letterSpacing: 0.4,
+                              flexShrink: 0,
+                            }}
+                            title="This carrier requires an extra rule"
+                          >CNA rule</span>
+                        )}
+                      </span>
+                      <span className="flex-shrink-0 flex items-center">{statusEl}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
+            </div>
+          </nav>
+          </div>
+
+          {/* ── CENTER: white background, no card. Sections split by
+              soft dividers + section labels. */}
+          <main style={{ padding: "28px 32px 96px" }} onClick={e => e.stopPropagation()}>
+            <div>
+              {/* Header: eyebrow + h1 + subtitle. WC scope + status live in
+                  the shared top strip above the 3-column grid. */}
+              <div style={{ padding: "0 4px 20px", borderBottom: `1px solid ${c.softDivider}` }}>
+                <div style={{ fontFamily: FONT, fontSize: 11, fontWeight: 600, color: c.razz, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>
+                  {meta.crumb}
+                </div>
+                <h1 style={{ fontFamily: FONT, fontSize: 22, fontWeight: 600, color: c.text, letterSpacing: "-0.01em", margin: 0 }}>{meta.title}</h1>
+                <p style={{ margin: "8px 0 0", color: c.muted, fontSize: 13, maxWidth: "60ch" }}>{meta.subtitle}</p>
+              </div>
+
+              {/* Fields section — flat, no card */}
+              <div style={{ padding: "10px 4px 22px" }}>
+                {type === "contact"   && renderContact()}
+                {type === "mcp65"     && renderMcp65()}
+                {type === "puc"       && renderPuc()}
+                {type === "classcode" && renderClassCode()}
+              </div>
+
+              {/* Supporting Detail — flat, no card */}
+              <div style={{ padding: "20px 4px 24px", borderTop: `1px solid ${c.softDivider}` }}>
+                <div style={{ fontFamily: FONT, fontSize: 12, fontWeight: 700, color: c.text, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>
+                  Supporting detail
+                </div>
+                {supportingDetailFields()}
+              </div>
+            </div>
+          </main>
+
+          {/* ── RIGHT: sidebar column — same treatment as LEFT. */}
+          <div
+            style={{
+              borderLeft: `1px solid ${c.border}`,
+              padding: "28px 32px 96px 32px",
+            }}
+          >
+          <aside
+            className="flex flex-col"
+            style={{ position: "sticky", top: 20, alignSelf: "flex-start" }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* ── Section header: CARRIER + carrier state pill (like the reference's
+                "Embedding v3 · AI Model · Warning" panel header). */}
+            <div style={{ padding: "0 2px 12px" }}>
+              <div className="flex items-start justify-between gap-3 mb-3">
+                <div className="min-w-0">
+                  <div style={{ fontFamily: FONT, fontSize: 18, fontWeight: 600, color: c.text, letterSpacing: "-0.01em", lineHeight: 1.2 }}>
+                    {CARRIERS.find(x => x.key === carrier)!.label}
+                  </div>
+                  <div style={{ fontFamily: FONT, fontSize: 12, color: c.muted, marginTop: 2 }}>Issuing carrier</div>
+                </div>
+                {(carrier === "cna" && type === "mcp65") ? (
+                  <span
+                    className="inline-flex items-center gap-1.5"
+                    style={{ fontFamily: FONT, fontSize: 11, fontWeight: 600, color: "#B91C1C", background: "rgba(239,68,68,0.10)", border: `1px solid rgba(239,68,68,0.22)`, padding: "3px 10px", borderRadius: 999 }}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#EF4444" }} /> Extra rule
+                  </span>
+                ) : (
+                  <span
+                    className="inline-flex items-center gap-1.5"
+                    style={{ fontFamily: FONT, fontSize: 11, fontWeight: 600, color: c.green, background: c.greenBg, border: `1px solid ${c.greenBorder}`, padding: "3px 10px", borderRadius: 999 }}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#10B981" }} /> Standard
+                  </span>
+                )}
+              </div>
+
+              {/* Carrier dropdown (kept as a compact chip so switching is fast) */}
+              <div className="relative">
+                <button type="button" onClick={() => { closeAll(); setCarrierOpen(o => !o); }}
+                  className="w-full flex items-center justify-between"
+                  style={{ ...inputStyle, cursor: "pointer", textAlign: "left" }}
+                >
+                  <span>Change carrier: {CARRIERS.find(x => x.key === carrier)!.label}</span>
+                  <ChevronDown className={`w-4 h-4 transition-transform ${carrierOpen ? "rotate-180" : ""}`} style={{ color: c.muted }} />
+                </button>
+                {carrierOpen && (
+                  <div className="absolute left-0 right-0 top-full mt-1 z-30 rounded-lg shadow-lg overflow-hidden" style={{ background: c.cardBg, border: `1px solid ${c.border}` }}>
+                    {CARRIERS.map(x => (
+                      <button key={x.key} onClick={() => { setCarrier(x.key); setCarrierOpen(false); }}
+                        className="w-full text-left px-3 py-2 text-[13px] transition-colors"
+                        style={{ fontFamily: FONT, color: x.key === carrier ? c.razz : c.text, background: x.key === carrier ? c.softBg : "transparent", fontWeight: x.key === carrier ? 600 : 500 }}
+                        onMouseEnter={e => { if (x.key !== carrier) e.currentTarget.style.background = c.hoverBg; }}
+                        onMouseLeave={e => { if (x.key !== carrier) e.currentTarget.style.background = "transparent"; }}
+                      >{x.label}</button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* ── SUBMIT GATE — bordered card with big number + requirement rows,
+                each row clickable to scroll to its field. */}
+            <div style={{ fontFamily: FONT, fontSize: 11, fontWeight: 700, color: c.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginTop: 20, marginBottom: 8, padding: "0 2px" }}>
+              Submit gate
+            </div>
+            <div
+              className="rounded-xl"
+              style={{ border: `1px solid ${c.border}`, background: c.cardBg, overflow: "hidden" }}
+            >
+              <div className="flex items-baseline gap-2" style={{ padding: "14px 14px 12px" }}>
+                <span style={{ fontFamily: FONT, fontSize: 28, fontWeight: 700, color: submitReady ? c.green : c.razz, letterSpacing: "-0.03em", lineHeight: 1 }}>{outstanding}</span>
+                <span style={{ fontFamily: FONT, fontSize: 12.5, color: c.muted }}>
+                  {outstanding === 1 ? "requirement left" : "requirements left"}
+                </span>
+              </div>
+              {requirements.length > 0 && (
+                <ul className="list-none p-0 m-0" style={{ borderTop: `1px solid ${c.softDivider}` }}>
+                  {requirements.map((r, i) => (
+                    <li key={r.label + i}>
+                      <button
+                        type="button"
+                        onClick={() => !r.done && focusRef(r.refKey)}
+                        disabled={r.done}
+                        className="w-full flex items-center gap-2.5 text-left transition-colors"
+                        style={{
+                          padding: "9px 14px",
+                          borderTop: i === 0 ? "none" : `1px solid ${c.softDivider}`,
+                          fontFamily: FONT,
+                          fontSize: 13,
+                          background: "transparent",
+                          border: "none",
+                          cursor: r.done ? "default" : "pointer",
+                        }}
+                        onMouseEnter={e => { if (!r.done) e.currentTarget.style.background = c.hoverBg; }}
+                        onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                      >
+                        <span
+                          className="flex items-center justify-center flex-shrink-0 rounded-full"
+                          style={{
+                            width: 18, height: 18,
+                            background: r.done ? c.greenBg : c.amberBg,
+                            color:      r.done ? c.green   : c.amber,
+                          }}
+                        >
+                          {r.done ? <Check className="w-3 h-3" strokeWidth={3.5} /> : <span style={{ fontSize: 10, fontWeight: 700 }}>!</span>}
+                        </span>
+                        <span className="flex-1 min-w-0 truncate" style={{ color: r.done ? c.muted : c.text, textDecoration: r.done ? "line-through" : "none" }}>{r.label}</span>
+                        {!r.done && <ChevronRight className="w-3.5 h-3.5 flex-shrink-0" style={{ color: c.sub }} />}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            {/* ── QUICK ACTIONS — bordered card with icon+label+chevron rows. */}
+            <div style={{ fontFamily: FONT, fontSize: 11, fontWeight: 700, color: c.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginTop: 20, marginBottom: 8, padding: "0 2px" }}>
+              Quick actions
+            </div>
+            <div
+              className="rounded-xl"
+              style={{ border: `1px solid ${c.border}`, background: c.cardBg, overflow: "hidden" }}
+            >
+              {[
+                { icon: FileText, label: "View full policy",   onClick: () => {} },
+                { icon: Clock,    label: "Recent endorsements", onClick: () => {} },
+                { icon: Save,     label: draftSaved ? "Draft saved" : "Save draft", onClick: handleSaveDraft },
+                { icon: Trash2,   label: "Discard request",    onClick: () => {}, danger: true },
+              ].map((row, i, arr) => {
+                const Icon = row.icon;
+                return (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={row.onClick}
+                    className="w-full flex items-center gap-2.5 text-left transition-colors"
+                    style={{
+                      padding: "10px 14px",
+                      borderTop: i === 0 ? "none" : `1px solid ${c.softDivider}`,
+                      fontFamily: FONT,
+                      fontSize: 13,
+                      fontWeight: 500,
+                      color: row.danger ? "#B91C1C" : c.text,
+                      background: "transparent",
+                      border: "none",
+                      cursor: "pointer",
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+                    onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                  >
+                    <Icon className="w-4 h-4 flex-shrink-0" style={{ color: row.danger ? "#B91C1C" : c.muted }} />
+                    <span className="flex-1 min-w-0 truncate">{row.label}</span>
+                    <ChevronRight className="w-3.5 h-3.5 flex-shrink-0" style={{ color: c.sub }} />
+                    {i === arr.length - 2 /* Save draft row */ && draftSaved && (
+                      <span style={{ fontFamily: FONT, fontSize: 10, fontWeight: 700, color: c.green }}>✓</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* ── Primary CTA — Submit endorsement request, pulled out of the
+                cards so it reads as the page's final action. */}
             <button
-              key={p.key}
               type="button"
-              onClick={() => setPage(p.key)}
-              className="text-[12.5px] font-semibold px-3.5 py-2 rounded-full transition-all"
+              onClick={onSubmit}
+              disabled={!submitReady}
+              className="w-full inline-flex items-center justify-center gap-1.5 transition-all"
               style={{
                 fontFamily: FONT,
-                color:  active ? "#fff" : c.text,
-                background: active ? btnGrad : c.cardBg,
-                border: `1px solid ${active ? "transparent" : c.border}`,
-                cursor: "pointer",
-                boxShadow: active ? "0 3px 10px rgba(166,20,195,0.20)" : "none",
+                fontSize: 13.5,
+                fontWeight: 600,
+                padding: "12px 16px",
+                borderRadius: 10,
+                marginTop: 20,
+                border: "none",
+                color: submitReady ? "#fff" : c.sub,
+                background: submitReady ? razzGrad : c.mutedBg,
+                cursor: submitReady ? "pointer" : "not-allowed",
+                boxShadow: submitReady ? "0 4px 14px rgba(166,20,195,0.25)" : "none",
               }}
-              onMouseEnter={e => { if (!active) e.currentTarget.style.background = c.hoverBg; }}
-              onMouseLeave={e => { if (!active) e.currentTarget.style.background = c.cardBg; }}
+              onMouseEnter={e => { if (submitReady) e.currentTarget.style.filter = "brightness(1.08)"; }}
+              onMouseLeave={e => (e.currentTarget.style.filter = "none")}
             >
-              {p.label}
+              <Send className="w-3.5 h-3.5" />
+              {submitReady ? "Submit endorsement request" : `${outstanding} field${outstanding > 1 ? "s" : ""} remaining`}
             </button>
-          );
-        })}
-      </div>
-
-      {/* ── Form card — same shape as the "Find a policy" search card */}
-      <div
-        className="rounded-2xl"
-        style={{
-          backgroundColor: c.cardBg,
-          backgroundImage: "linear-gradient(90deg,#5C2ED4 0%,#A614C3 65%)",
-          backgroundRepeat: "no-repeat",
-          backgroundSize: "100% 4px",
-          backgroundPosition: "top",
-          borderLeft: `1px solid ${c.border}`,
-          borderRight: `1px solid ${c.border}`,
-          borderBottom: `1px solid ${c.border}`,
-          boxShadow: isDark ? "none" : "0 1px 3px rgba(15,23,42,0.04)",
-        }}
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="px-8 pt-8 pb-8">
-          <div className="text-[15px] font-semibold mb-1" style={{ color: c.text, fontFamily: FONT }}>{meta.title}</div>
-          <div className="text-[13px] mb-6" style={{ color: c.muted, fontFamily: FONT }}>{meta.subtitle}</div>
-
-          {page === "contact"   && renderContact()}
-          {page === "mcp65"     && renderMcp65()}
-          {page === "puc"       && renderPuc()}
-          {page === "classcode" && renderClassCode()}
+          </aside>
+          </div>
         </div>
-      </div>
-
-      {/* ── Footer bar — remaining-fields count + Cancel/Submit */}
-      <div className="flex items-center justify-between gap-4 flex-wrap" onClick={e => e.stopPropagation()}>
-        <div className="inline-flex items-center gap-2 text-[12.5px]" style={{ fontFamily: FONT }}>
-          {outstanding === 0 ? (
-            <>
-              <span
-                className="inline-flex items-center justify-center rounded-full"
-                style={{ width: 18, height: 18, background: "rgba(16,185,129,0.15)", color: c.doneText }}
-              >
-                <Check className="w-3 h-3" strokeWidth={3.5} />
-              </span>
-              <span style={{ color: c.doneText, fontWeight: 600 }}>All required fields complete</span>
-            </>
-          ) : (
-            <>
-              <span
-                className="inline-flex items-center justify-center rounded-full text-[10px] font-bold"
-                style={{ width: 18, height: 18, background: c.softBg, color: c.razz }}
-              >{outstanding}</span>
-              <span style={{ color: c.muted }}>
-                required field{outstanding > 1 ? "s" : ""} remaining
-              </span>
-            </>
-          )}
-        </div>
-
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={onBack}
-            className="text-[13px] font-medium transition-colors"
-            style={{
-              fontFamily: FONT,
-              background: c.cardBg,
-              border: `1px solid ${c.border}`,
-              color: c.text,
-              padding: "9px 22px",
-              borderRadius: 10,
-              cursor: "pointer",
-            }}
-            onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
-            onMouseLeave={e => (e.currentTarget.style.background = c.cardBg)}
-          >Cancel</button>
-          <button
-            type="button"
-            onClick={onSubmit}
-            disabled={outstanding > 0}
-            className="text-[13px] font-semibold text-white transition-all"
-            style={{
-              fontFamily: FONT,
-              background: outstanding > 0 ? c.mutedBg : btnGrad,
-              color: outstanding > 0 ? c.sub : "#fff",
-              padding: "10px 26px",
-              borderRadius: 10,
-              border: outstanding > 0 ? `1px solid ${c.border}` : "none",
-              cursor: outstanding > 0 ? "not-allowed" : "pointer",
-              boxShadow: outstanding > 0 ? "none" : "0 4px 14px rgba(166,20,195,0.25)",
-            }}
-            onMouseEnter={e => { if (outstanding === 0) e.currentTarget.style.filter = "brightness(1.08)"; }}
-            onMouseLeave={e => (e.currentTarget.style.filter = "none")}
-          >Submit request</button>
-        </div>
-      </div>
     </div>
   );
 }
@@ -671,10 +1044,11 @@ interface RowProps {
   row: ClassCodeRow;
   isLast: boolean;
   c: Record<string, string>;
+  registerRef: (key: string) => (el: HTMLElement | null) => void;
   onChange: (patch: Partial<ClassCodeRow>) => void;
   onRemove: () => void;
 }
-function ClassCodeRowInput({ row, isLast, c, onChange, onRemove }: RowProps) {
+function ClassCodeRowInput({ row, isLast, c, registerRef, onChange, onRemove }: RowProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const hits = row.code.trim()
     ? CLASS_CODES.filter(x => x.code.includes(row.code.trim()) || x.desc.toLowerCase().includes(row.code.trim().toLowerCase())).slice(0, 6)
@@ -696,7 +1070,7 @@ function ClassCodeRowInput({ row, isLast, c, onChange, onRemove }: RowProps) {
     borderRight: `1px solid ${c.border}`,
   };
   return (
-    <div className="grid items-center" style={{ gridTemplateColumns: "110px 1.5fr 1fr 70px 70px 40px" }}>
+    <div className="grid items-center" style={{ gridTemplateColumns: "120px 1.5fr 1fr 70px 70px 36px" }}>
       <div style={cellStyle}>
         <select value={row.action} onChange={e => onChange({ action: e.target.value as ClassCodeRow["action"] })} style={cellInput}>
           <option>Add</option>
@@ -704,7 +1078,7 @@ function ClassCodeRowInput({ row, isLast, c, onChange, onRemove }: RowProps) {
           <option>Remove</option>
         </select>
       </div>
-      <div style={{ ...cellStyle, position: "relative" }}>
+      <div style={{ ...cellStyle, position: "relative" }} ref={registerRef(`cc-code-${row.id}`)}>
         <input
           value={row.code}
           onChange={e => { onChange({ code: e.target.value }); setMenuOpen(true); }}
@@ -736,13 +1110,13 @@ function ClassCodeRowInput({ row, isLast, c, onChange, onRemove }: RowProps) {
           </div>
         )}
       </div>
-      <div style={cellStyle}>
+      <div style={cellStyle} ref={registerRef(`cc-pay-${row.id}`)}>
         <input value={row.payroll} onChange={e => onChange({ payroll: e.target.value })} disabled={isRemove} inputMode="numeric" placeholder="50,000" style={{ ...cellInput, opacity: isRemove ? 0.4 : 1 }} />
       </div>
-      <div style={cellStyle}>
+      <div style={cellStyle} ref={registerRef(`cc-ft-${row.id}`)}>
         <input value={row.ft} onChange={e => onChange({ ft: e.target.value })} disabled={isRemove} inputMode="numeric" maxLength={3} placeholder="0" style={{ ...cellInput, opacity: isRemove ? 0.4 : 1 }} />
       </div>
-      <div style={cellStyle}>
+      <div style={cellStyle} ref={registerRef(`cc-pt-${row.id}`)}>
         <input value={row.pt} onChange={e => onChange({ pt: e.target.value })} disabled={isRemove} inputMode="numeric" maxLength={3} placeholder="0" style={{ ...cellInput, opacity: isRemove ? 0.4 : 1 }} />
       </div>
       <div style={{ ...cellStyle, borderRight: "none", textAlign: "center" }}>

@@ -151,6 +151,24 @@ export default function Endorsements({ isDark }: { isDark: boolean }) {
         <h1 className="text-[22px] font-normal" style={{ fontFamily: FONT, color: c.text }}>Endorsements</h1>
       </div>
 
+      {view === "form" && intakePolicy && (
+        <EndorsementIntake
+          selectedPolicy={{
+            policyNumber: intakePolicy.policyNumber,
+            applicant:    intakePolicy.applicant,
+            submissionId: intakePolicy.submissionId,
+            effective:    intakePolicy.effective,
+            lob:          intakePolicy.lob,
+            dba:          intakePolicy.dba,
+            status:       intakePolicy.status,
+          }}
+          onBack={handleBack}
+          onSubmit={handleSubmit}
+          isDark={isDark}
+        />
+      )}
+
+      {view !== "form" && (
       <div className="flex-1 min-h-0 overflow-y-auto" style={{ paddingBottom: 48 }}>
         {(view === "search" || view === "results") && (
           <div className="flex flex-col gap-6">
@@ -424,10 +442,10 @@ export default function Endorsements({ isDark }: { isDark: boolean }) {
                     <div className="text-[12px]" style={{ color: c.text }}>{r.applicant}</div>
                     <div className="text-[12px]" style={{ color: c.muted }}>{r.lob}</div>
                     <div className="text-[12px]" style={{ color: c.muted }}>{r.dba}</div>
-                    <div className="flex items-center">
+                    <div className="flex items-center justify-start">
                       <span
-                        className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-[3px] rounded-md whitespace-nowrap"
-                        style={{ fontFamily: FONT, background: c.mutedBg, color: c.text, border: `1px solid ${c.border}` }}
+                        className="inline-flex items-center gap-1.5 text-[11px] font-medium py-[3px] rounded-md whitespace-nowrap"
+                        style={{ fontFamily: FONT, background: c.mutedBg, color: c.text, border: `1px solid ${c.border}`, paddingLeft: 8, paddingRight: 10, marginLeft: -9 }}
                       >
                         <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: statusDot }} />
                         {r.status}
@@ -445,20 +463,6 @@ export default function Endorsements({ isDark }: { isDark: boolean }) {
             </div>
           </>)}
           </div>
-        )}
-
-        {view === "form" && intakePolicy && (
-          <EndorsementIntake
-            selectedPolicy={{
-              policyNumber: intakePolicy.policyNumber,
-              applicant:    intakePolicy.applicant,
-              submissionId: intakePolicy.submissionId,
-              effective:    intakePolicy.effective,
-            }}
-            onBack={handleBack}
-            onSubmit={handleSubmit}
-            isDark={isDark}
-          />
         )}
 
         {chooseOpen && (
@@ -577,6 +581,7 @@ export default function Endorsements({ isDark }: { isDark: boolean }) {
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }
