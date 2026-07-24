@@ -74,28 +74,21 @@ const CARRIERS: { key: Carrier; label: string }[] = [
   { key: "cna",         label: "CNA" },
 ];
 
-type Phase = "simple" | "medium" | "complex";
-interface NavItem { key: EndorsementType | null; label: string; mini: string; disabled?: boolean }
-const NAV: { label: string; phase: Phase; items: NavItem[] }[] = [
+interface NavItem { key: EndorsementType | null; label: string; disabled?: boolean }
+const NAV: { label?: string; items: NavItem[] }[] = [
   {
-    label: "Phase 1 · Test batch", phase: "simple",
     items: [
-      { key: "contact",   label: "Contact Info",  mini: "3 fields" },
-      { key: "mcp65",     label: "MCP 65",        mini: "carrier rule" },
-      { key: "puc",       label: "PUC Filing",    mini: "2 fields" },
+      { key: "contact",   label: "Contact Info" },
+      { key: "mcp65",     label: "MCP 65" },
+      { key: "puc",       label: "PUC Filing" },
+      { key: "classcode", label: "Class Code / Payroll" },
     ],
   },
   {
-    label: "Phase 1 · Core", phase: "medium",
+    label: "Coming soon",
     items: [
-      { key: "classcode", label: "Class Code / Payroll", mini: "reusable grid" },
-    ],
-  },
-  {
-    label: "Deferred", phase: "complex",
-    items: [
-      { key: null, label: "Location", mini: "reuses grid", disabled: true },
-      { key: null, label: "Entity",   mini: "reuses grid", disabled: true },
+      { key: null, label: "Location", disabled: true },
+      { key: null, label: "Entity",   disabled: true },
     ],
   },
 ];
@@ -173,15 +166,18 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
     border:     isDark ? "rgba(255,255,255,0.08)" : "#E5E7EB",
     softDivider:isDark ? "rgba(255,255,255,0.05)" : "#F3F4F6",
     inputBg:    isDark ? "rgba(255,255,255,0.05)" : "#ffffff",
-    hoverBg:    isDark ? "rgba(255,255,255,0.04)" : "#F5F3FF",
+    hoverBg:    isDark ? "rgba(255,255,255,0.04)" : "#F9FAFB",
     mutedBg:    isDark ? "rgba(255,255,255,0.03)" : "#F9FAFB",
-    helperBg:   isDark ? "rgba(255,255,255,0.03)" : "#FAF9F5",
+    helperBg:   isDark ? "rgba(255,255,255,0.03)" : "#F9FAFB",
     softBg:     isDark ? "rgba(166,20,195,0.14)" : "rgba(166,20,195,0.08)",
     softBorder: isDark ? "rgba(166,20,195,0.30)" : "rgba(166,20,195,0.22)",
     razz:       "#A614C3",
-    green:      isDark ? "#34D399" : "#059669",
-    greenBg:    isDark ? "rgba(16,185,129,0.15)" : "rgba(16,185,129,0.10)",
-    greenBorder:isDark ? "rgba(16,185,129,0.30)" : "rgba(16,185,129,0.22)",
+    // Brand teal (#73C9B7) — same as the Bound status dot on Policies /
+    // Quotes / Endorsements results. Text uses a darker sibling shade for
+    // legible contrast on white; bg/border use tints of the brand teal.
+    green:      isDark ? "#8FDBC9" : "#2D8578",
+    greenBg:    isDark ? "rgba(115,201,183,0.18)" : "rgba(115,201,183,0.14)",
+    greenBorder:isDark ? "rgba(115,201,183,0.35)" : "rgba(115,201,183,0.30)",
     amber:      "#B45309",
     amberBg:    isDark ? "rgba(245,158,11,0.15)" : "rgba(245,158,11,0.10)",
     warnBg:     isDark ? "rgba(239,68,68,0.10)" : "#FEF2F2",
@@ -616,15 +612,6 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
   );
 
   const meta = PAGE_META[type];
-  const phasePillStyle = (p: Phase): React.CSSProperties => ({
-    fontFamily: FONT,
-    fontSize: 10,
-    fontWeight: 700,
-    padding: "1px 7px",
-    borderRadius: 20,
-    background: p === "simple" ? c.greenBg : p === "medium" ? c.softBg : c.mutedBg,
-    color:      p === "simple" ? c.green : p === "medium" ? c.razz : c.muted,
-  });
 
   const statusDot = selectedPolicy.status === "Bound" ? "#73C9B7"
                   : selectedPolicy.status === "Cancelled" ? "#EF4444"
@@ -645,48 +632,6 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
           past main's px-12 padding via negative left/right margins so the
           sidebar bg tint reaches the app sidenav on one side and the
           viewport edge on the other. */}
-      {/* ── Top strip: back link + policy identity + WC scope + status.
-          Groups all the page-context bits (previously scattered across
-          the left nav and center card header) in one strip above the
-          3-column grid. */}
-      <div
-        className="flex items-center gap-4 flex-wrap"
-        style={{
-          padding: "24px 48px 20px",
-          borderBottom: `1px solid ${c.softDivider}`,
-        }}
-        onClick={e => e.stopPropagation()}
-      >
-        <button
-          type="button"
-          onClick={onBack}
-          className="inline-flex items-center gap-1.5 transition-opacity hover:opacity-70"
-          style={{ fontFamily: FONT, fontSize: 12, fontWeight: 500, color: c.muted, background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
-        >
-          <ArrowLeft className="w-3.5 h-3.5" /> Back to results
-        </button>
-        <div className="flex items-baseline gap-3 flex-wrap min-w-0 flex-1">
-          <span style={{ fontFamily: FONT, fontSize: 15, fontWeight: 600, color: c.text, letterSpacing: "-0.01em" }}>{selectedPolicy.applicant}</span>
-          <span style={{ fontFamily: FONT, fontSize: 12, color: c.muted }}>
-            Policy <span style={{ color: c.text, fontWeight: 600 }}>{selectedPolicy.policyNumber}</span>
-            {selectedPolicy.submissionId && <> · Sub <span style={{ color: c.text, fontWeight: 600 }}>{selectedPolicy.submissionId}</span></>}
-          </span>
-        </div>
-        <span
-          style={{
-            fontFamily: FONT, fontSize: 10.5, fontWeight: 700, color: "#fff",
-            background: razzGrad, letterSpacing: 1, padding: "3px 10px",
-            borderRadius: 3, textTransform: "uppercase",
-          }}
-        >Worker&apos;s Comp Endorsement</span>
-        {selectedPolicy.status && (
-          <span className="inline-flex items-center gap-1.5" style={{ fontFamily: FONT, fontSize: 11, fontWeight: 500, color: c.text, background: c.mutedBg, border: `1px solid ${c.border}`, padding: "3px 8px", borderRadius: 6 }}>
-            <span className="w-1.5 h-1.5 rounded-full" style={{ background: statusDot }} />
-            {selectedPolicy.status}
-          </span>
-        )}
-      </div>
-
       <div
         className="grid items-stretch"
         style={{
@@ -709,7 +654,35 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
             style={{ position: "sticky", top: 20, alignSelf: "flex-start" }}
             onClick={e => e.stopPropagation()}
           >
-            <div className="flex flex-col">
+            {/* Policy identity + scope pills — stacked above the progress bar
+                so all page-context bits live in the left rail together.
+                Tight vertical rhythm: back → applicant → meta → pills, single
+                soft divider, no double margins with the progress row. */}
+            <div style={{ padding: "0 2px 14px", borderBottom: `1px solid ${c.softDivider}` }}>
+              <button
+                type="button"
+                onClick={onBack}
+                className="inline-flex items-center gap-1.5 transition-opacity hover:opacity-70"
+                style={{ fontFamily: FONT, fontSize: 12, fontWeight: 500, color: c.muted, background: "transparent", border: "none", cursor: "pointer", padding: 0, marginBottom: 8 }}
+              >
+                <ArrowLeft className="w-3.5 h-3.5" /> Back to results
+              </button>
+              <div
+                className="truncate"
+                title={selectedPolicy.applicant}
+                style={{ fontFamily: FONT, fontSize: 13.5, fontWeight: 600, color: c.text, letterSpacing: "-0.01em", lineHeight: 1.35 }}
+              >
+                {selectedPolicy.applicant}
+              </div>
+              <div style={{ fontFamily: FONT, fontSize: 12, color: c.razz, fontWeight: 500, marginTop: 2, lineHeight: 1.5 }}>
+                {selectedPolicy.policyNumber}
+                {selectedPolicy.submissionId && (
+                  <> · {selectedPolicy.submissionId}</>
+                )}
+              </div>
+            </div>
+
+            <div className="flex flex-col" style={{ marginTop: 14 }}>
               {/* Progress — one small uppercase 11/700 label, same style as phase groups */}
               <div style={{ padding: "0 6px 12px" }}>
                 <div className="flex items-center justify-between mb-1.5">
@@ -723,25 +696,19 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
                 </div>
               </div>
 
-            {NAV.map(g => (
-              <div key={g.label} style={{ marginBottom: 14 }}>
-                <div className="flex items-center gap-1.5 px-2.5 pb-1.5">
-                  {/* Phase headers use the same 11/700 uppercase as PROGRESS */}
-                  <span style={{ fontFamily: FONT, fontSize: 11, fontWeight: 700, color: c.muted, textTransform: "uppercase", letterSpacing: "0.07em" }}>{g.label}</span>
-                  <span style={phasePillStyle(g.phase)}>{g.phase}</span>
-                </div>
+            {NAV.map((g, gi) => (
+              <div key={g.label ?? `group-${gi}`} style={{ marginBottom: 20 }}>
+                {g.label && (
+                  <div style={{ padding: "8px 10px 6px", marginTop: gi === 0 ? 0 : 4, borderTop: gi === 0 ? "none" : `1px solid ${c.softDivider}` }}>
+                    <span style={{ fontFamily: FONT, fontSize: 11, fontWeight: 700, color: c.muted, textTransform: "uppercase", letterSpacing: "0.07em" }}>{g.label}</span>
+                  </div>
+                )}
                 {g.items.map((it, i) => {
                   const active = it.key === type;
                   const disabled = !!it.disabled || it.key === null;
                   const done     = !disabled && it.key ? isTypeDone(it.key) : false;
                   const started  = !disabled && it.key ? isTypeStarted(it.key) && !done : false;
-                  // Carrier-conditional badge: MCP 65 gets an extra CNA rule
-                  // when carrier=CNA. Nav shows a small razz badge so switching
-                  // carriers visibly changes what's ahead of you.
-                  const carrierRule = it.key === "mcp65" && carrier === "cna";
-                  const statusEl = disabled ? (
-                    <span style={{ fontFamily: FONT, fontSize: 11, fontWeight: 500, color: c.sub }}>{it.mini}</span>
-                  ) : done ? (
+                  const statusEl = disabled ? null : done ? (
                     <span
                       className="inline-flex items-center justify-center rounded-full"
                       style={{ width: 16, height: 16, background: c.greenBg, color: c.green }}
@@ -774,32 +741,19 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
                         textAlign: "left",
                         background: active ? c.softBg : "transparent",
                         color: active ? c.razz : (disabled ? c.sub : c.text),
-                        padding: "8px 10px",
+                        padding: "10px 12px",
                         border: "none",
                         borderRadius: 8,
                         fontSize: 13.5,
                         fontWeight: active ? 600 : 500,
                         cursor: disabled ? "not-allowed" : "pointer",
+                        marginBottom: 2,
                       }}
                       onMouseEnter={e => { if (!disabled && !active) e.currentTarget.style.background = c.hoverBg; }}
                       onMouseLeave={e => { if (!active) e.currentTarget.style.background = "transparent"; }}
                     >
-                      <span className="min-w-0 truncate flex items-center gap-1.5">
-                        {it.label}
-                        {carrierRule && (
-                          <span
-                            style={{
-                              fontFamily: FONT, fontSize: 9.5, fontWeight: 700,
-                              color: "#fff", background: razzGrad,
-                              padding: "1px 6px", borderRadius: 3,
-                              textTransform: "uppercase", letterSpacing: 0.4,
-                              flexShrink: 0,
-                            }}
-                            title="This carrier requires an extra rule"
-                          >CNA rule</span>
-                        )}
-                      </span>
-                      <span className="flex-shrink-0 flex items-center">{statusEl}</span>
+                      <span className="min-w-0 truncate">{it.label}</span>
+                      {statusEl && <span className="flex-shrink-0 flex items-center">{statusEl}</span>}
                     </button>
                   );
                 })}
@@ -813,14 +767,11 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
               soft dividers + section labels. */}
           <main style={{ padding: "28px 32px 96px" }} onClick={e => e.stopPropagation()}>
             <div>
-              {/* Header: eyebrow + h1 + subtitle. WC scope + status live in
+              {/* Header: h1 + subtitle. WC scope + status live in
                   the shared top strip above the 3-column grid. */}
               <div style={{ padding: "0 4px 20px", borderBottom: `1px solid ${c.softDivider}` }}>
-                <div style={{ fontFamily: FONT, fontSize: 11, fontWeight: 600, color: c.razz, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>
-                  {meta.crumb}
-                </div>
                 <h1 style={{ fontFamily: FONT, fontSize: 22, fontWeight: 600, color: c.text, letterSpacing: "-0.01em", margin: 0 }}>{meta.title}</h1>
-                <p style={{ margin: "8px 0 0", color: c.muted, fontSize: 13, maxWidth: "60ch" }}>{meta.subtitle}</p>
+                <p style={{ margin: "8px 0 0", color: c.muted, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{meta.subtitle}</p>
               </div>
 
               {/* Fields section — flat, no card */}
@@ -957,52 +908,6 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
                   ))}
                 </ul>
               )}
-            </div>
-
-            {/* ── QUICK ACTIONS — bordered card with icon+label+chevron rows. */}
-            <div style={{ fontFamily: FONT, fontSize: 11, fontWeight: 700, color: c.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginTop: 20, marginBottom: 8, padding: "0 2px" }}>
-              Quick actions
-            </div>
-            <div
-              className="rounded-xl"
-              style={{ border: `1px solid ${c.border}`, background: c.cardBg, overflow: "hidden" }}
-            >
-              {[
-                { icon: FileText, label: "View full policy",   onClick: () => {} },
-                { icon: Clock,    label: "Recent endorsements", onClick: () => {} },
-                { icon: Save,     label: draftSaved ? "Draft saved" : "Save draft", onClick: handleSaveDraft },
-                { icon: Trash2,   label: "Discard request",    onClick: () => {}, danger: true },
-              ].map((row, i, arr) => {
-                const Icon = row.icon;
-                return (
-                  <button
-                    key={i}
-                    type="button"
-                    onClick={row.onClick}
-                    className="w-full flex items-center gap-2.5 text-left transition-colors"
-                    style={{
-                      padding: "10px 14px",
-                      borderTop: i === 0 ? "none" : `1px solid ${c.softDivider}`,
-                      fontFamily: FONT,
-                      fontSize: 13,
-                      fontWeight: 500,
-                      color: row.danger ? "#B91C1C" : c.text,
-                      background: "transparent",
-                      border: "none",
-                      cursor: "pointer",
-                    }}
-                    onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
-                    onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
-                  >
-                    <Icon className="w-4 h-4 flex-shrink-0" style={{ color: row.danger ? "#B91C1C" : c.muted }} />
-                    <span className="flex-1 min-w-0 truncate">{row.label}</span>
-                    <ChevronRight className="w-3.5 h-3.5 flex-shrink-0" style={{ color: c.sub }} />
-                    {i === arr.length - 2 /* Save draft row */ && draftSaved && (
-                      <span style={{ fontFamily: FONT, fontSize: 10, fontWeight: 700, color: c.green }}>✓</span>
-                    )}
-                  </button>
-                );
-              })}
             </div>
 
             {/* ── Primary CTA — Submit endorsement request, pulled out of the

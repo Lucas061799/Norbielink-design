@@ -22,8 +22,22 @@ interface SearchResult {
   status: PolicyStatus;
   effective: string;
 }
-type PolicyStatus = "Bound" | "Cancelled" | "Incomplete" | "Submission Incomplete";
-const STATUS_OPTIONS: PolicyStatus[] = ["Bound", "Cancelled", "Incomplete", "Submission Incomplete"];
+// Unified status vocabulary shared with Quotes + Policies dropdowns.
+type PolicyStatus =
+  | "Incomplete" | "Submission Incomplete" | "Bind Incomplete" | "Paid-Bind Incomplete"
+  | "Submitted" | "Under Review" | "Requested Info" | "Pending" | "Pending/Action Req."
+  | "Approved" | "Bound" | "Sold/Issued" | "Issued"
+  | "Declined" | "Cancelled" | "File Closed"
+  | "Renewal Pending" | "Renewal Created" | "Upcoming Renewals"
+  | "Add'l Insured Request";
+const STATUS_OPTIONS: PolicyStatus[] = [
+  "Incomplete", "Submission Incomplete", "Bind Incomplete", "Paid-Bind Incomplete",
+  "Submitted", "Under Review", "Requested Info", "Pending", "Pending/Action Req.",
+  "Approved", "Bound", "Sold/Issued", "Issued",
+  "Declined", "Cancelled", "File Closed",
+  "Renewal Pending", "Renewal Created", "Upcoming Renewals",
+  "Add'l Insured Request",
+];
 const SEARCH_RESULTS: SearchResult[] = [
   { submissionId: "VIC00003362",     policyNumber: "7038911131",     applicant: "Pizza Club LLC, Pizza Club BT LLC",      lob: "Victor",         dba: "--",                                status: "Cancelled",             effective: "07/19/2026" },
   { submissionId: "VIC00003355",     policyNumber: "P102117404",     applicant: "MONTICELLO STAFFING LLC",                lob: "Victor",         dba: "--",                                status: "Bound",                 effective: "07/20/2026" },

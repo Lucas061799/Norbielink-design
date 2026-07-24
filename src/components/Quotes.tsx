@@ -44,20 +44,52 @@ const mockQuotes: QuoteRow[] = [
 ];
 
 const ALL_LOBS = ["All LOBs","General Liability","Worker's Comp","Vacant Risks","Business Owners","Professional Liability","Excess","Bonds","Commercial Auto","Property","Cyber Liability","Builder's Risk","Equipment Floater"];
-const QUOTE_STATUSES = ["All Statuses","Sold/Issued","Pending","Approved","Incomplete","Declined","Add'l Insured Request","Upcoming Renewals","Pending/Action Req."];
+const QUOTE_STATUSES = [
+  "All Statuses",
+  // In progress / missing data
+  "Incomplete", "Submission Incomplete", "Bind Incomplete", "Paid-Bind Incomplete",
+  // Submitted / under review
+  "Submitted", "Under Review", "Requested Info", "Pending", "Pending/Action Req.",
+  // Positive outcomes
+  "Approved", "Bound", "Sold/Issued", "Issued",
+  // Negative / closed
+  "Declined", "Cancelled", "File Closed",
+  // Renewal lifecycle
+  "Renewal Pending", "Renewal Created", "Upcoming Renewals",
+  // Info / request
+  "Add'l Insured Request",
+];
 
 // Status palette: each status has its own distinct hue so the dot is meaningful
 // at a glance. Brand teal + magenta still anchor "done" and "urgent action";
 // the other slots use semantic colors (amber/red/blue/orange/emerald/gray).
 const STATUS_DOT: Record<string, string> = {
-  "Sold/Issued":           "#73C9B7", // brand teal — closed/bound
-  "Approved":              "#10B981", // emerald — success/affirmative
-  "Pending":               "#F59E0B", // amber — waiting
+  // In progress
   "Incomplete":            "#9CA3AF", // gray — missing data
-  "Declined":              "#EF4444", // red — terminal failure
+  "Submission Incomplete": "#9CA3AF",
+  "Bind Incomplete":       "#9CA3AF",
+  "Paid-Bind Incomplete":  "#F59E0B", // amber — paid but pending bind
+  // Submitted / review
+  "Submitted":             "#3B82F6", // blue — sent, awaiting review
+  "Under Review":          "#8B5CF6", // violet — active review
+  "Requested Info":        "#0EA5E9", // sky — info requested from insured
+  "Pending":               "#F59E0B", // amber — waiting
   "Pending/Action Req.":   "#A614C3", // brand magenta — urgent action
-  "Add'l Insured Request": "#ACD697", // brand sage green — info/request
+  // Success
+  "Approved":              "#10B981", // emerald — success/affirmative
+  "Bound":                 "#73C9B7", // brand teal — bound
+  "Sold/Issued":           "#73C9B7", // brand teal — closed/bound
+  "Issued":                "#73C9B7", // brand teal — issued
+  // Closed
+  "Declined":              "#EF4444", // red — terminal failure
+  "Cancelled":             "#EF4444", // red — cancelled
+  "File Closed":           "#64748B", // slate — closed file
+  // Renewal
+  "Renewal Pending":       "#F59E0B", // amber — awaiting renewal
+  "Renewal Created":       "#10B981", // emerald — renewal ready
   "Upcoming Renewals":     "#F97316", // orange — timeline / upcoming
+  // Info
+  "Add'l Insured Request": "#ACD697", // brand sage green — info/request
 };
 
 // Used by the detail view's heading accent — same palette as the dots.
