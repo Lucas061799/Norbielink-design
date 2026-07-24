@@ -30,14 +30,6 @@ type PolicyStatus =
   | "Declined" | "Cancelled" | "File Closed"
   | "Renewal Pending" | "Renewal Created" | "Upcoming Renewals"
   | "Add'l Insured Request";
-const STATUS_OPTIONS: PolicyStatus[] = [
-  "Incomplete", "Submission Incomplete", "Bind Incomplete", "Paid-Bind Incomplete",
-  "Submitted", "Under Review", "Requested Info", "Pending", "Pending/Action Req.",
-  "Approved", "Bound", "Sold/Issued", "Issued",
-  "Declined", "Cancelled", "File Closed",
-  "Renewal Pending", "Renewal Created", "Upcoming Renewals",
-  "Add'l Insured Request",
-];
 const SEARCH_RESULTS: SearchResult[] = [
   { submissionId: "VIC00003362",     policyNumber: "7038911131",     applicant: "Pizza Club LLC, Pizza Club BT LLC",      lob: "Victor",         dba: "--",                                status: "Cancelled",             effective: "07/19/2026" },
   { submissionId: "VIC00003355",     policyNumber: "P102117404",     applicant: "MONTICELLO STAFFING LLC",                lob: "Victor",         dba: "--",                                status: "Bound",                 effective: "07/20/2026" },
@@ -81,11 +73,6 @@ export default function Endorsements({ isDark }: { isDark: boolean }) {
   // in-flight intake.
   const [intakePolicy, setIntakePolicy] = useState<SearchResult | null>(null);
 
-  // Status column filter on the results table — mirrors the multi-select
-  // dropdown pattern used on Policies. Empty set = no filter.
-  const [statusFilter, setStatusFilter] = useState<Set<PolicyStatus>>(new Set());
-  const [statusFilterOpen, setStatusFilterOpen] = useState(false);
-
   // Pagination — matches the Policies table footer (10 / 20 / 50 per page).
   const [page, setPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -105,19 +92,9 @@ export default function Endorsements({ isDark }: { isDark: boolean }) {
     ? "radial-gradient(171.32% 99.33% at 33.13% -9%, #282550 0%, #191735 55.82%, rgba(0,0,0,0.3) 74%, rgba(0,0,0,0) 100%), linear-gradient(88.34deg, #5C2ED4 0.11%, #A614C3 63.8%)"
     : "linear-gradient(90deg,#5C2ED4 0%,#A614C3 65%)";
 
-  const closeAll = () => { setSearchByOpen(false); setStatusFilterOpen(false); setPageSizeOpen(false); };
+  const closeAll = () => { setSearchByOpen(false); setPageSizeOpen(false); };
 
-  const toggleStatus = (s: PolicyStatus) => {
-    setStatusFilter(prev => {
-      const next = new Set(prev);
-      if (next.has(s)) next.delete(s); else next.add(s);
-      return next;
-    });
-    setPage(1); // reset to first page whenever the filter changes
-  };
-  const filteredResults = statusFilter.size > 0
-    ? SEARCH_RESULTS.filter(r => statusFilter.has(r.status))
-    : SEARCH_RESULTS;
+  const filteredResults = SEARCH_RESULTS;
   const totalPages   = Math.max(1, Math.ceil(filteredResults.length / itemsPerPage));
   const currentPage  = Math.min(page, totalPages);
   const pagedResults = filteredResults.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -382,12 +359,10 @@ export default function Endorsements({ isDark }: { isDark: boolean }) {
               <div className="grid px-6 py-3 gap-4 sticky top-0 z-10"
                 style={{ gridTemplateColumns: "1.3fr 1.2fr 1.6fr 1fr 1.4fr 0.9fr 0.9fr", borderBottom: `1px solid ${c.border}`, background: c.mutedBg }}>
                 {["Submission ID", "Policy Number", "Applicant", "LOB", "DBA", "Status", "Effective"].map(h => {
-                  const isStatus = h === "Status";
                   return (
                     <div key={h}
-                      className={`flex items-center text-[11px] font-bold uppercase tracking-wider ${isStatus ? "relative" : ""}`}
+                      className="flex items-center text-[11px] font-bold uppercase tracking-wider"
                       style={{ fontFamily: FONT, color: c.muted }}
-                      onClick={isStatus ? (e => e.stopPropagation()) : undefined}
                     >
                       {h}
                       <span className="inline-flex ml-0.5">
@@ -396,69 +371,6 @@ export default function Endorsements({ isDark }: { isDark: boolean }) {
                           <path d="M10 1V8M10 8L8 6M10 8L12 6" stroke={c.sub} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
                         </svg>
                       </span>
-                      {isStatus && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => setStatusFilterOpen(o => !o)}
-                            className="ml-1 p-0.5 rounded transition-colors relative"
-                            style={{ background: statusFilter.size ? "rgba(166,20,195,0.14)" : "transparent", border: "none", cursor: "pointer" }}
-                            title="Filter"
-                          >
-                            <ChevronDown className="w-3 h-3" style={{ color: statusFilter.size ? "#A614C3" : c.muted }} />
-                            {statusFilter.size > 0 && (
-                              <span
-                                className="absolute -top-1 -right-1 text-[9px] font-bold flex items-center justify-center rounded-full"
-                                style={{ width: 12, height: 12, background: "#A614C3", color: "#fff", fontFamily: FONT }}
-                              >{statusFilter.size}</span>
-                            )}
-                          </button>
-                          {statusFilterOpen && (
-                            <div
-                              className="absolute z-30 rounded-lg shadow-lg overflow-hidden"
-                              style={{
-                                top: "calc(100% + 4px)",
-                                left: -8,
-                                minWidth: 210,
-                                background: c.cardBg,
-                                border: `1px solid ${c.border}`,
-                                boxShadow: "0 8px 24px rgba(15,23,42,0.12)",
-                              }}
-                            >
-                              <div className="flex items-center justify-between px-3 py-2" style={{ borderBottom: `1px solid ${c.border}` }}>
-                                <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: c.muted, fontFamily: FONT }}>Filter by status</span>
-                                {statusFilter.size > 0 && (
-                                  <button
-                                    type="button"
-                                    onClick={() => setStatusFilter(new Set())}
-                                    className="text-[11px] font-semibold transition-opacity hover:opacity-70"
-                                    style={{ color: "#A614C3", background: "transparent", border: "none", cursor: "pointer" }}
-                                  >Clear</button>
-                                )}
-                              </div>
-                              {STATUS_OPTIONS.map(s => (
-                                <button
-                                  key={s}
-                                  type="button"
-                                  onClick={() => toggleStatus(s)}
-                                  className="w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors"
-                                  style={{ fontFamily: FONT, background: "transparent", border: "none", cursor: "pointer" }}
-                                  onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
-                                  onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
-                                >
-                                  <div className="flex items-center justify-center w-4 h-4 rounded flex-shrink-0"
-                                    style={{ border: `1.5px solid ${statusFilter.has(s) ? "#A614C3" : c.sub}`, background: statusFilter.has(s) ? "#A614C3" : "transparent" }}>
-                                    {statusFilter.has(s) && (
-                                      <svg width="9" height="7" viewBox="0 0 9 7" fill="none"><path d="M1 3.5L3.5 6L8 1" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                                    )}
-                                  </div>
-                                  <span className="text-[12.5px]" style={{ color: c.text, textTransform: "none", letterSpacing: 0 }}>{s}</span>
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </>
-                      )}
                     </div>
                   );
                 })}

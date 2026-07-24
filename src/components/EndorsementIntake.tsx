@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import {
-  ArrowLeft, Check, ChevronDown, ChevronRight, Clock, FileText, Paperclip, Plus, Save, Send, Trash2, X,
+  ArrowLeft, Check, ChevronDown, ChevronRight, CircleAlert, Clock, FileText, Paperclip, Plus, Save, Send, Trash2, X,
 } from "lucide-react";
 import { DatePicker } from "./DatePicker";
 
@@ -33,7 +33,11 @@ const FONT = "var(--font-montserrat), Montserrat, sans-serif";
 //   white, .card → rounded-2xl + razz 3px top stroke (search-card
 //   pattern), colors from the app palette (#1F2937 / #6B7280 / #E5E7EB).
 
-type EndorsementType = "contact" | "mcp65" | "puc" | "classcode";
+type EndorsementType =
+  | "contact" | "mcp65" | "puc" | "classcode"
+  | "altemp" | "thirdpartynoc" | "mailing" | "reinstate" | "cancel"
+  | "waiver" | "fein" | "xmod" | "location" | "entity"
+  | "namedinsured" | "effdate" | "officer" | "limits" | "other";
 type Carrier = "amtrust" | "clearspring" | "cna";
 
 interface SelectedPolicy {
@@ -46,7 +50,7 @@ interface SelectedPolicy {
   status?: string;
 }
 
-interface ClassCodeRow { id: number; action: "Add" | "Edit" | "Remove"; code: string; payroll: string; ft: string; pt: string }
+interface ClassCodeRow { id: number; action: "Add Class Code" | "Edit Payroll" | "Remove Class Code"; code: string; payroll: string; ft: string; pt: string }
 
 const CLASS_CODES: { code: string; desc: string }[] = [
   { code: "5190", desc: "Electrical wiring – within buildings" },
@@ -77,27 +81,75 @@ const CARRIERS: { key: Carrier; label: string }[] = [
 interface NavItem { key: EndorsementType | null; label: string; disabled?: boolean }
 const NAV: { label?: string; items: NavItem[] }[] = [
   {
+    label: "Contact & identity",
     items: [
-      { key: "contact",   label: "Contact Info" },
-      { key: "mcp65",     label: "MCP 65" },
-      { key: "puc",       label: "PUC Filing" },
-      { key: "classcode", label: "Class Code / Payroll" },
+      { key: "contact",      label: "Contact Info" },
+      { key: "namedinsured", label: "Named Insured / DBA" },
+      { key: "mailing",      label: "Mailing Address" },
+      { key: "effdate",      label: "Effective Date" },
     ],
   },
   {
-    label: "Coming soon",
+    label: "Coverage",
     items: [
-      { key: null, label: "Location", disabled: true },
-      { key: null, label: "Entity",   disabled: true },
+      { key: "classcode",  label: "Class Code / Payroll" },
+      { key: "limits",     label: "Limits" },
+      { key: "waiver",     label: "Waiver of Subrogation" },
+      { key: "officer",    label: "Officer Exclusion / Inclusion" },
+    ],
+  },
+  {
+    label: "Filings",
+    items: [
+      { key: "mcp65",         label: "MCP 65" },
+      { key: "puc",           label: "PUC Filing" },
+      { key: "thirdpartynoc", label: "Third Party NOC" },
+      { key: "altemp",        label: "Alternate Employer" },
+      { key: "fein",          label: "FEIN" },
+      { key: "xmod",          label: "XMOD" },
+    ],
+  },
+  {
+    label: "Structure",
+    items: [
+      { key: "location", label: "Location" },
+      { key: "entity",   label: "Entity" },
+    ],
+  },
+  {
+    label: "Policy lifecycle",
+    items: [
+      { key: "reinstate", label: "Reinstatement Request" },
+      { key: "cancel",    label: "Cancellation Request" },
+    ],
+  },
+  {
+    items: [
+      { key: "other", label: "Other" },
     ],
   },
 ];
 
-const PAGE_META: Record<EndorsementType, { crumb: string; title: string; subtitle: string }> = {
-  contact:   { crumb: "Phase 1 · Simple", title: "Contact Info",         subtitle: "Update the insured or agency contact on file. At least one contact field is required to submit." },
-  mcp65:     { crumb: "Phase 1 · Simple", title: "MCP 65",               subtitle: "Motor Carrier Permit filing. Carrier-specific requirements appear automatically." },
-  puc:       { crumb: "Phase 1 · Simple", title: "PUC Filing",           subtitle: "Public Utilities Commission filing request." },
-  classcode: { crumb: "Phase 1 · Core · reusable across Location & Entity", title: "Class Code / Payroll", subtitle: "Add, remove, or edit class codes and payroll. This grid is the building block that Location and Entity endorsements reuse." },
+const PAGE_META: Record<EndorsementType, { title: string; subtitle: string }> = {
+  contact:       { title: "Contact Info",              subtitle: "Update the insured or agency contact on file. At least one contact field is required to submit." },
+  mcp65:         { title: "MCP 65",                    subtitle: "Motor Carrier Permit filing." },
+  puc:           { title: "PUC Filing",                subtitle: "Public Utilities Commission filing request." },
+  classcode:     { title: "Class Code / Payroll",      subtitle: "Add, remove, or edit class codes and payroll." },
+  altemp:        { title: "Alternate Employer",        subtitle: "Name an alternate employer for this policy." },
+  thirdpartynoc: { title: "Third Party NOC",           subtitle: "Add a third party to receive notice of cancellation." },
+  mailing:       { title: "Mailing Address",           subtitle: "Update the mailing address on file for this policy." },
+  reinstate:     { title: "Reinstatement Request",     subtitle: "Request reinstatement of a lapsed or cancelled policy." },
+  cancel:        { title: "Cancellation Request",      subtitle: "Request cancellation of the policy." },
+  waiver:        { title: "Waiver of Subrogation",     subtitle: "Add a blanket or specific waiver of subrogation." },
+  fein:          { title: "FEIN",                      subtitle: "Add or update the FEIN for an entity on the policy." },
+  xmod:          { title: "XMOD",                      subtitle: "Update the experience modification factor." },
+  location:      { title: "Location",                  subtitle: "Add, edit, or remove a location on this policy." },
+  entity:        { title: "Entity",                    subtitle: "Add, edit, or remove an entity on this policy." },
+  namedinsured:  { title: "Named Insured / DBA",       subtitle: "Amend the legal name or DBA of an entity already on the policy." },
+  effdate:       { title: "Policy Effective Date",     subtitle: "Change the requested policy effective date." },
+  officer:       { title: "Officer Exclusion / Inclusion", subtitle: "Include or exclude an officer previously disclosed on the policy." },
+  limits:        { title: "Limits",                    subtitle: "Change the employer's liability limits at policy inception." },
+  other:         { title: "Other",                     subtitle: "Anything not covered by the endorsement types above." },
 };
 
 interface Props {
@@ -123,15 +175,14 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
 
   const [mcpEff, setMcpEff] = useState("");
   const [mcpNumber, setMcpNumber] = useState("");
-  const [mcpFormAttached, setMcpFormAttached] = useState(false);
 
   const [pucEff, setPucEff] = useState("");
   const [pucNumber, setPucNumber] = useState("");
 
   const [ccEff, setCcEff] = useState("");
   const [ccRows, setCcRows] = useState<ClassCodeRow[]>([
-    { id: 1, action: "Add", code: "", payroll: "", ft: "", pt: "" },
-    { id: 2, action: "Add", code: "", payroll: "", ft: "", pt: "" },
+    { id: 1, action: "Add Class Code", code: "", payroll: "", ft: "", pt: "" },
+    { id: 2, action: "Add Class Code", code: "", payroll: "", ft: "", pt: "" },
   ]);
   const [ccReason, setCcReason] = useState("");
   const [ccAddress, setCcAddress] = useState("");
@@ -144,6 +195,13 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
   const [notes, setNotes] = useState("");
   const [fileAttached, setFileAttached] = useState(false);
   const [draftSaved, setDraftSaved] = useState(false);
+
+  // Shared form-values store for the spec-driven endorsement types.
+  // Each key is `{type}.{fieldKey}` so keys never collide across types.
+  const [formValues, setFormValues] = useState<Record<string, string>>({});
+  const [openSelect, setOpenSelect] = useState<string | null>(null);
+  const fv = (k: string) => formValues[k] ?? "";
+  const setFv = (k: string, v: string) => setFormValues(p => ({ ...p, [k]: v }));
 
   // Field refs for the "click checklist item → scroll to field" behavior
   const fieldRefs = useRef<Record<string, HTMLElement | null>>({});
@@ -175,7 +233,7 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
     // Brand teal (#73C9B7) — same as the Bound status dot on Policies /
     // Quotes / Endorsements results. Text uses a darker sibling shade for
     // legible contrast on white; bg/border use tints of the brand teal.
-    green:      isDark ? "#8FDBC9" : "#2D8578",
+    green:      isDark ? "#8FDBC9" : "#73C9B7",
     greenBg:    isDark ? "rgba(115,201,183,0.18)" : "rgba(115,201,183,0.14)",
     greenBorder:isDark ? "rgba(115,201,183,0.35)" : "rgba(115,201,183,0.30)",
     amber:      "#B45309",
@@ -206,10 +264,292 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
     display: "block",
   };
 
-  const closeAll = () => { setCarrierOpen(false); setContactTypeOpen(false); setCcStateOpen(false); };
+  const closeAll = () => { setCarrierOpen(false); setContactTypeOpen(false); setCcStateOpen(false); setOpenSelect(null); };
 
   // ─── requirements engine (matches prototype's live submit-gate)
   interface Requirement { label: string; done: boolean; refKey: string }
+  const SPECS: Partial<Record<EndorsementType, FieldSpec[]>> = {
+    altemp: [
+      { k: "row", cols: [
+        { k: "date",  key: "eff",   label: "Effective date",             req: true },
+        { k: "state", key: "state", label: "State",                      req: true },
+      ]},
+      { k: "row", cols: [
+        { k: "num",   key: "form",  label: "Form number",                req: true },
+        { k: "num",   key: "fein",  label: "Alternate employer FEIN",    req: true, digits: 9, ph: "9 digits" },
+      ]},
+      { k: "text",    key: "name",  label: "Name of alternate employer", req: true },
+    ],
+    thirdpartynoc: [
+      { k: "row", cols: [
+        { k: "date", key: "eff",  label: "Effective date",   req: true },
+        { k: "text", key: "name", label: "Third party name", req: true },
+      ]},
+      { k: "header", text: "Third party address" },
+      { k: "addr", prefix: "" },
+    ],
+    mailing: [
+      { k: "date",   key: "eff",  label: "Effective date",  req: true },
+      { k: "header", text: "New mailing address" },
+      { k: "addr",   prefix: "" },
+    ],
+    reinstate: [
+      { k: "date",   key: "eff",     label: "Effective date",       req: true },
+      { k: "ta",     key: "reason",  label: "Reinstatement request", req: true, ph: "Reason for reinstatement…" },
+      { k: "helper", text: "A carrier-specific no loss statement may be required. If needed, we will reach out." },
+      { k: "attach", key: "acord37", label: "Acord 37 No Loss Statement" },
+    ],
+    cancel: [
+      { k: "date",   key: "eff",    label: "Effective date",     req: true },
+      { k: "sel",    key: "reason", label: "Cancellation reason", req: true,
+        opts: ["Coverage placed elsewhere", "Ownership Change / Business Sold", "Completed Operations - No Employees", "Retiring / Out of Business", "Rewritten", "Other"] },
+      { k: "helper", text: "If requesting to backdate the cancellation, we require proof of replacement coverage or other supporting documentation." },
+      { k: "attach", key: "acord25", label: "Upload Acord 25 LPR / Replacement Coverage Document", req: true },
+    ],
+    fein: [
+      { k: "row", cols: [
+        { k: "date", key: "eff",  label: "Effective date", req: true },
+        { k: "num",  key: "fein", label: "FEIN",           req: true, digits: 9, ph: "9 digits" },
+      ]},
+      { k: "header", text: "Entity the FEIN applies to" },
+      { k: "row", cols: [
+        { k: "text", key: "legal", label: "Legal name", req: true },
+        { k: "text", key: "dba",   label: "DBA" },
+      ]},
+    ],
+    xmod: [
+      { k: "row", cols: [
+        { k: "date", key: "eff",    label: "Ex-Mod effective date", req: true },
+        { k: "num",  key: "factor", label: "Ex-Mod factor",         req: true, decimals: true, ph: "e.g. 0.80 or 1.50" },
+      ]},
+      { k: "header", text: "Entity the Ex-Mod applies to" },
+      { k: "row", cols: [
+        { k: "text", key: "legal", label: "Legal name", req: true },
+        { k: "text", key: "dba",   label: "DBA" },
+      ]},
+      { k: "row", cols: [
+        { k: "num",  key: "fein",   label: "FEIN",           req: true, digits: 9 },
+        { k: "text", key: "states", label: "Rating state(s)", req: true, ph: "e.g. CA, NV" },
+      ]},
+      { k: "helper", text: "Please upload ex-mod worksheet if available." },
+      { k: "attach", key: "worksheet", label: "Upload Ex-Mod worksheet", req: true },
+    ],
+    namedinsured: [
+      { k: "date",   key: "eff", label: "Effective date", req: true },
+      { k: "helper", text: <>This page is only for amending the <span style={{ color: c.text, fontWeight: 600 }}>Legal name / DBA</span> of an entity already listed on the policy. If adding a new entity or changing ownership, please complete an Entity endorsement.</> },
+      { k: "row", cols: [
+        { k: "text", key: "curLegal", label: "Current legal name", req: true },
+        { k: "text", key: "curDba",   label: "Current DBA" },
+      ]},
+      { k: "row", cols: [
+        { k: "text", key: "newLegal", label: "New legal name" },
+        { k: "text", key: "newDba",   label: "New DBA" },
+      ]},
+      { k: "helper", warn: true, text: "At least one of New legal name or New DBA must be completed to submit." },
+      { k: "ta", key: "reason", label: "Additional comment (please clearly explain changes)", req: true },
+    ],
+    effdate: [
+      { k: "date", key: "eff",    label: "Requested policy effective date", req: true },
+      { k: "ta",   key: "reason", label: "Reason for effective date change", req: true, ph: "e.g. Client requested a later inception…" },
+    ],
+    officer: [
+      { k: "date",   key: "eff", label: "Effective date", req: true },
+      { k: "helper", text: "This page is only to exclude or include an officer previously disclosed. If ownership is changing, please complete an Entity endorsement. A signed officer waiver may be required for excluded officers." },
+      { k: "row", cols: [
+        { k: "text", key: "first", label: "First name", req: true },
+        { k: "text", key: "last",  label: "Last name",  req: true },
+      ]},
+      { k: "row", cols: [
+        { k: "text", key: "title",   label: "Title", req: true },
+        { k: "sel",  key: "incexc",  label: "Included / Excluded", req: true, opts: ["Included", "Excluded"] },
+      ]},
+    ],
+    limits: [
+      { k: "date", key: "eff", label: "Effective date", req: true,
+      },
+      { k: "helper", text: "Effective date must be policy inception date." },
+      { k: "sel", key: "el", label: "Employer's liability limits", req: true,
+        opts: ["$100,000 / $500,000 / $100,000", "$500,000 / $500,000 / $500,000", "$1,000,000 / $1,000,000 / $1,000,000"] },
+    ],
+    other: [
+      { k: "date", key: "eff",     label: "Effective date", req: true },
+      { k: "ta",   key: "request", label: "Describe your request", req: true, rows: 5,
+        ph: "Anything not covered by the other endorsement types — the underwriter will route it." },
+    ],
+    waiver: [
+      { k: "row", cols: [
+        { k: "date", key: "eff",  label: "Effective date",    req: true },
+        { k: "sel",  key: "type", label: "Waiver of subrogation", req: true, opts: ["Blanket", "Specific"] },
+      ]},
+      { k: "showIf", when: "type", equals: "Specific", children: [
+        { k: "helper", text: "Only one entity per waiver request allowed." },
+        { k: "text",   key: "holder", label: "Waiver holder's name", req: true },
+        { k: "header", text: "Waiver holder's address" },
+        { k: "addr",   prefix: "wh." },
+        { k: "header", text: "Jobsite address" },
+        { k: "addr",   prefix: "js." },
+        { k: "header", text: "Class code / payroll associated with job" },
+        { k: "row", cols: [
+          { k: "num", key: "code",    label: "Class code", req: true, digits: 4 },
+          { k: "num", key: "payroll", label: "Payroll",    req: true },
+        ]},
+        { k: "row", cols: [
+          { k: "num", key: "emps", label: "Employees",   req: true, digits: 3 },
+          { k: "ta",  key: "desc", label: "Description of work performed at jobsite", req: true, rows: 2 },
+        ]},
+      ]},
+    ],
+    location: [
+      { k: "row", cols: [
+        { k: "date", key: "eff",  label: "Effective date", req: true },
+        { k: "sel",  key: "mode", label: "Add / Edit / Remove location", req: true, opts: ["Add", "Edit", "Remove"] },
+      ]},
+      { k: "showIf", when: "mode", equals: "Add", children: [
+        { k: "helper", text: "If adding a new entity, a location endorsement is not required. Please complete an Entity endorsement." },
+        { k: "header", text: "Location" },
+        { k: "addr",   prefix: "" },
+        { k: "row", cols: [
+          { k: "text", key: "legal", label: "Legal name", req: true },
+          { k: "text", key: "dba",   label: "DBA" },
+        ]},
+        { k: "ta", key: "ops", label: "Operations performed at this location", req: true, rows: 2 },
+        { k: "header", text: "Please provide exposure for this new location only" },
+        { k: "row", cols: [
+          { k: "num", key: "code",    label: "Class code", req: true, digits: 4 },
+          { k: "num", key: "payroll", label: "Payroll",    req: true },
+        ]},
+        { k: "row", cols: [
+          { k: "num", key: "ft", label: "Full-time employees", req: true, digits: 3 },
+          { k: "num", key: "pt", label: "Part-time employees", req: true, digits: 3 },
+        ]},
+      ]},
+      { k: "showIf", when: "mode", equals: "Edit", children: [
+        { k: "helper", text: "If adding a new entity, please complete an Entity endorsement separately." },
+        { k: "header", text: "Current location info" },
+        { k: "addr",   prefix: "cur." },
+        { k: "row", cols: [
+          { k: "text", key: "curLegal", label: "Legal name", req: true },
+          { k: "text", key: "curDba",   label: "DBA" },
+        ]},
+        { k: "header", text: "New location info" },
+        { k: "addr",   prefix: "new." },
+        { k: "row", cols: [
+          { k: "text", key: "newLegal", label: "Legal name", req: true },
+          { k: "text", key: "newDba",   label: "DBA" },
+        ]},
+        { k: "check", key: "expChg", label: "Any change in exposure or operations at this location?" },
+        { k: "showIf", when: "expChg", checked: true, children: [
+          { k: "ta", key: "ops", label: "Operations performed at this location", req: true, rows: 2 },
+          { k: "helper", text: "Please provide revised prorated exposure for location(s) in the given state." },
+          { k: "sel", key: "payAction", label: "Add / Remove / Edit payroll", req: true, opts: ["Add Class Code", "Remove Class Code", "Edit Payroll"] },
+          { k: "row", cols: [
+            { k: "num", key: "code",    label: "Class code", req: true, digits: 4 },
+            { k: "num", key: "payroll", label: "Payroll",    req: true },
+          ]},
+          { k: "row", cols: [
+            { k: "num", key: "ft", label: "Full-time employees", req: true, digits: 3 },
+            { k: "num", key: "pt", label: "Part-time employees", req: true, digits: 3 },
+          ]},
+        ]},
+      ]},
+      { k: "showIf", when: "mode", equals: "Remove", children: [
+        { k: "header", text: "Location being removed" },
+        { k: "addr",   prefix: "rem." },
+        { k: "row", cols: [
+          { k: "text", key: "remLegal", label: "Legal name", req: true },
+          { k: "text", key: "remDba",   label: "DBA" },
+        ]},
+        { k: "check", key: "expChg", label: "Any change in exposure for remaining locations?" },
+        { k: "showIf", when: "expChg", checked: true, children: [
+          { k: "helper", text: "If payroll is being updated due to location removal, please provide revised total exposure for remaining location(s) in the given state." },
+          { k: "sel", key: "payAction", label: "Add / Remove / Edit payroll", req: true, opts: ["Add Class Code", "Remove Class Code", "Edit Payroll"] },
+          { k: "row", cols: [
+            { k: "num", key: "code",    label: "Class code", req: true, digits: 4 },
+            { k: "num", key: "payroll", label: "Payroll",    req: true },
+          ]},
+          { k: "row", cols: [
+            { k: "num", key: "ft", label: "Full-time employees", req: true, digits: 3 },
+            { k: "num", key: "pt", label: "Part-time employees", req: true, digits: 3 },
+          ]},
+        ]},
+      ]},
+    ],
+    entity: [
+      { k: "row", cols: [
+        { k: "date", key: "eff",  label: "Effective date", req: true },
+        { k: "sel",  key: "mode", label: "Add / Edit / Remove entity", req: true, opts: ["Add New", "Edit", "Remove"] },
+      ]},
+      { k: "sel", key: "etype", label: "Entity type", req: true, opts: [
+        "Association", "Common Ownership", "Corporation", "Government Entity", "Individual",
+        "Joint Employers", "Joint Venture", "Labor Union", "Limited Liability Company",
+        "Limited Liability Partnership", "Limited Partnership", "Partnership",
+        "Religious Organization", "Trust or Estate", "Other",
+      ]},
+      { k: "showIf", when: "etype", equals: "Other", children: [
+        { k: "text", key: "otherType", label: "Other entity type", req: true },
+      ]},
+      { k: "row", cols: [
+        { k: "text", key: "legal", label: "Legal name", req: true },
+        { k: "text", key: "dba",   label: "DBA" },
+      ]},
+      { k: "num", key: "fein", label: "FEIN", req: true, digits: 9, ph: "9 digits" },
+      { k: "header", text: "Ownership information (if adding excluded owners, attach a signed waiver form)" },
+      { k: "row", cols: [
+        { k: "text", key: "owFirst", label: "First name", req: true },
+        { k: "text", key: "owLast",  label: "Last name",  req: true },
+      ]},
+      { k: "row", cols: [
+        { k: "text", key: "owTitle", label: "Title",     req: true },
+        { k: "num",  key: "owPct",   label: "Ownership %", req: true, digits: 3, ph: "0-100" },
+      ]},
+      { k: "sel", key: "owInc", label: "Included / Excluded", req: true, opts: ["Included", "Excluded"] },
+      { k: "header", text: "Entity location" },
+      { k: "addr", prefix: "" },
+      { k: "check", key: "expChg", label: "Any change in exposure or operations at this location?" },
+      { k: "showIf", when: "expChg", checked: true, children: [
+        { k: "ta", key: "ops", label: "Operations performed at this location", req: true, rows: 2 },
+        { k: "header", text: "Please provide exposure for this entity" },
+        { k: "row", cols: [
+          { k: "num", key: "code",    label: "Class code", req: true, digits: 4 },
+          { k: "num", key: "payroll", label: "Payroll",    req: true },
+        ]},
+        { k: "row", cols: [
+          { k: "num", key: "ft", label: "Full-time employees", req: true, digits: 3 },
+          { k: "num", key: "pt", label: "Part-time employees", req: true, digits: 3 },
+        ]},
+      ]},
+    ],
+  };
+
+  const specRequirements = (t: EndorsementType): { label: string; done: boolean; refKey: string }[] => {
+    const spec = SPECS[t];
+    if (!spec) return [];
+    const out: { label: string; done: boolean; refKey: string }[] = [];
+    const walk = (arr: FieldSpec[]) => {
+      for (const f of arr) {
+        if (f.k === "row") walk(f.cols);
+        else if (f.k === "addr") {
+          walk([
+            { k: "text",  key: `${f.prefix}addr`,  label: "Address", req: true },
+            { k: "text",  key: `${f.prefix}city`,  label: "City",    req: true },
+            { k: "state", key: `${f.prefix}state`, label: "State",   req: true },
+            { k: "num",   key: `${f.prefix}zip`,   label: "Zip",     req: true, digits: 5 },
+          ]);
+        }
+        else if (f.k === "showIf") {
+          const cur = fv(`${t}.${f.when}`);
+          const active = f.checked ? cur === "true" : (f.equals ? cur === f.equals : !!cur);
+          if (active) walk(f.children);
+        }
+        else if ("req" in f && f.req && "key" in f) {
+          out.push({ label: f.label, done: !!fv(`${t}.${f.key}`).trim(), refKey: `${t}-${f.key}` });
+        }
+      }
+    };
+    walk(spec);
+    return out;
+  };
+
   const requirements = useMemo<Requirement[]>(() => {
     const R = (label: string, done: boolean, refKey: string): Requirement => ({ label, done, refKey });
     switch (type) {
@@ -221,14 +561,11 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
           R("At least one contact field", anyContact,                   "contact-any"),
         ];
       }
-      case "mcp65": {
-        const base = [
+      case "mcp65":
+        return [
           R("Effective date", !!mcpEff.trim(),    "mcp-eff"),
           R("MCP 65 number",  !!mcpNumber.trim(), "mcp-num"),
         ];
-        if (carrier === "cna") base.push(R("CNA MCP 65 form attached", mcpFormAttached, "mcp-form"));
-        return base;
-      }
       case "puc":
         return [
           R("Effective date",    !!pucEff.trim(),    "puc-eff"),
@@ -238,7 +575,7 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
         const rowReqs: Requirement[] = ccRows.flatMap((r, i) => {
           const line = i + 1;
           const items: Requirement[] = [R(`Class code (line ${line})`, !!r.code.trim(), `cc-code-${r.id}`)];
-          if (r.action !== "Remove") {
+          if (r.action !== "Remove Class Code") {
             items.push(R(`Payroll (line ${line})`, !!r.payroll.trim(), `cc-pay-${r.id}`));
             items.push(R(`FT (line ${line})`,      r.ft.trim().length > 0, `cc-ft-${r.id}`));
             items.push(R(`PT (line ${line})`,      r.pt.trim().length > 0, `cc-pt-${r.id}`));
@@ -255,13 +592,16 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
           R("Zip",               !!ccZip.trim(),    "cc-zip"),
         ];
       }
+      default:
+        return specRequirements(type);
     }
   }, [
-    type, carrier,
+    type,
     contactEff, contactType, contactFirst, contactLast, contactPhone, contactEmail,
-    mcpEff, mcpNumber, mcpFormAttached,
+    mcpEff, mcpNumber,
     pucEff, pucNumber,
     ccEff, ccRows, ccReason, ccAddress, ccCity, ccState, ccZip,
+    formValues,
   ]);
   const outstanding = requirements.filter(r => !r.done).length;
   const submitReady = outstanding === 0;
@@ -274,24 +614,36 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
         return !!contactEff.trim() && !!contactType.trim() && anyContact;
       }
       case "mcp65":
-        return !!mcpEff.trim() && !!mcpNumber.trim() && (carrier !== "cna" || mcpFormAttached);
+        return !!mcpEff.trim() && !!mcpNumber.trim();
       case "puc":
         return !!pucEff.trim() && !!pucNumber.trim();
       case "classcode": {
-        const rowsOk = ccRows.every(r => !!r.code.trim() && (r.action === "Remove" || (!!r.payroll.trim() && !!r.ft.trim() && !!r.pt.trim())));
+        const rowsOk = ccRows.every(r => !!r.code.trim() && (r.action === "Remove Class Code" || (!!r.payroll.trim() && !!r.ft.trim() && !!r.pt.trim())));
         return !!ccEff.trim() && rowsOk && !!ccReason.trim() && !!ccAddress.trim() && !!ccCity.trim() && !!ccState.trim() && !!ccZip.trim();
+      }
+      default: {
+        const reqs = specRequirements(t);
+        return reqs.length > 0 && reqs.every(r => r.done);
       }
     }
   };
   const isTypeStarted = (t: EndorsementType): boolean => {
     switch (t) {
       case "contact":   return [contactEff, contactType, contactFirst, contactLast, contactPhone, contactEmail].some(v => v.trim());
-      case "mcp65":     return !!mcpEff.trim() || !!mcpNumber.trim() || mcpFormAttached;
+      case "mcp65":     return !!mcpEff.trim() || !!mcpNumber.trim();
       case "puc":       return !!pucEff.trim() || !!pucNumber.trim();
       case "classcode": return !!ccEff.trim() || ccRows.some(r => r.code.trim() || r.payroll.trim() || r.ft.trim() || r.pt.trim()) || !!ccReason.trim() || !!ccAddress.trim() || !!ccCity.trim() || !!ccState.trim() || !!ccZip.trim();
+      default:          return Object.keys(formValues).some(k => k.startsWith(`${t}.`) && !!formValues[k].trim());
     }
   };
-  const activeTypes: EndorsementType[] = ["contact", "mcp65", "puc", "classcode"];
+  const activeTypes: EndorsementType[] = [
+    "contact", "namedinsured", "mailing", "effdate",
+    "classcode", "limits", "waiver", "officer",
+    "mcp65", "puc", "thirdpartynoc", "altemp", "fein", "xmod",
+    "location", "entity",
+    "reinstate", "cancel",
+    "other",
+  ];
   const pagesDone = activeTypes.filter(isTypeDone).length;
   const totalPct = Math.round((pagesDone / activeTypes.length) * 100);
 
@@ -318,18 +670,20 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
 
   const Helper = ({ children, warn }: { children: React.ReactNode; warn?: boolean }) => (
     <div
+      className={warn ? "flex items-center gap-1.5" : ""}
       style={{
         fontFamily: FONT,
-        fontSize: 12.5,
-        color: c.muted,
+        fontSize: warn ? 11 : 12.5,
+        color: warn ? c.razz : c.muted,
         margin: "0 0 12px",
         padding: "9px 12px",
-        background: warn ? c.warnBg : c.helperBg,
-        border: `1px solid ${warn ? c.warnBorder : c.border}`,
+        background: c.helperBg,
+        border: `1px solid ${c.border}`,
         borderRadius: 8,
       }}
     >
-      {children}
+      {warn && <CircleAlert className="w-3 h-3 flex-shrink-0" />}
+      <span>{children}</span>
     </div>
   );
 
@@ -350,6 +704,174 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
       {hint && <div style={{ fontFamily: FONT, fontSize: 11.5, color: c.muted, marginTop: 4 }}>{hint}</div>}
     </div>
   );
+
+  // ─── Spec-driven field system used by every endorsement type below
+  // the original 4. Each spec is a flat array of FieldSpec entries;
+  // renderSpec() walks the array and emits Field / Helper / Section
+  // primitives. Values live in `formValues` under `{type}.{key}` keys
+  // so no additional useState hooks are needed per type.
+  type FieldSpec =
+    | { k: "date";   key: string; label: string; req?: boolean }
+    | { k: "text";   key: string; label: string; req?: boolean; ph?: string; hint?: React.ReactNode }
+    | { k: "num";    key: string; label: string; req?: boolean; ph?: string; digits?: number; decimals?: boolean }
+    | { k: "sel";    key: string; label: string; req?: boolean; opts: string[] }
+    | { k: "state";  key: string; label: string; req?: boolean }
+    | { k: "ta";     key: string; label: string; req?: boolean; ph?: string; rows?: number }
+    | { k: "attach"; key: string; label: string; req?: boolean }
+    | { k: "check";  key: string; label: string }
+    | { k: "header"; text: string }
+    | { k: "helper"; text: React.ReactNode; warn?: boolean }
+    | { k: "section"; label: string }
+    | { k: "row";    cols: FieldSpec[] }
+    | { k: "addr";   prefix: string }
+    | { k: "showIf"; when: string; equals?: string; checked?: boolean; children: FieldSpec[] };
+
+  const renderField = (t: EndorsementType, f: FieldSpec, idx: number): React.ReactNode => {
+    const kk = (key: string) => `${t}.${key}`;
+    const refKey = (key: string) => `${t}-${key}`;
+    switch (f.k) {
+      case "date":
+        return (
+          <Field key={idx} label={f.label} required={f.req} refKey={refKey(f.key)}>
+            <DatePicker value={fv(kk(f.key))} onChange={v => setFv(kk(f.key), v)} inputStyle={inputStyle} c={c} btnGrad={razzGrad} font={font} />
+          </Field>
+        );
+      case "text":
+        return (
+          <Field key={idx} label={f.label} required={f.req} refKey={refKey(f.key)} hint={f.hint}>
+            <input value={fv(kk(f.key))} onChange={e => setFv(kk(f.key), e.target.value)} placeholder={f.ph} style={inputStyle} />
+          </Field>
+        );
+      case "num":
+        return (
+          <Field key={idx} label={f.label} required={f.req} refKey={refKey(f.key)}>
+            <input
+              inputMode={f.decimals ? "decimal" : "numeric"}
+              maxLength={f.digits}
+              value={fv(kk(f.key))}
+              onChange={e => setFv(kk(f.key), e.target.value)}
+              placeholder={f.ph}
+              style={inputStyle}
+            />
+          </Field>
+        );
+      case "sel": {
+        const selId = kk(f.key);
+        const isOpen = openSelect === selId;
+        const val = fv(selId);
+        return (
+          <Field key={idx} label={f.label} required={f.req} refKey={refKey(f.key)}>
+            <div className="relative">
+              <button type="button" onClick={() => { closeAll(); setOpenSelect(isOpen ? null : selId); }}
+                className="w-full flex items-center justify-between"
+                style={{ ...inputStyle, cursor: "pointer", textAlign: "left", color: val ? c.text : c.sub }}>
+                <span>{val || "Select…"}</span>
+                <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? "rotate-180" : ""}`} style={{ color: c.muted }} />
+              </button>
+              {isOpen && (
+                <div className="absolute left-0 right-0 top-full mt-1 z-20 rounded-lg shadow-lg overflow-hidden max-h-[280px] overflow-y-auto" style={{ background: c.cardBg, border: `1px solid ${c.border}` }}>
+                  {f.opts.map(o => {
+                    const selected = val === o;
+                    return (
+                      <button key={o} onClick={() => { setFv(selId, o); setOpenSelect(null); }}
+                        className="w-full flex items-center justify-between gap-2 text-left px-3 py-2 text-[13px] transition-colors"
+                        style={{ fontFamily: FONT, color: selected ? c.razz : c.text, background: selected ? c.softBg : "transparent", fontWeight: selected ? 600 : 500 }}
+                        onMouseEnter={e => { if (!selected) e.currentTarget.style.background = c.hoverBg; }}
+                        onMouseLeave={e => { if (!selected) e.currentTarget.style.background = "transparent"; }}
+                      >
+                        <span>{o}</span>
+                        {selected && <Check className="w-3.5 h-3.5 flex-shrink-0" strokeWidth={2.5} />}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </Field>
+        );
+      }
+      case "state":
+        return renderField(t, { k: "sel", key: f.key, label: f.label, req: f.req, opts: STATES }, idx);
+      case "ta":
+        return (
+          <Field key={idx} label={f.label} required={f.req} refKey={refKey(f.key)}>
+            <textarea value={fv(kk(f.key))} onChange={e => setFv(kk(f.key), e.target.value)}
+              placeholder={f.ph}
+              rows={f.rows ?? 3}
+              style={{ ...inputStyle, resize: "vertical", minHeight: 72, fontFamily: FONT }} />
+          </Field>
+        );
+      case "attach":
+        return (
+          <Field key={idx} label={f.label} required={f.req} refKey={refKey(f.key)}>
+            <label
+              className="flex flex-col items-center justify-center cursor-pointer transition-colors"
+              style={{
+                background: fv(kk(f.key)) ? c.softBg : c.helperBg,
+                border: `1.5px dashed ${fv(kk(f.key)) ? c.razz : c.border}`,
+                borderRadius: 10, padding: 16, textAlign: "center", color: c.muted, fontSize: 13,
+              }}
+              onClick={() => setFv(kk(f.key), fv(kk(f.key)) ? "" : "attached")}
+            >
+              <Paperclip className="w-4 h-4 mb-1.5" style={{ color: c.razz }} />
+              <span style={{ fontFamily: FONT, fontSize: 13, fontWeight: 500, color: c.text }}>
+                {fv(kk(f.key)) ? "Document attached" : "Drag a file here or click to browse"}
+              </span>
+              <span style={{ fontFamily: FONT, fontSize: 11, color: c.muted, marginTop: 2 }}>PDF, JPG, PNG · Max 10MB</span>
+            </label>
+          </Field>
+        );
+      case "check":
+        return (
+          <Field key={idx}>
+            <label className="inline-flex items-center gap-2 cursor-pointer" style={{ fontFamily: FONT, fontSize: 13, color: c.text }}>
+              <input type="checkbox" checked={fv(kk(f.key)) === "true"} onChange={e => setFv(kk(f.key), e.target.checked ? "true" : "")}
+                style={{ accentColor: c.razz, width: 15, height: 15 }} />
+              {f.label}
+            </label>
+          </Field>
+        );
+      case "header":
+        return (
+          <div key={idx} style={{ fontFamily: FONT, fontSize: 12.5, fontWeight: 600, color: c.text, marginTop: 14, marginBottom: 4 }}>
+            {f.text}
+          </div>
+        );
+      case "helper":
+        return <Helper key={idx} warn={f.warn}>{f.text}</Helper>;
+      case "section":
+        return <SectionLabel key={idx}>{f.label}</SectionLabel>;
+      case "row":
+        return (
+          <div key={idx} className="grid grid-cols-2 gap-3.5">
+            {f.cols.map((c2, i) => renderField(t, c2, i))}
+          </div>
+        );
+      case "addr":
+        return (
+          <div key={idx}>
+            <Field
+              label="Address" required refKey={refKey(`${f.prefix}addr`)}
+              hint={<><span style={{ color: c.razz }}>◈</span> Autofills from Google Address when a match is found</>}
+            >
+              <input value={fv(kk(`${f.prefix}addr`))} onChange={e => setFv(kk(`${f.prefix}addr`), e.target.value)} placeholder="587 Test St." style={inputStyle} />
+            </Field>
+            <div className="grid gap-3.5" style={{ gridTemplateColumns: "2fr 1fr 1fr" }}>
+              {renderField(t, { k: "text",  key: `${f.prefix}city`,  label: "City",  req: true }, 0)}
+              {renderField(t, { k: "state", key: `${f.prefix}state`, label: "State", req: true }, 1)}
+              {renderField(t, { k: "num",   key: `${f.prefix}zip`,   label: "Zip",   req: true, digits: 5 }, 2)}
+            </div>
+          </div>
+        );
+      case "showIf": {
+        const cur = fv(kk(f.when));
+        const active = f.checked ? cur === "true" : (f.equals ? cur === f.equals : !!cur);
+        if (!active) return null;
+        return <React.Fragment key={idx}>{f.children.map((c2, i) => renderField(t, c2, i))}</React.Fragment>;
+      }
+    }
+  };
+
 
   // Rendered as its own card outside the form card (see center column).
   const supportingDetailFields = () => (
@@ -389,36 +911,35 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
   // ─── page renderers (content copied 1:1 from the prototype)
   const renderContact = () => (
     <>
-      <Field label="Effective date" required refKey="contact-eff">
-        <div style={{ maxWidth: 260 }}>
+      <div className="grid grid-cols-2 gap-3.5">
+        <Field label="Effective date" required refKey="contact-eff">
           <DatePicker value={contactEff} onChange={setContactEff} inputStyle={inputStyle} c={c} btnGrad={razzGrad} font={font} />
-        </div>
-      </Field>
+        </Field>
+        <Field label="Contact type" required refKey="contact-type">
+          <div className="relative">
+            <button type="button" onClick={() => { closeAll(); setContactTypeOpen(o => !o); }}
+              className="w-full flex items-center justify-between"
+              style={{ ...inputStyle, cursor: "pointer", textAlign: "left", color: contactType ? c.text : c.sub }}>
+              <span>{contactType || "Select…"}</span>
+              <ChevronDown className={`w-4 h-4 transition-transform ${contactTypeOpen ? "rotate-180" : ""}`} style={{ color: c.muted }} />
+            </button>
+            {contactTypeOpen && (
+              <div className="absolute left-0 right-0 top-full mt-1 z-20 rounded-lg shadow-lg overflow-hidden" style={{ background: c.cardBg, border: `1px solid ${c.border}` }}>
+                {["Insured", "Agent"].map(o => (
+                  <button key={o} onClick={() => { setContactType(o); setContactTypeOpen(false); }}
+                    className="w-full text-left px-3 py-2 text-[13px] transition-colors"
+                    style={{ fontFamily: FONT, color: c.text }}
+                    onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+                    onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                  >{o}</button>
+                ))}
+              </div>
+            )}
+          </div>
+        </Field>
+      </div>
 
-      <Helper>Are you updating the <b style={{ color: c.text }}>insured</b> or the <b style={{ color: c.text }}>agency</b> contact information?</Helper>
-
-      <Field label="Contact type" required refKey="contact-type">
-        <div style={{ maxWidth: 260 }} className="relative">
-          <button type="button" onClick={() => { closeAll(); setContactTypeOpen(o => !o); }}
-            className="w-full flex items-center justify-between"
-            style={{ ...inputStyle, cursor: "pointer", textAlign: "left", color: contactType ? c.text : c.sub }}>
-            <span>{contactType || "Select…"}</span>
-            <ChevronDown className={`w-4 h-4 transition-transform ${contactTypeOpen ? "rotate-180" : ""}`} style={{ color: c.muted }} />
-          </button>
-          {contactTypeOpen && (
-            <div className="absolute left-0 right-0 top-full mt-1 z-20 rounded-lg shadow-lg overflow-hidden" style={{ background: c.cardBg, border: `1px solid ${c.border}` }}>
-              {["Insured", "Agent"].map(o => (
-                <button key={o} onClick={() => { setContactType(o); setContactTypeOpen(false); }}
-                  className="w-full text-left px-3 py-2 text-[13px] transition-colors"
-                  style={{ fontFamily: FONT, color: c.text }}
-                  onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
-                  onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
-                >{o}</button>
-              ))}
-            </div>
-          )}
-        </div>
-      </Field>
+      <Helper>Are you updating the <span style={{ color: c.text, fontWeight: 600 }}>insured</span> or the <span style={{ color: c.text, fontWeight: 600 }}>agency</span> contact information?</Helper>
 
       <div className="grid grid-cols-2 gap-3.5" ref={setRef("contact-any")}>
         <Field label="First name" optional>
@@ -436,7 +957,6 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
       </div>
 
       <Helper warn>
-        <span style={{ color: "#B91C1C", fontWeight: 600 }}>⚠</span>{" "}
         At least one of first name, last name, phone, or email must be completed to submit.
       </Helper>
 
@@ -446,87 +966,41 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
 
   const renderMcp65 = () => (
     <>
-      <Field label="Effective date" required refKey="mcp-eff">
-        <div style={{ maxWidth: 260 }}>
+      <div className="grid gap-4" style={{ gridTemplateColumns: "1fr 1fr", maxWidth: 540 }}>
+        <Field label="Effective date" required refKey="mcp-eff">
           <DatePicker value={mcpEff} onChange={setMcpEff} inputStyle={inputStyle} c={c} btnGrad={razzGrad} font={font} />
-        </div>
-      </Field>
+        </Field>
+        <Field label="MCP 65 number" required refKey="mcp-num">
+          <input inputMode="numeric" value={mcpNumber} onChange={e => setMcpNumber(e.target.value)} placeholder="e.g. 0123456" style={inputStyle} />
+        </Field>
+      </div>
 
-      {/* Carrier-conditional callout — restyled to match the app's helper-box
-          pattern (soft gray bg, thin border, muted text) with a razz text link
-          for the forms-library action. No heavy color fill. */}
-      {carrier === "cna" && (
-        <div
-          ref={setRef("mcp-form")}
-          style={{
-            margin: "14px 0",
-            padding: "10px 12px",
-            borderRadius: 8,
-            background: c.helperBg,
-            border: `1px solid ${c.border}`,
-            borderLeft: `3px solid ${c.razz}`,
-            fontFamily: FONT,
-          }}
-        >
-          <div style={{ fontSize: 12.5, color: c.muted, lineHeight: 1.5 }}>
-            <span style={{ color: c.text, fontWeight: 600 }}>CNA requirement.</span>{" "}
-            CNA only allows an MCP 65 when a commercial auto policy is in force with them, and requires a specific form attached.
-          </div>
-          <button
-            type="button"
-            onClick={() => setMcpFormAttached(v => !v)}
-            className="inline-flex items-center gap-1 mt-1.5 transition-opacity hover:opacity-70"
-            style={{ fontFamily: FONT, fontSize: 12.5, fontWeight: 600, color: c.razz, background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
-          >
-            {mcpFormAttached ? (
-              <>
-                <Check className="w-3.5 h-3.5" strokeWidth={3} />
-                CNA MCP 65 form attached
-              </>
-            ) : (
-              <>
-                Open CNA MCP 65 form from the forms library
-                <ChevronRight className="w-3.5 h-3.5" />
-              </>
-            )}
-          </button>
-        </div>
-      )}
-
-      <Field label="MCP 65 number" required refKey="mcp-num">
-        <input inputMode="numeric" value={mcpNumber} onChange={e => setMcpNumber(e.target.value)} placeholder="e.g. 0123456" style={{ ...inputStyle, maxWidth: 260 }} />
-      </Field>
-
-      
     </>
   );
 
   const renderPuc = () => (
     <>
-      <Field label="Effective date" required refKey="puc-eff">
-        <div style={{ maxWidth: 260 }}>
+      <div className="grid gap-4" style={{ gridTemplateColumns: "1fr 1fr", maxWidth: 540 }}>
+        <Field label="Effective date" required refKey="puc-eff">
           <DatePicker value={pucEff} onChange={setPucEff} inputStyle={inputStyle} c={c} btnGrad={razzGrad} font={font} />
-        </div>
-      </Field>
-      <Field label="PUC filing number" required refKey="puc-num">
-        <input inputMode="numeric" value={pucNumber} onChange={e => setPucNumber(e.target.value)} style={{ ...inputStyle, maxWidth: 260 }} />
-      </Field>
-      
+        </Field>
+        <Field label="PUC filing number" required refKey="puc-num">
+          <input inputMode="numeric" value={pucNumber} onChange={e => setPucNumber(e.target.value)} style={inputStyle} />
+        </Field>
+      </div>
     </>
   );
 
   const renderClassCode = () => (
     <>
       <Field label="Effective date" required refKey="cc-eff">
-        <div style={{ maxWidth: 260 }}>
-          <DatePicker value={ccEff} onChange={setCcEff} inputStyle={inputStyle} c={c} btnGrad={razzGrad} font={font} />
-        </div>
+        <DatePicker value={ccEff} onChange={setCcEff} inputStyle={inputStyle} c={c} btnGrad={razzGrad} font={font} />
       </Field>
 
       <SectionLabel>Class code changes</SectionLabel>
       <Helper>
-        Choose an action per line. On <b style={{ color: c.text }}>Remove</b>, payroll and employee counts grey out — only the class code is needed.
-        Use <b style={{ color: c.text }}>+ Add line</b> for multiple changes in one request.
+        Choose an action per line. On <span style={{ color: c.text, fontWeight: 600 }}>Remove</span>, payroll and employee counts grey out — only the class code is needed.
+        Use <span style={{ color: c.text, fontWeight: 600 }}>+ Add line</span> for multiple changes in one request.
       </Helper>
 
       <div className="overflow-hidden" style={{ border: `1px solid ${c.border}`, borderRadius: 10, marginTop: 6 }}>
@@ -550,11 +1024,13 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
       </div>
       <button
         type="button"
-        onClick={() => setCcRows(rows => [...rows, { id: nextRowId.current++, action: "Add", code: "", payroll: "", ft: "", pt: "" }])}
-        className="mt-2.5 inline-flex items-center gap-1.5 transition-colors"
-        style={{ fontFamily: FONT, fontSize: 13, fontWeight: 600, color: c.razz, background: c.softBg, border: `1px dashed ${c.softBorder}`, padding: "8px 14px", borderRadius: 8, cursor: "pointer" }}
+        onClick={() => setCcRows(rows => [...rows, { id: nextRowId.current++, action: "Add Class Code", code: "", payroll: "", ft: "", pt: "" }])}
+        className="w-full mt-2.5 inline-flex items-center justify-center gap-1.5 transition-colors"
+        style={{ fontFamily: FONT, fontSize: 13, fontWeight: 600, color: c.razz, background: "transparent", border: `1px dashed ${c.softBorder}`, padding: "12px 14px", borderRadius: 10, cursor: "pointer" }}
+        onMouseEnter={e => (e.currentTarget.style.background = c.softBg)}
+        onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
       >
-        <Plus className="w-3.5 h-3.5" /> Add line
+        <Plus className="w-4 h-4" /> Add line
       </button>
 
       <SectionLabel>Reason for change</SectionLabel>
@@ -683,26 +1159,12 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
             </div>
 
             <div className="flex flex-col" style={{ marginTop: 14 }}>
-              {/* Progress — one small uppercase 11/700 label, same style as phase groups */}
-              <div style={{ padding: "0 6px 12px" }}>
-                <div className="flex items-center justify-between mb-1.5">
-                  <span style={{ fontFamily: FONT, fontSize: 11, fontWeight: 700, color: c.muted, textTransform: "uppercase", letterSpacing: "0.07em" }}>Progress</span>
-                  <span style={{ fontFamily: FONT, fontSize: 11, fontWeight: 700, color: pagesDone === activeTypes.length ? c.green : c.razz }}>
-                    {pagesDone}<span style={{ color: c.muted, marginLeft: 3 }}>/ {activeTypes.length}</span>
-                  </span>
-                </div>
-                <div style={{ height: 3, background: c.softDivider, borderRadius: 999, overflow: "hidden" }}>
-                  <div style={{ width: `${totalPct}%`, height: "100%", background: pagesDone === activeTypes.length ? c.green : razzGrad, transition: "width 300ms ease" }} />
-                </div>
-              </div>
-
             {NAV.map((g, gi) => (
-              <div key={g.label ?? `group-${gi}`} style={{ marginBottom: 20 }}>
-                {g.label && (
-                  <div style={{ padding: "8px 10px 6px", marginTop: gi === 0 ? 0 : 4, borderTop: gi === 0 ? "none" : `1px solid ${c.softDivider}` }}>
-                    <span style={{ fontFamily: FONT, fontSize: 11, fontWeight: 700, color: c.muted, textTransform: "uppercase", letterSpacing: "0.07em" }}>{g.label}</span>
-                  </div>
-                )}
+              <div key={g.label ?? `group-${gi}`} style={{
+                marginBottom: 10,
+                paddingTop: gi === 0 ? 0 : 12,
+                borderTop: gi === 0 ? "none" : `1px solid ${c.softDivider}`,
+              }}>
                 {g.items.map((it, i) => {
                   const active = it.key === type;
                   const disabled = !!it.disabled || it.key === null;
@@ -711,7 +1173,7 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
                   const statusEl = disabled ? null : done ? (
                     <span
                       className="inline-flex items-center justify-center rounded-full"
-                      style={{ width: 16, height: 16, background: c.greenBg, color: c.green }}
+                      style={{ width: 16, height: 16, background: c.razz, color: "#fff" }}
                       title="All required fields complete"
                     >
                       <Check className="w-2.5 h-2.5" strokeWidth={3.5} />
@@ -780,6 +1242,7 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
                 {type === "mcp65"     && renderMcp65()}
                 {type === "puc"       && renderPuc()}
                 {type === "classcode" && renderClassCode()}
+                {SPECS[type] && SPECS[type]!.map((f, i) => renderField(type, f, i))}
               </div>
 
               {/* Supporting Detail — flat, no card */}
@@ -804,51 +1267,32 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
             style={{ position: "sticky", top: 20, alignSelf: "flex-start" }}
             onClick={e => e.stopPropagation()}
           >
-            {/* ── Section header: CARRIER + carrier state pill (like the reference's
-                "Embedding v3 · AI Model · Warning" panel header). */}
-            <div style={{ padding: "0 2px 12px" }}>
-              <div className="flex items-start justify-between gap-3 mb-3">
-                <div className="min-w-0">
-                  <div style={{ fontFamily: FONT, fontSize: 18, fontWeight: 600, color: c.text, letterSpacing: "-0.01em", lineHeight: 1.2 }}>
-                    {CARRIERS.find(x => x.key === carrier)!.label}
-                  </div>
-                  <div style={{ fontFamily: FONT, fontSize: 12, color: c.muted, marginTop: 2 }}>Issuing carrier</div>
-                </div>
-                {(carrier === "cna" && type === "mcp65") ? (
-                  <span
-                    className="inline-flex items-center gap-1.5"
-                    style={{ fontFamily: FONT, fontSize: 11, fontWeight: 600, color: "#B91C1C", background: "rgba(239,68,68,0.10)", border: `1px solid rgba(239,68,68,0.22)`, padding: "3px 10px", borderRadius: 999 }}
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#EF4444" }} /> Extra rule
-                  </span>
-                ) : (
-                  <span
-                    className="inline-flex items-center gap-1.5"
-                    style={{ fontFamily: FONT, fontSize: 11, fontWeight: 600, color: c.green, background: c.greenBg, border: `1px solid ${c.greenBorder}`, padding: "3px 10px", borderRadius: 999 }}
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#10B981" }} /> Standard
-                  </span>
-                )}
+            {/* ── ISSUING CARRIER — matches other sidebar sections
+                (uppercase label + control). */}
+            <div style={{ padding: "0 2px 4px" }}>
+              <div style={{ fontFamily: FONT, fontSize: 11, fontWeight: 700, color: c.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8, padding: "0 2px" }}>
+                Issuing carrier
               </div>
-
-              {/* Carrier dropdown (kept as a compact chip so switching is fast) */}
               <div className="relative">
                 <button type="button" onClick={() => { closeAll(); setCarrierOpen(o => !o); }}
                   className="w-full flex items-center justify-between"
                   style={{ ...inputStyle, cursor: "pointer", textAlign: "left" }}
                 >
-                  <span>Change carrier: {CARRIERS.find(x => x.key === carrier)!.label}</span>
+                  <span>{CARRIERS.find(x => x.key === carrier)!.label}</span>
                   <ChevronDown className={`w-4 h-4 transition-transform ${carrierOpen ? "rotate-180" : ""}`} style={{ color: c.muted }} />
                 </button>
                 {carrierOpen && (
                   <div className="absolute left-0 right-0 top-full mt-1 z-30 rounded-lg shadow-lg overflow-hidden" style={{ background: c.cardBg, border: `1px solid ${c.border}` }}>
                     {CARRIERS.map(x => (
                       <button key={x.key} onClick={() => { setCarrier(x.key); setCarrierOpen(false); }}
-                        className="w-full text-left px-3 py-2 text-[13px] transition-colors"
+                        className="w-full flex items-center justify-between gap-2 text-left px-3 py-2 text-[13px] transition-colors"
                         style={{ fontFamily: FONT, color: x.key === carrier ? c.razz : c.text, background: x.key === carrier ? c.softBg : "transparent", fontWeight: x.key === carrier ? 600 : 500 }}
                         onMouseEnter={e => { if (x.key !== carrier) e.currentTarget.style.background = c.hoverBg; }}
                         onMouseLeave={e => { if (x.key !== carrier) e.currentTarget.style.background = "transparent"; }}
-                      >{x.label}</button>
+                      >
+                        <span>{x.label}</span>
+                        {x.key === carrier && <Check className="w-3.5 h-3.5 flex-shrink-0" strokeWidth={2.5} />}
+                      </button>
                     ))}
                   </div>
                 )}
@@ -856,7 +1300,8 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
             </div>
 
             {/* ── SUBMIT GATE — bordered card with big number + requirement rows,
-                each row clickable to scroll to its field. */}
+                each row clickable to scroll to its field. Colors kept simple
+                (razz + neutral gray) — no teal / amber accents. */}
             <div style={{ fontFamily: FONT, fontSize: 11, fontWeight: 700, color: c.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginTop: 20, marginBottom: 8, padding: "0 2px" }}>
               Submit gate
             </div>
@@ -865,7 +1310,7 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
               style={{ border: `1px solid ${c.border}`, background: c.cardBg, overflow: "hidden" }}
             >
               <div className="flex items-baseline gap-2" style={{ padding: "14px 14px 12px" }}>
-                <span style={{ fontFamily: FONT, fontSize: 28, fontWeight: 700, color: submitReady ? c.green : c.razz, letterSpacing: "-0.03em", lineHeight: 1 }}>{outstanding}</span>
+                <span style={{ fontFamily: FONT, fontSize: 28, fontWeight: 700, color: submitReady ? c.muted : c.razz, letterSpacing: "-0.03em", lineHeight: 1 }}>{outstanding}</span>
                 <span style={{ fontFamily: FONT, fontSize: 12.5, color: c.muted }}>
                   {outstanding === 1 ? "requirement left" : "requirements left"}
                 </span>
@@ -895,8 +1340,8 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
                           className="flex items-center justify-center flex-shrink-0 rounded-full"
                           style={{
                             width: 18, height: 18,
-                            background: r.done ? c.greenBg : c.amberBg,
-                            color:      r.done ? c.green   : c.amber,
+                            background: r.done ? c.greenBg : "rgba(166,20,195,0.10)",
+                            color:      r.done ? c.green   : c.razz,
                           }}
                         >
                           {r.done ? <Check className="w-3 h-3" strokeWidth={3.5} /> : <span style={{ fontSize: 10, fontWeight: 700 }}>!</span>}
@@ -958,7 +1403,7 @@ function ClassCodeRowInput({ row, isLast, c, registerRef, onChange, onRemove }: 
   const hits = row.code.trim()
     ? CLASS_CODES.filter(x => x.code.includes(row.code.trim()) || x.desc.toLowerCase().includes(row.code.trim().toLowerCase())).slice(0, 6)
     : [];
-  const isRemove = row.action === "Remove";
+  const isRemove = row.action === "Remove Class Code";
   const cellInput: React.CSSProperties = {
     fontFamily: FONT,
     width: "100%",
@@ -978,9 +1423,9 @@ function ClassCodeRowInput({ row, isLast, c, registerRef, onChange, onRemove }: 
     <div className="grid items-center" style={{ gridTemplateColumns: "120px 1.5fr 1fr 70px 70px 36px" }}>
       <div style={cellStyle}>
         <select value={row.action} onChange={e => onChange({ action: e.target.value as ClassCodeRow["action"] })} style={cellInput}>
-          <option>Add</option>
-          <option>Edit</option>
-          <option>Remove</option>
+          <option>Add Class Code</option>
+          <option>Edit Payroll</option>
+          <option>Remove Class Code</option>
         </select>
       </div>
       <div style={{ ...cellStyle, position: "relative" }} ref={registerRef(`cc-code-${row.id}`)}>
