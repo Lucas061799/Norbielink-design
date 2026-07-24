@@ -19,77 +19,61 @@ interface PolicyRow {
 }
 
 const mockPolicies: PolicyRow[] = [
-  { id: "1",  created: "05/01/2024", submissionId: "QAA123456789",   applicant: "Elvis Prestley", dba: "NASA",                   effective: "05/01/2024", lob: "General Liability",    status: "Add'l Insured Request", producer: "Elvis Prestley" },
-  { id: "2",  created: "01/01/2024", submissionId: "QAN555666123",   applicant: "Jane Smith",     dba: "VRG Plumbing, LLC",      effective: "01/01/2024", lob: "Worker's Comp",        status: "Sold/Issued",           producer: "Jane Smith" },
+  { id: "1",  created: "05/01/2024", submissionId: "QAA123456789",   applicant: "Elvis Prestley", dba: "NASA",                   effective: "05/01/2024", lob: "General Liability",    status: "Requested Info", producer: "Elvis Prestley" },
+  { id: "2",  created: "01/01/2024", submissionId: "QAN555666123",   applicant: "Jane Smith",     dba: "VRG Plumbing, LLC",      effective: "01/01/2024", lob: "Worker's Comp",        status: "Issued",           producer: "Jane Smith" },
   { id: "3",  created: "06/15/2024", submissionId: "QMWC123456789",  applicant: "Joe Smith",      dba: "California Auto Sales",  effective: "06/15/2024", lob: "General Liability",    status: "Declined",              producer: "Joe Smith" },
   { id: "4",  created: "07/01/2024", submissionId: "QMWC111222333",  applicant: "Elvis Prestley", dba: "Restaurant R' Us",       effective: "07/01/2024", lob: "Vacant Risks",         status: "Incomplete",            producer: "Elvis Prestley" },
   { id: "5",  created: "07/01/2024", submissionId: "QMWC111222333",  applicant: "Elvis Prestley", dba: "Restaurant R' Us",       effective: "07/01/2024", lob: "Worker's Comp",        status: "Incomplete",            producer: "Elvis Prestley" },
   { id: "6",  created: "07/01/2024", submissionId: "QMWC111222333",  applicant: "Joe Smith",      dba: "Restaurant R' Us",       effective: "07/01/2024", lob: "General Liability",    status: "Incomplete",            producer: "Joe Smith" },
-  { id: "7",  created: "03/01/2025", submissionId: "QAA987654321-1", applicant: "Elvis Prestley", dba: "Iron Gate Fencing",      effective: "03/01/2025", lob: "Vacant Risks",         status: "Upcoming Renewals",     producer: "Elvis Prestley" },
-  { id: "8",  created: "03/01/2025", submissionId: "QAA987654321-1", applicant: "Joe Smith",      dba: "Iron Gate Fencing",      effective: "03/01/2025", lob: "Vacant Risks",         status: "Pending/Action Req.",   producer: "Joe Smith" },
-  { id: "9",  created: "02/14/2025", submissionId: "QAA246813579",   applicant: "Maria Garcia",   dba: "Sunset Bakery",          effective: "02/14/2025", lob: "Business Owners",      status: "Sold/Issued",           producer: "Maria Garcia" },
-  { id: "10", created: "02/20/2025", submissionId: "QMWC246813580",  applicant: "David Chen",     dba: "Dragon Express Logistics", effective: "02/20/2025", lob: "Commercial Auto",    status: "Pending",               producer: "David Chen" },
+  { id: "7",  created: "03/01/2025", submissionId: "QAA987654321-1", applicant: "Elvis Prestley", dba: "Iron Gate Fencing",      effective: "03/01/2025", lob: "Vacant Risks",         status: "Renewal Pending",     producer: "Elvis Prestley" },
+  { id: "8",  created: "03/01/2025", submissionId: "QAA987654321-1", applicant: "Joe Smith",      dba: "Iron Gate Fencing",      effective: "03/01/2025", lob: "Vacant Risks",         status: "Requested Info",   producer: "Joe Smith" },
+  { id: "9",  created: "02/14/2025", submissionId: "QAA246813579",   applicant: "Maria Garcia",   dba: "Sunset Bakery",          effective: "02/14/2025", lob: "Business Owners",      status: "Issued",           producer: "Maria Garcia" },
+  { id: "10", created: "02/20/2025", submissionId: "QMWC246813580",  applicant: "David Chen",     dba: "Dragon Express Logistics", effective: "02/20/2025", lob: "Commercial Auto",    status: "Under Review",               producer: "David Chen" },
   { id: "11", created: "04/05/2025", submissionId: "QAN135792468",   applicant: "Sarah Johnson",  dba: "BlueSky Consulting",     effective: "04/05/2025", lob: "Professional Liability", status: "Approved",            producer: "Sarah Johnson" },
-  { id: "12", created: "11/12/2024", submissionId: "QMWC998877665",  applicant: "Michael Brown",  dba: "Brown & Sons Roofing",   effective: "11/12/2024", lob: "Worker's Comp",        status: "Sold/Issued",           producer: "Michael Brown" },
-  { id: "13", created: "09/03/2024", submissionId: "QAA112233445",   applicant: "Linda Wilson",   dba: "Wilson Dental Group",    effective: "09/03/2024", lob: "Professional Liability", status: "Upcoming Renewals",    producer: "Linda Wilson" },
-  { id: "14", created: "12/18/2024", submissionId: "QMP778899001",   applicant: "Elvis Prestley", dba: "Prestley Properties",    effective: "12/18/2024", lob: "Property",             status: "Pending",               producer: "Elvis Prestley" },
-  { id: "15", created: "10/25/2024", submissionId: "QCY554433221",   applicant: "Jane Smith",     dba: "Smith Tech Solutions",   effective: "10/25/2024", lob: "Cyber Liability",      status: "Sold/Issued",           producer: "Jane Smith" },
+  { id: "12", created: "11/12/2024", submissionId: "QMWC998877665",  applicant: "Michael Brown",  dba: "Brown & Sons Roofing",   effective: "11/12/2024", lob: "Worker's Comp",        status: "Issued",           producer: "Michael Brown" },
+  { id: "13", created: "09/03/2024", submissionId: "QAA112233445",   applicant: "Linda Wilson",   dba: "Wilson Dental Group",    effective: "09/03/2024", lob: "Professional Liability", status: "Renewal Pending",    producer: "Linda Wilson" },
+  { id: "14", created: "12/18/2024", submissionId: "QMP778899001",   applicant: "Elvis Prestley", dba: "Prestley Properties",    effective: "12/18/2024", lob: "Property",             status: "Under Review",               producer: "Elvis Prestley" },
+  { id: "15", created: "10/25/2024", submissionId: "QCY554433221",   applicant: "Jane Smith",     dba: "Smith Tech Solutions",   effective: "10/25/2024", lob: "Cyber Liability",      status: "Issued",           producer: "Jane Smith" },
   { id: "16", created: "08/14/2024", submissionId: "QBR667788990",   applicant: "Joe Smith",      dba: "Smith Construction Co.", effective: "08/14/2024", lob: "Builder's Risk",       status: "Declined",              producer: "Joe Smith" },
-  { id: "17", created: "01/28/2025", submissionId: "QEX445566778",   applicant: "Robert Taylor",  dba: "Taylor Manufacturing",   effective: "01/28/2025", lob: "Excess",               status: "Pending/Action Req.",   producer: "Robert Taylor" },
+  { id: "17", created: "01/28/2025", submissionId: "QEX445566778",   applicant: "Robert Taylor",  dba: "Taylor Manufacturing",   effective: "01/28/2025", lob: "Excess",               status: "Requested Info",   producer: "Robert Taylor" },
   { id: "18", created: "04/10/2025", submissionId: "QBD223344556",   applicant: "Amanda Martinez", dba: "Martinez Contracting",  effective: "04/10/2025", lob: "Bonds",                status: "Approved",              producer: "Amanda Martinez" },
   { id: "19", created: "03/22/2025", submissionId: "QEF889900112",   applicant: "Maria Garcia",   dba: "Garcia Landscaping",     effective: "03/22/2025", lob: "Equipment Floater",    status: "Incomplete",            producer: "Maria Garcia" },
-  { id: "20", created: "04/18/2025", submissionId: "QAA778899123",   applicant: "David Chen",     dba: "Dragon Express Logistics", effective: "04/18/2025", lob: "General Liability",  status: "Pending",               producer: "David Chen" },
-  { id: "21", created: "04/20/2025", submissionId: "QAN334455667",   applicant: "Sarah Johnson",  dba: "BlueSky Consulting",     effective: "04/20/2025", lob: "Worker's Comp",        status: "Add'l Insured Request", producer: "Sarah Johnson" },
-  { id: "22", created: "04/21/2025", submissionId: "QMWC556677889",  applicant: "Michael Brown",  dba: "Brown & Sons Roofing",   effective: "04/21/2025", lob: "General Liability",    status: "Sold/Issued",           producer: "Michael Brown" },
+  { id: "20", created: "04/18/2025", submissionId: "QAA778899123",   applicant: "David Chen",     dba: "Dragon Express Logistics", effective: "04/18/2025", lob: "General Liability",  status: "Under Review",               producer: "David Chen" },
+  { id: "21", created: "04/20/2025", submissionId: "QAN334455667",   applicant: "Sarah Johnson",  dba: "BlueSky Consulting",     effective: "04/20/2025", lob: "Worker's Comp",        status: "Requested Info", producer: "Sarah Johnson" },
+  { id: "22", created: "04/21/2025", submissionId: "QMWC556677889",  applicant: "Michael Brown",  dba: "Brown & Sons Roofing",   effective: "04/21/2025", lob: "General Liability",    status: "Issued",           producer: "Michael Brown" },
 ];
 
 const ALL_LOBS = ["All LOBs","General Liability","Worker's Comp","Vacant Risks","Business Owners","Professional Liability","Excess","Bonds","Commercial Auto","Property","Cyber Liability","Builder's Risk","Equipment Floater"];
+// 15-status vocabulary — matches the reference deck exactly.
 const POLICY_STATUSES = [
   "All Statuses",
-  // In progress / missing data
-  "Incomplete", "Submission Incomplete", "Bind Incomplete", "Paid-Bind Incomplete",
-  // Submitted / under review
-  "Submitted", "Under Review", "Requested Info", "Pending", "Pending/Action Req.",
-  // Positive outcomes
-  "Approved", "Bound", "Sold/Issued", "Issued",
-  // Negative / closed
-  "Declined", "Cancelled", "File Closed",
-  // Renewal lifecycle
-  "Renewal Pending", "Renewal Created", "Upcoming Renewals",
-  // Info / request
-  "Add'l Insured Request",
+  "Incomplete", "Submitted", "Under Review", "Requested Info",
+  "Declined", "File Closed", "Cancelled",
+  "Renewal Pending", "Renewal Created",
+  "Approved", "Bound",
+  "Paid-Bind Incomplete", "Submission Incomplete",
+  "Issued", "Bind Incomplete",
 ];
 
 // Status palette: each status has its own distinct hue so the dot is meaningful
 // at a glance. Brand teal + magenta still anchor "done" and "urgent action";
 // the other slots use semantic colors (amber/red/blue/orange/emerald/gray).
 const STATUS_DOT: Record<string, string> = {
-  // In progress
   "Incomplete":            "#9CA3AF", // gray — missing data
-  "Submission Incomplete": "#9CA3AF",
-  "Bind Incomplete":       "#9CA3AF",
-  "Paid-Bind Incomplete":  "#F59E0B", // amber — paid but pending bind
-  // Submitted / review
   "Submitted":             "#3B82F6", // blue — sent, awaiting review
   "Under Review":          "#8B5CF6", // violet — active review
   "Requested Info":        "#0EA5E9", // sky — info requested from insured
-  "Pending":               "#F59E0B", // amber — waiting
-  "Pending/Action Req.":   "#A614C3", // brand magenta — urgent action
-  // Success
-  "Approved":              "#10B981", // emerald — success/affirmative
-  "Bound":                 "#73C9B7", // brand teal — bound
-  "Sold/Issued":           "#73C9B7", // brand teal — closed/bound
-  "Issued":                "#73C9B7", // brand teal — issued
-  // Closed
   "Declined":              "#EF4444", // red — terminal failure
-  "Cancelled":             "#EF4444", // red — cancelled
   "File Closed":           "#64748B", // slate — closed file
-  // Renewal
+  "Cancelled":             "#EF4444", // red — cancelled
   "Renewal Pending":       "#F59E0B", // amber — awaiting renewal
   "Renewal Created":       "#10B981", // emerald — renewal ready
-  "Upcoming Renewals":     "#F97316", // orange — timeline / upcoming
-  // Info
-  "Add'l Insured Request": "#ACD697", // brand sage green — info/request
+  "Approved":              "#10B981", // emerald — success/affirmative
+  "Bound":                 "#73C9B7", // brand teal — bound
+  "Paid-Bind Incomplete":  "#F59E0B", // amber — paid but pending bind
+  "Submission Incomplete": "#9CA3AF",
+  "Issued":                "#73C9B7", // brand teal — issued
+  "Bind Incomplete":       "#9CA3AF",
 };
 
 // Used by the detail view's heading accent — same palette as the dots.
@@ -559,26 +543,18 @@ export default function Policies({ isDark }: { isDark: boolean }) {
   }
 
   // Counts per status — for the quick-filter KPI cards.
-  // "Active" folds Sold/Issued + Approved together because both are policies currently
-  // in force from the agency's day-to-day perspective (issued = bound + paid; approved =
-  // underwriting-approved and about to bind). Splitting them across two cards buries the
-  // signal — one merged card is what the sales team actually looks at.
-  const activeCount       = mockPolicies.filter(p => p.status === "Sold/Issued" || p.status === "Approved").length;
-  const renewalsCount     = mockPolicies.filter(p => p.status === "Upcoming Renewals").length;
-  // "Action Required" folds together every status that requires the agent to do something:
-  // Pending/Action Req. (explicit), Add'l Insured Request (outstanding request), and
-  // Incomplete (submission still missing info). One card, one clear queue of what to work on.
+  // "Active" folds Bound + Issued + Approved together — all three describe policies
+  // currently in force from the agency's day-to-day perspective.
+  const activeCount       = mockPolicies.filter(p => p.status === "Bound" || p.status === "Issued" || p.status === "Approved").length;
+  const renewalsCount     = mockPolicies.filter(p => p.status === "Renewal Pending" || p.status === "Renewal Created").length;
+  // "Action Required" folds together every status that needs agent attention.
   const actionReqCount    = mockPolicies.filter(p =>
-    p.status === "Pending/Action Req." || p.status === "Add'l Insured Request" || p.status === "Incomplete"
+    p.status === "Requested Info" || p.status === "Incomplete" || p.status === "Submission Incomplete" || p.status === "Bind Incomplete" || p.status === "Paid-Bind Incomplete"
   ).length;
   const statusSummary: { keys: string[]; label: string; sub: string; count: number }[] = [
-    // "Total Policies" (All Statuses) intentionally removed — Active / Upcoming Renewals /
-    // Action Required are the actionable signals; a total of every policy doesn't drive any
-    // decision. The Start-a-Quote CTA tile (rendered before this map) now completes a clean
-    // 4-tile row alongside the 3 status breakdowns.
-    { keys: ["Sold/Issued", "Approved"],                                            label: "Active",             sub: "Bound · Approved · Issued",                                  count: activeCount   },
-    { keys: ["Upcoming Renewals"],                                                  label: "Upcoming Renewals",  sub: "Next 30 days",                                               count: renewalsCount },
-    { keys: ["Pending/Action Req.", "Add'l Insured Request", "Incomplete"],         label: "Action Required",    sub: "Pending · Add'l Insured Request · Incomplete",               count: actionReqCount },
+    { keys: ["Bound", "Issued", "Approved"],                                                                             label: "Active",             sub: "Bound · Issued · Approved",             count: activeCount   },
+    { keys: ["Renewal Pending", "Renewal Created"],                                                                      label: "Renewals",           sub: "Pending · Created",                     count: renewalsCount },
+    { keys: ["Requested Info", "Incomplete", "Submission Incomplete", "Bind Incomplete", "Paid-Bind Incomplete"],        label: "Action Required",    sub: "Info requested · Incomplete",           count: actionReqCount },
   ];
 
   return (
