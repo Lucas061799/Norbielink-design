@@ -431,7 +431,7 @@ export default function Endorsements({ isDark }: { isDark: boolean }) {
                 return (
                   <div
                     className="flex items-center justify-between gap-3 px-5 py-3 flex-wrap"
-                    style={{ borderTop: `1px solid ${c.softDivider}` }}
+                    style={{ borderTop: `1px solid ${c.border}` }}
                     onClick={e => e.stopPropagation()}
                   >
                     <span className="text-[11.5px]" style={{ fontFamily: FONT, color: c.muted }}>
