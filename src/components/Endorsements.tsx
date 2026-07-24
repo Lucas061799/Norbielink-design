@@ -31,7 +31,7 @@ type PolicyStatus =
   | "Renewal Pending" | "Renewal Created" | "Upcoming Renewals"
   | "Add'l Insured Request";
 const SEARCH_RESULTS: SearchResult[] = [
-  { submissionId: "VIC00003362",     policyNumber: "7038911131",     applicant: "Pizza Club LLC, Pizza Club BT LLC",      lob: "Victor",         dba: "--",                                status: "Cancelled",             effective: "07/19/2026" },
+  { submissionId: "VIC00003362",     policyNumber: "7038911131",     applicant: "Byrne Insurance Group",      lob: "Victor",         dba: "--",                                status: "Cancelled",             effective: "07/19/2026" },
   { submissionId: "VIC00003355",     policyNumber: "P102117404",     applicant: "MONTICELLO STAFFING LLC",                lob: "Victor",         dba: "--",                                status: "Bound",                 effective: "07/20/2026" },
   { submissionId: "QMWC0750104-E47", policyNumber: "WCB11144570800", applicant: "SB DE Production Test 2 LLC",            lob: "Worker's Comp",  dba: "SB DE Production Test 2 LLC",       status: "Bound",                 effective: "05/11/2026" },
   { submissionId: "QMWC0748621-E43", policyNumber: "WCB11144570700", applicant: "SB PA Production Test 3",                lob: "Worker's Comp",  dba: "SB PA Production Test 3",           status: "Submission Incomplete", effective: "05/29/2026" },

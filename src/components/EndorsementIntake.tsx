@@ -271,14 +271,12 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
   const SPECS: Partial<Record<EndorsementType, FieldSpec[]>> = {
     altemp: [
       { k: "row", cols: [
-        { k: "date",  key: "eff",   label: "Effective date",             req: true },
-        { k: "state", key: "state", label: "State",                      req: true },
+        { k: "date",  key: "eff",   label: "Effective date", req: true },
+        { k: "state", key: "state", label: "State",          req: true },
       ]},
-      { k: "row", cols: [
-        { k: "num",   key: "form",  label: "Form number",                req: true },
-        { k: "num",   key: "fein",  label: "Alternate employer FEIN",    req: true, digits: 9, ph: "9 digits" },
-      ]},
-      { k: "text",    key: "name",  label: "Name of alternate employer", req: true },
+      { k: "num",  key: "form", label: "Form number",                req: true },
+      { k: "text", key: "name", label: "Name of alternate employer", req: true },
+      { k: "num",  key: "fein", label: "Alternate employer FEIN",    req: true, digits: 9, ph: "9 digits" },
     ],
     thirdpartynoc: [
       { k: "row", cols: [
@@ -372,9 +370,8 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
         opts: ["$100,000 / $500,000 / $100,000", "$500,000 / $500,000 / $500,000", "$1,000,000 / $1,000,000 / $1,000,000"] },
     ],
     other: [
-      { k: "date", key: "eff",     label: "Effective date", req: true },
-      { k: "ta",   key: "request", label: "Describe your request", req: true, rows: 5,
-        ph: "Anything not covered by the other endorsement types — the underwriter will route it." },
+      { k: "date",   key: "eff", label: "Effective date", req: true },
+      { k: "helper", text: "Use the Additional comment and Upload supporting document fields below to describe your request. The underwriter will route it to the right team." },
     ],
     waiver: [
       { k: "row", cols: [
@@ -479,43 +476,141 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
         { k: "date", key: "eff",  label: "Effective date", req: true },
         { k: "sel",  key: "mode", label: "Add / Edit / Remove entity", req: true, opts: ["Add New", "Edit", "Remove"] },
       ]},
-      { k: "sel", key: "etype", label: "Entity type", req: true, opts: [
-        "Association", "Common Ownership", "Corporation", "Government Entity", "Individual",
-        "Joint Employers", "Joint Venture", "Labor Union", "Limited Liability Company",
-        "Limited Liability Partnership", "Limited Partnership", "Partnership",
-        "Religious Organization", "Trust or Estate", "Other",
-      ]},
-      { k: "showIf", when: "etype", equals: "Other", children: [
-        { k: "text", key: "otherType", label: "Other entity type", req: true },
-      ]},
-      { k: "row", cols: [
-        { k: "text", key: "legal", label: "Legal name", req: true },
-        { k: "text", key: "dba",   label: "DBA" },
-      ]},
-      { k: "num", key: "fein", label: "FEIN", req: true, digits: 9, ph: "9 digits" },
-      { k: "header", text: "Ownership information (if adding excluded owners, attach a signed waiver form)" },
-      { k: "row", cols: [
-        { k: "text", key: "owFirst", label: "First name", req: true },
-        { k: "text", key: "owLast",  label: "Last name",  req: true },
-      ]},
-      { k: "row", cols: [
-        { k: "text", key: "owTitle", label: "Title",     req: true },
-        { k: "num",  key: "owPct",   label: "Ownership %", req: true, digits: 3, ph: "0-100" },
-      ]},
-      { k: "sel", key: "owInc", label: "Included / Excluded", req: true, opts: ["Included", "Excluded"] },
-      { k: "header", text: "Entity location" },
-      { k: "addr", prefix: "" },
-      { k: "check", key: "expChg", label: "Any change in exposure or operations at this location?" },
-      { k: "showIf", when: "expChg", checked: true, children: [
-        { k: "ta", key: "ops", label: "Operations performed at this location", req: true, rows: 2 },
-        { k: "header", text: "Please provide exposure for this entity" },
-        { k: "row", cols: [
-          { k: "num", key: "code",    label: "Class code", req: true, digits: 4 },
-          { k: "num", key: "payroll", label: "Payroll",    req: true },
+
+      // ── ADD NEW
+      { k: "showIf", when: "mode", equals: "Add New", children: [
+        { k: "sel", key: "etype", label: "Entity type", req: true, opts: [
+          "Association", "Common Ownership", "Corporation", "Government Entity", "Individual",
+          "Joint Employers", "Joint Venture", "Labor Union", "Limited Liability Company",
+          "Limited Liability Partnership", "Limited Partnership", "Partnership",
+          "Religious Organization", "Trust or Estate", "Other",
+        ]},
+        { k: "showIf", when: "etype", equals: "Other", children: [
+          { k: "text", key: "otherType", label: "Other entity type", req: true },
         ]},
         { k: "row", cols: [
-          { k: "num", key: "ft", label: "Full-time employees", req: true, digits: 3 },
-          { k: "num", key: "pt", label: "Part-time employees", req: true, digits: 3 },
+          { k: "text", key: "legal", label: "Legal name", req: true },
+          { k: "text", key: "dba",   label: "DBA" },
+        ]},
+        { k: "num", key: "fein", label: "FEIN", req: true, digits: 9, ph: "9 digits" },
+        { k: "header", text: "Ownership information (if adding excluded owners, attach a signed waiver form)" },
+        { k: "row", cols: [
+          { k: "text", key: "owFirst", label: "First name", req: true },
+          { k: "text", key: "owLast",  label: "Last name",  req: true },
+        ]},
+        { k: "row", cols: [
+          { k: "text", key: "owTitle", label: "Title",     req: true },
+          { k: "num",  key: "owPct",   label: "Ownership %", req: true, digits: 3, ph: "0-100" },
+        ]},
+        { k: "sel", key: "owInc", label: "Included / Excluded", req: true, opts: ["Included", "Excluded"] },
+        { k: "header", text: "Entity location" },
+        { k: "addr", prefix: "loc." },
+        { k: "check", key: "expChg", label: "Any change in exposure or operations at this location?" },
+        { k: "showIf", when: "expChg", checked: true, children: [
+          { k: "ta", key: "ops", label: "Operations performed at this location", req: true, rows: 2 },
+          { k: "header", text: "Please provide exposure for this entity" },
+          { k: "row", cols: [
+            { k: "num", key: "code",    label: "Class code", req: true, digits: 4 },
+            { k: "num", key: "payroll", label: "Payroll",    req: true },
+          ]},
+          { k: "row", cols: [
+            { k: "num", key: "ft", label: "Full-time employees", req: true, digits: 3 },
+            { k: "num", key: "pt", label: "Part-time employees", req: true, digits: 3 },
+          ]},
+        ]},
+      ]},
+
+      // ── EDIT
+      { k: "showIf", when: "mode", equals: "Edit", children: [
+        { k: "header", text: "Current entity info" },
+        { k: "row", cols: [
+          { k: "text", key: "curLegal", label: "Legal name", req: true },
+          { k: "text", key: "curDba",   label: "DBA" },
+        ]},
+        { k: "num", key: "curFein", label: "FEIN", req: true, digits: 9, ph: "9 digits" },
+        { k: "header", text: "New entity info" },
+        { k: "row", cols: [
+          { k: "text", key: "newLegal", label: "Legal name", req: true },
+          { k: "text", key: "newDba",   label: "DBA" },
+        ]},
+        { k: "num", key: "newFein", label: "FEIN", req: true, digits: 9, ph: "9 digits" },
+        { k: "check", key: "ownChg", label: "Is ownership changing?" },
+        { k: "showIf", when: "ownChg", checked: true, children: [
+          { k: "header", text: "New entity ownership" },
+          { k: "row", cols: [
+            { k: "text", key: "owFirst", label: "First name", req: true },
+            { k: "text", key: "owLast",  label: "Last name",  req: true },
+          ]},
+          { k: "row", cols: [
+            { k: "text", key: "owTitle", label: "Title",     req: true },
+            { k: "num",  key: "owPct",   label: "Ownership %", req: true, digits: 3, ph: "0-100" },
+          ]},
+          { k: "sel", key: "owInc", label: "Included / Excluded", req: true, opts: ["Included", "Excluded"] },
+        ]},
+        { k: "check", key: "locChg", label: "Is the entity location changing?" },
+        { k: "showIf", when: "locChg", checked: true, children: [
+          { k: "header", text: "Entity location" },
+          { k: "addr", prefix: "loc." },
+          { k: "check", key: "expChg", label: "Any change in exposure or operations at this location?" },
+          { k: "showIf", when: "expChg", checked: true, children: [
+            { k: "ta", key: "ops", label: "Operations performed at this location", req: true, rows: 2 },
+            { k: "header", text: "Please provide revised prorated exposure for location(s) in the given state" },
+            { k: "sel", key: "payAction", label: "Add / Remove / Edit payroll", req: true, opts: ["Add Class Code", "Remove Class Code", "Edit Payroll"] },
+            { k: "row", cols: [
+              { k: "num", key: "code",    label: "Class code", req: true, digits: 4 },
+              { k: "num", key: "payroll", label: "Payroll",    req: true },
+            ]},
+            { k: "row", cols: [
+              { k: "num", key: "ft", label: "Full-time employees", req: true, digits: 3 },
+              { k: "num", key: "pt", label: "Part-time employees", req: true, digits: 3 },
+            ]},
+          ]},
+        ]},
+      ]},
+
+      // ── REMOVE
+      { k: "showIf", when: "mode", equals: "Remove", children: [
+        { k: "sel", key: "etype", label: "Entity type", req: true, opts: [
+          "Association", "Common Ownership", "Corporation", "Government Entity", "Individual",
+          "Joint Employers", "Joint Venture", "Labor Union", "Limited Liability Company",
+          "Limited Liability Partnership", "Limited Partnership", "Partnership",
+          "Religious Organization", "Trust or Estate", "Other",
+        ]},
+        { k: "showIf", when: "etype", equals: "Other", children: [
+          { k: "text", key: "otherType", label: "Other entity type", req: true },
+        ]},
+        { k: "row", cols: [
+          { k: "text", key: "legal", label: "Legal name", req: true },
+          { k: "text", key: "dba",   label: "DBA" },
+        ]},
+        { k: "num", key: "fein", label: "FEIN", req: true, digits: 9, ph: "9 digits" },
+        { k: "check", key: "ownChg", label: "Is ownership changing?" },
+        { k: "showIf", when: "ownChg", checked: true, children: [
+          { k: "header", text: "Revised ownership information" },
+          { k: "row", cols: [
+            { k: "text", key: "owFirst", label: "First name", req: true },
+            { k: "text", key: "owLast",  label: "Last name",  req: true },
+          ]},
+          { k: "row", cols: [
+            { k: "text", key: "owTitle", label: "Title",     req: true },
+            { k: "num",  key: "owPct",   label: "Ownership %", req: true, digits: 3, ph: "0-100" },
+          ]},
+          { k: "sel", key: "owInc", label: "Included / Excluded", req: true, opts: ["Included", "Excluded"] },
+        ]},
+        { k: "header", text: "Entity location" },
+        { k: "addr", prefix: "loc." },
+        { k: "check", key: "expChg", label: "Any change in exposure or operations at this location?" },
+        { k: "showIf", when: "expChg", checked: true, children: [
+          { k: "helper", text: "If payroll is being updated due to entity removal, please provide revised prorated exposure for remaining location(s) in the given state." },
+          { k: "sel", key: "payAction", label: "Add / Remove / Edit payroll", req: true, opts: ["Add Class Code", "Remove Class Code", "Edit Payroll"] },
+          { k: "row", cols: [
+            { k: "num", key: "code",    label: "Class code", req: true, digits: 4 },
+            { k: "num", key: "payroll", label: "Payroll",    req: true },
+          ]},
+          { k: "row", cols: [
+            { k: "num", key: "ft", label: "Full-time employees", req: true, digits: 3 },
+            { k: "num", key: "pt", label: "Part-time employees", req: true, digits: 3 },
+          ]},
         ]},
       ]},
     ],
@@ -843,7 +938,7 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
         return <SectionLabel key={idx}>{f.label}</SectionLabel>;
       case "row":
         return (
-          <div key={idx} className="grid grid-cols-2 gap-3.5">
+          <div key={idx} className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             {f.cols.map((c2, i) => renderField(t, c2, i))}
           </div>
         );
@@ -856,7 +951,7 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
             >
               <input value={fv(kk(`${f.prefix}addr`))} onChange={e => setFv(kk(`${f.prefix}addr`), e.target.value)} placeholder="587 Test St." style={inputStyle} />
             </Field>
-            <div className="grid gap-3.5" style={{ gridTemplateColumns: "2fr 1fr 1fr" }}>
+            <div className="grid gap-3.5 grid-cols-1 sm:grid-cols-[2fr_1fr_1fr]">
               {renderField(t, { k: "text",  key: `${f.prefix}city`,  label: "City",  req: true }, 0)}
               {renderField(t, { k: "state", key: `${f.prefix}state`, label: "State", req: true }, 1)}
               {renderField(t, { k: "num",   key: `${f.prefix}zip`,   label: "Zip",   req: true, digits: 5 }, 2)}
@@ -911,7 +1006,7 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
   // ─── page renderers (content copied 1:1 from the prototype)
   const renderContact = () => (
     <>
-      <div className="grid grid-cols-2 gap-3.5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
         <Field label="Effective date" required refKey="contact-eff">
           <DatePicker value={contactEff} onChange={setContactEff} inputStyle={inputStyle} c={c} btnGrad={razzGrad} font={font} />
         </Field>
@@ -941,7 +1036,7 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
 
       <Helper>Are you updating the <span style={{ color: c.text, fontWeight: 600 }}>insured</span> or the <span style={{ color: c.text, fontWeight: 600 }}>agency</span> contact information?</Helper>
 
-      <div className="grid grid-cols-2 gap-3.5" ref={setRef("contact-any")}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5" ref={setRef("contact-any")}>
         <Field label="First name" optional>
           <input value={contactFirst} onChange={e => setContactFirst(e.target.value)} placeholder="Sean" style={inputStyle} />
         </Field>
@@ -966,7 +1061,7 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
 
   const renderMcp65 = () => (
     <>
-      <div className="grid gap-4" style={{ gridTemplateColumns: "1fr 1fr", maxWidth: 540 }}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
         <Field label="Effective date" required refKey="mcp-eff">
           <DatePicker value={mcpEff} onChange={setMcpEff} inputStyle={inputStyle} c={c} btnGrad={razzGrad} font={font} />
         </Field>
@@ -980,7 +1075,7 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
 
   const renderPuc = () => (
     <>
-      <div className="grid gap-4" style={{ gridTemplateColumns: "1fr 1fr", maxWidth: 540 }}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
         <Field label="Effective date" required refKey="puc-eff">
           <DatePicker value={pucEff} onChange={setPucEff} inputStyle={inputStyle} c={c} btnGrad={razzGrad} font={font} />
         </Field>
@@ -1109,20 +1204,20 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
           sidebar bg tint reaches the app sidenav on one side and the
           viewport edge on the other. */}
       <div
-        className="grid items-stretch"
+        className="grid items-stretch grid-cols-1 lg:grid-cols-[300px_1fr_340px]"
         style={{
-          gridTemplateColumns: "300px 1fr 340px",
           minHeight: 0,
           flex: 1,
         }}
       >
 
           {/* ── LEFT: sidebar — just progress + nav, no policy header
-              (moved to the top strip). */}
+              (moved to the top strip). Stacks above main on narrow. */}
           <div
+            className="border-b lg:border-b-0 lg:border-r"
             style={{
-              borderRight: `1px solid ${c.border}`,
-              padding: "28px 32px 96px 32px",
+              borderColor: c.border,
+              padding: "28px 32px 32px",
             }}
           >
           <nav
@@ -1255,16 +1350,18 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
             </div>
           </main>
 
-          {/* ── RIGHT: sidebar column — same treatment as LEFT. */}
+          {/* ── RIGHT: sidebar column — same treatment as LEFT.
+              Stacks below main on narrow. */}
           <div
+            className="border-t lg:border-t-0 lg:border-l"
             style={{
-              borderLeft: `1px solid ${c.border}`,
+              borderColor: c.border,
               padding: "28px 32px 96px 32px",
             }}
           >
           <aside
-            className="flex flex-col"
-            style={{ position: "sticky", top: 20, alignSelf: "flex-start" }}
+            className="flex flex-col lg:sticky"
+            style={{ top: 20, alignSelf: "flex-start" }}
             onClick={e => e.stopPropagation()}
           >
             {/* ── ISSUING CARRIER — matches other sidebar sections
