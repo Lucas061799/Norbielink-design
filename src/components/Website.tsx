@@ -819,7 +819,7 @@ function MfaMethodView({ c, font, primaryBtnStyle, btnGrad, onSelect, onBack }: 
   ];
   return (
     <>
-      <h1 className="mb-3" style={{ ...font, fontSize: 32, fontWeight: 600, lineHeight: "38px", color: c.text }}>
+      <h1 className="mb-3" style={{ ...font, fontSize: 28, fontWeight: 600, lineHeight: "34px", color: c.text, whiteSpace: "nowrap" }}>
         Choose your{" "}
         <span
           style={{
