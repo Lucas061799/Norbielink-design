@@ -416,7 +416,7 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
     ],
     officer: [
       { k: "date",   key: "eff", label: "Effective date", req: true },
-      { k: "helper", text: "This page is only to exclude or include an officer previously disclosed. If ownership is changing, please complete an Entity endorsement. A signed officer waiver may be required for excluded officers." },
+      { k: "helper", warn: true, text: "This page is only to exclude or include an officer previously disclosed. If ownership is changing, please complete an Entity endorsement. A signed officer waiver may be required for excluded officers." },
       { k: "row", cols: [
         { k: "text", key: "first", label: "First name", req: true },
         { k: "text", key: "last",  label: "Last name",  req: true },
@@ -429,13 +429,13 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
     limits: [
       { k: "date", key: "eff", label: "Effective date", req: true,
       },
-      { k: "helper", text: "Effective date must be policy inception date." },
+      { k: "helper", warn: true, text: "Effective date must be policy inception date." },
       { k: "sel", key: "el", label: "Employer's liability limits", req: true,
         opts: ["$100,000 / $500,000 / $100,000", "$500,000 / $500,000 / $500,000", "$1,000,000 / $1,000,000 / $1,000,000"] },
     ],
     other: [
       { k: "date",   key: "eff", label: "Effective date", req: true },
-      { k: "helper", text: "Use the Additional comment and Upload supporting document fields below to describe your request. The underwriter will route it to the right team." },
+      { k: "helper", warn: true, text: "Use the Additional comment and Upload supporting document fields below to describe your request. The underwriter will route it to the right team." },
     ],
     waiver: [
       { k: "row", cols: [
@@ -466,7 +466,7 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
         { k: "sel",  key: "mode", label: "Add / Edit / Remove location", req: true, opts: ["Add", "Edit", "Remove"] },
       ]},
       { k: "showIf", when: "mode", equals: "Add", children: [
-        { k: "helper", text: "If adding a new entity, a location endorsement is not required. Please complete an Entity endorsement." },
+        { k: "helper", warn: true, text: "If adding a new entity, a location endorsement is not required. Please complete an Entity endorsement." },
         { k: "header", text: "Location" },
         { k: "addr",   prefix: "" },
         { k: "row", cols: [
@@ -485,7 +485,7 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
         ]},
       ]},
       { k: "showIf", when: "mode", equals: "Edit", children: [
-        { k: "helper", text: "If adding a new entity, please complete an Entity endorsement separately." },
+        { k: "helper", warn: true, text: "If adding a new entity, please complete an Entity endorsement separately." },
         { k: "header", text: "Current location info" },
         { k: "addr",   prefix: "cur." },
         { k: "row", cols: [
@@ -501,7 +501,7 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
         { k: "check", key: "expChg", label: "Any change in exposure or operations at this location?" },
         { k: "showIf", when: "expChg", checked: true, children: [
           { k: "ta", key: "ops", label: "Operations performed at this location", req: true, rows: 2 },
-          { k: "helper", text: "Please provide revised prorated exposure for location(s) in the given state." },
+          { k: "helper", warn: true, text: "Please provide revised prorated exposure for location(s) in the given state." },
           { k: "sel", key: "payAction", label: "Add / Remove / Edit payroll", req: true, opts: ["Add Class Code", "Remove Class Code", "Edit Payroll"] },
           { k: "row", cols: [
             { k: "num", key: "code",    label: "Class code", req: true, digits: 4 },
@@ -522,7 +522,7 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
         ]},
         { k: "check", key: "expChg", label: "Any change in exposure for remaining locations?" },
         { k: "showIf", when: "expChg", checked: true, children: [
-          { k: "helper", text: "If payroll is being updated due to location removal, please provide revised total exposure for remaining location(s) in the given state." },
+          { k: "helper", warn: true, text: "If payroll is being updated due to location removal, please provide revised total exposure for remaining location(s) in the given state." },
           { k: "sel", key: "payAction", label: "Add / Remove / Edit payroll", req: true, opts: ["Add Class Code", "Remove Class Code", "Edit Payroll"] },
           { k: "row", cols: [
             { k: "num", key: "code",    label: "Class code", req: true, digits: 4 },
@@ -665,7 +665,7 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
         { k: "addr", prefix: "loc." },
         { k: "check", key: "expChg", label: "Any change in exposure or operations at this location?" },
         { k: "showIf", when: "expChg", checked: true, children: [
-          { k: "helper", text: "If payroll is being updated due to entity removal, please provide revised prorated exposure for remaining location(s) in the given state." },
+          { k: "helper", warn: true, text: "If payroll is being updated due to entity removal, please provide revised prorated exposure for remaining location(s) in the given state." },
           { k: "sel", key: "payAction", label: "Add / Remove / Edit payroll", req: true, opts: ["Add Class Code", "Remove Class Code", "Edit Payroll"] },
           { k: "row", cols: [
             { k: "num", key: "code",    label: "Class code", req: true, digits: 4 },

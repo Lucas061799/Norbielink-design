@@ -362,7 +362,7 @@ function LoginView({ c, font, inputStyle, labelStyle, primaryBtnStyle, btnGrad, 
             // avoids firing the toast while they're still typing their actual identifier.
             if (looksLikeAgencyCode(identifier)) onAgencyCodeDetected(identifier.trim());
           }}
-          placeholder="Enter your User ID"
+          placeholder="Enter your User ID or email"
           style={inputStyle} />
         {/* No persistent hint here — most users don't have an agency code at all, so a
             preemptive "agency code isn't a login" line would be both presumptuous and noisy
@@ -411,6 +411,30 @@ function LoginView({ c, font, inputStyle, labelStyle, primaryBtnStyle, btnGrad, 
         </span>
         Remember me
       </label>
+
+      {/* Continuity note — existing users who signed in with an email
+          address before don't need to migrate to a User ID; email still
+          works. Warn Helper look (razz AlertCircle + black text with a
+          razz callout at the front) matches the intake style. */}
+      <div
+        className="mb-4 flex items-start gap-2"
+        style={{
+          fontFamily: FONT,
+          fontSize: 12.5,
+          color: c.text,
+          padding: "10px 12px",
+          background: "#F9FAFB",
+          border: `1px solid ${c.border}`,
+          borderRadius: 8,
+          lineHeight: 1.5,
+        }}
+      >
+        <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#A614C3", marginTop: 3 }} />
+        <span>
+          <span style={{ color: "#A614C3", fontWeight: 600 }}>Your User ID is not your Agency Code.</span>{" "}
+          If you previously signed in with an email address, you can keep using it here.
+        </span>
+      </div>
 
       <button type="button" disabled={!enabled} onClick={onContinue} style={primaryBtnStyle(enabled)}>
         Continue
