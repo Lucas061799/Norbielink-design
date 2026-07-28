@@ -129,6 +129,17 @@ const CARRIERS: { key: Carrier; label: string }[] = [
   { key: "cna",         label: "CNA" },
 ];
 
+// Endorsement types that already have their own dedicated Additional
+// Comment (required) and/or Upload (required) field in the spec, so the
+// universal supporting-detail section at the bottom would just duplicate
+// them. Everything else keeps the universal section.
+const SKIP_UNIVERSAL_SUPPORTING: Set<EndorsementType> = new Set([
+  "reinstate",     // has Acord 37 No Loss Statement attachment
+  "cancel",        // has required Acord 25 LPR upload
+  "xmod",          // has required Ex-Mod worksheet upload
+  "namedinsured",  // has required "Additional comment (clearly explain changes)" ta
+]);
+
 interface NavItem { key: EndorsementType | null; label: string; disabled?: boolean }
 const NAV: { label?: string; items: NavItem[] }[] = [
   {
@@ -382,7 +393,7 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
         { k: "num",  key: "fein",   label: "FEIN",           req: true, digits: 9 },
         { k: "text", key: "states", label: "Rating state(s)", req: true, ph: "e.g. CA, NV" },
       ]},
-      { k: "helper", text: "Please upload ex-mod worksheet if available." },
+      { k: "helper", warn: true, text: "Please upload ex-mod worksheet if available." },
       { k: "attach", key: "worksheet", label: "Upload Ex-Mod worksheet", req: true },
     ],
     namedinsured: [
@@ -432,7 +443,7 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
         { k: "sel",  key: "type", label: "Waiver of subrogation", req: true, opts: ["Blanket", "Specific"] },
       ]},
       { k: "showIf", when: "type", equals: "Specific", children: [
-        { k: "helper", text: "Only one entity per waiver request allowed." },
+        { k: "helper", warn: true, text: "Only one entity per waiver request allowed." },
         { k: "text",   key: "holder", label: "Waiver holder's name", req: true },
         { k: "header", text: "Waiver holder's address" },
         { k: "addr",   prefix: "wh." },
@@ -1533,11 +1544,14 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
                 {SPECS[type] && SPECS[type]!.map((f, i) => renderField(type, f, i))}
               </div>
 
-              {/* Additional comment + upload — no section header,
-                  just the fields directly under the type-specific ones. */}
-              <div style={{ padding: "20px 4px 24px", borderTop: `1px solid ${c.softDivider}` }}>
-                {supportingDetailFields()}
-              </div>
+              {/* Universal Additional comment + Upload supporting document.
+                  Hidden for types that already have their own dedicated
+                  comment or upload field baked into the spec. */}
+              {!SKIP_UNIVERSAL_SUPPORTING.has(type) && (
+                <div style={{ padding: "20px 4px 24px", borderTop: `1px solid ${c.softDivider}` }}>
+                  {supportingDetailFields()}
+                </div>
+              )}
             </div>
           </main>
 
