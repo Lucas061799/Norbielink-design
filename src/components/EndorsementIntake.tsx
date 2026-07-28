@@ -2,11 +2,20 @@
 
 import React, { useMemo, useRef, useState } from "react";
 import {
-  ArrowLeft, Check, ChevronDown, ChevronRight, CircleAlert, Clock, FileText, Paperclip, Plus, Save, Send, Trash2, X,
+  ArrowLeft, Check, ChevronDown, ChevronRight, CircleAlert, Clock, FileText, Info, Paperclip, Plus, Save, Send, Trash2, X,
 } from "lucide-react";
 import { DatePicker } from "./DatePicker";
 
 const FONT = "var(--font-montserrat), Montserrat, sans-serif";
+
+// Auto-format US phone as XXX-XXX-XXXX. Strips non-digits, caps at 10 digits,
+// re-inserts hyphens after 3 and 6 digits.
+function formatPhone(v: string): string {
+  const d = v.replace(/\D/g, "").slice(0, 10);
+  if (d.length <= 3) return d;
+  if (d.length <= 6) return `${d.slice(0, 3)}-${d.slice(3)}`;
+  return `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}`;
+}
 
 // Structured Endorsement Intake — feature-complete port of the prototype
 // (norbielink_endorsement_prototype.html) restyled to the -design app
@@ -70,6 +79,48 @@ const STATES = [
   "KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ",
   "NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT",
   "VA","WA","WV","WI","WY",
+];
+
+// Mock address suggestions — stands in for a real Google Places
+// Autocomplete lookup in the design. Filtered by whitespace-tokenized
+// substring against the full address string. A "Use as typed" row is
+// appended so the user always has a way to accept a novel address.
+interface AddressHit { addr: string; city: string; state: string; zip: string }
+const MOCK_ADDRESSES: AddressHit[] = [
+  // Market St — multiple cities so a "135 Market" search fans out
+  { addr: "1200 Market St",     city: "Philadelphia", state: "PA", zip: "19107" },
+  { addr: "1355 Market St",     city: "San Francisco",state: "CA", zip: "94103" },
+  { addr: "701 Market St",      city: "St. Louis",    state: "MO", zip: "63101" },
+  { addr: "225 Market St",      city: "Newark",       state: "NJ", zip: "07102" },
+  // Main St — the everywhere street
+  { addr: "100 Main St",        city: "Windermere",   state: "FL", zip: "34786" },
+  { addr: "215 Main St",        city: "Buffalo",      state: "NY", zip: "14203" },
+  { addr: "400 Main St",        city: "Houston",      state: "TX", zip: "77002" },
+  { addr: "555 Main St",        city: "Los Angeles",  state: "CA", zip: "90013" },
+  { addr: "800 Main St",        city: "Boise",        state: "ID", zip: "83702" },
+  // Broadway — NYC-heavy
+  { addr: "1500 Broadway",      city: "New York",     state: "NY", zip: "10036" },
+  { addr: "620 Broadway",       city: "Nashville",    state: "TN", zip: "37203" },
+  { addr: "1010 Broadway",      city: "Oakland",      state: "CA", zip: "94607" },
+  // Elm St
+  { addr: "220 Elm St",         city: "Dallas",       state: "TX", zip: "75201" },
+  { addr: "44 Elm St",          city: "Boston",       state: "MA", zip: "02109" },
+  // Corporate-recognizable addresses
+  { addr: "1 Apple Park Way",   city: "Cupertino",    state: "CA", zip: "95014" },
+  { addr: "1600 Amphitheatre Pkwy", city: "Mountain View", state: "CA", zip: "94043" },
+  { addr: "410 Terry Ave N",    city: "Seattle",      state: "WA", zip: "98109" },
+  { addr: "2211 Elliott Ave",   city: "Seattle",      state: "WA", zip: "98121" },
+  { addr: "1 Hacker Way",       city: "Menlo Park",   state: "CA", zip: "94025" },
+  // Downtown mix
+  { addr: "50 Beale St",        city: "San Francisco",state: "CA", zip: "94105" },
+  { addr: "233 S Wacker Dr",    city: "Chicago",      state: "IL", zip: "60606" },
+  { addr: "500 Pearl St",       city: "Denver",       state: "CO", zip: "80203" },
+  { addr: "701 Brazos St",      city: "Austin",       state: "TX", zip: "78701" },
+  { addr: "300 Vesey St",       city: "New York",     state: "NY", zip: "10282" },
+  { addr: "350 5th Ave",        city: "New York",     state: "NY", zip: "10118" },
+  { addr: "900 Metro Center Blvd", city: "Foster City", state: "CA", zip: "94404" },
+  { addr: "1 Lomb Memorial Dr", city: "Rochester",    state: "NY", zip: "14623" },
+  { addr: "587 Test St",        city: "Windermere",   state: "FL", zip: "34786" },
 ];
 
 const CARRIERS: { key: Carrier; label: string }[] = [
@@ -195,11 +246,13 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
   const [notes, setNotes] = useState("");
   const [fileAttached, setFileAttached] = useState(false);
   const [draftSaved, setDraftSaved] = useState(false);
+  const [confirmLeaveOpen, setConfirmLeaveOpen] = useState(false);
 
   // Shared form-values store for the spec-driven endorsement types.
   // Each key is `{type}.{fieldKey}` so keys never collide across types.
   const [formValues, setFormValues] = useState<Record<string, string>>({});
   const [openSelect, setOpenSelect] = useState<string | null>(null);
+  const [openAddr, setOpenAddr] = useState<string | null>(null);
   const fv = (k: string) => formValues[k] ?? "";
   const setFv = (k: string, v: string) => setFormValues(p => ({ ...p, [k]: v }));
 
@@ -264,7 +317,7 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
     display: "block",
   };
 
-  const closeAll = () => { setCarrierOpen(false); setContactTypeOpen(false); setCcStateOpen(false); setOpenSelect(null); };
+  const closeAll = () => { setCarrierOpen(false); setContactTypeOpen(false); setCcStateOpen(false); setOpenSelect(null); setOpenAddr(null); };
 
   // ─── requirements engine (matches prototype's live submit-gate)
   interface Requirement { label: string; done: boolean; refKey: string }
@@ -287,21 +340,21 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
       { k: "addr", prefix: "" },
     ],
     mailing: [
-      { k: "date",   key: "eff",  label: "Effective date",  req: true },
+      { k: "date",   key: "eff",  label: "Global effective date", req: true, info: "Applies to all changes unless overridden." },
       { k: "header", text: "New mailing address" },
       { k: "addr",   prefix: "" },
     ],
     reinstate: [
       { k: "date",   key: "eff",     label: "Effective date",       req: true },
       { k: "ta",     key: "reason",  label: "Reinstatement request", req: true, ph: "Reason for reinstatement…" },
-      { k: "helper", text: "A carrier-specific no loss statement may be required. If needed, we will reach out." },
+      { k: "helper", warn: true, text: "A carrier-specific no loss statement may be required. If needed, we will reach out." },
       { k: "attach", key: "acord37", label: "Acord 37 No Loss Statement" },
     ],
     cancel: [
       { k: "date",   key: "eff",    label: "Effective date",     req: true },
       { k: "sel",    key: "reason", label: "Cancellation reason", req: true,
         opts: ["Coverage placed elsewhere", "Ownership Change / Business Sold", "Completed Operations - No Employees", "Retiring / Out of Business", "Rewritten", "Other"] },
-      { k: "helper", text: "If requesting to backdate the cancellation, we require proof of replacement coverage or other supporting documentation." },
+      { k: "helper", warn: true, text: "If requesting to backdate the cancellation, we require proof of replacement coverage or other supporting documentation." },
       { k: "attach", key: "acord25", label: "Upload Acord 25 LPR / Replacement Coverage Document", req: true },
     ],
     fein: [
@@ -334,7 +387,7 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
     ],
     namedinsured: [
       { k: "date",   key: "eff", label: "Effective date", req: true },
-      { k: "helper", text: <>This page is only for amending the <span style={{ color: c.text, fontWeight: 600 }}>Legal name / DBA</span> of an entity already listed on the policy. If adding a new entity or changing ownership, please complete an Entity endorsement.</> },
+      { k: "helper", warn: true, text: <>This page is only for amending the <span style={{ fontWeight: 600 }}>Legal name / DBA</span> of an entity already listed on the policy. If adding a new entity or changing ownership, please complete an Entity endorsement.</> },
       { k: "row", cols: [
         { k: "text", key: "curLegal", label: "Current legal name", req: true },
         { k: "text", key: "curDba",   label: "Current DBA" },
@@ -744,6 +797,13 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
 
   const handleSaveDraft = () => { setDraftSaved(true); setTimeout(() => setDraftSaved(false), 2200); };
 
+  // Any user-entered content across every endorsement type + shared fields.
+  const hasDirty = activeTypes.some(isTypeStarted) || !!notes.trim() || fileAttached;
+  const handleBackClick = () => {
+    if (hasDirty) setConfirmLeaveOpen(true);
+    else onBack();
+  };
+
   // ─── helpers
   const SectionLabel = ({ children, first }: { children: React.ReactNode; first?: boolean }) => (
     <div
@@ -769,7 +829,7 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
       style={{
         fontFamily: FONT,
         fontSize: warn ? 11 : 12.5,
-        color: warn ? c.razz : c.muted,
+        color: warn ? c.text : c.muted,
         margin: "0 0 12px",
         padding: "9px 12px",
         background: c.helperBg,
@@ -777,7 +837,7 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
         borderRadius: 8,
       }}
     >
-      {warn && <CircleAlert className="w-3 h-3 flex-shrink-0" />}
+      {warn && <CircleAlert className="w-3 h-3 flex-shrink-0" style={{ color: c.razz }} />}
       <span>{children}</span>
     </div>
   );
@@ -806,7 +866,7 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
   // primitives. Values live in `formValues` under `{type}.{key}` keys
   // so no additional useState hooks are needed per type.
   type FieldSpec =
-    | { k: "date";   key: string; label: string; req?: boolean }
+    | { k: "date";   key: string; label: string; req?: boolean; info?: string }
     | { k: "text";   key: string; label: string; req?: boolean; ph?: string; hint?: React.ReactNode }
     | { k: "num";    key: string; label: string; req?: boolean; ph?: string; digits?: number; decimals?: boolean }
     | { k: "sel";    key: string; label: string; req?: boolean; opts: string[] }
@@ -825,12 +885,55 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
     const kk = (key: string) => `${t}.${key}`;
     const refKey = (key: string) => `${t}-${key}`;
     switch (f.k) {
-      case "date":
+      case "date": {
+        const labelNode = f.info ? (
+          <span className="inline-flex items-center gap-1.5">
+            <span>{f.label}{f.req && req}</span>
+            <span className="relative inline-flex cursor-help group" style={{ color: c.razz }}>
+              <Info className="w-3.5 h-3.5" style={{ flexShrink: 0 }} aria-label={f.info} />
+              <span
+                role="tooltip"
+                className="pointer-events-none absolute left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity"
+                style={{
+                  bottom: "calc(100% + 6px)",
+                  background: "#1F2937",
+                  color: "#fff",
+                  fontFamily: FONT,
+                  fontSize: 11.5,
+                  fontWeight: 500,
+                  lineHeight: 1.4,
+                  padding: "6px 10px",
+                  borderRadius: 6,
+                  whiteSpace: "normal",
+                  width: "max-content",
+                  maxWidth: 220,
+                  boxShadow: "0 4px 12px rgba(15,23,42,0.18)",
+                  zIndex: 40,
+                }}
+              >
+                {f.info}
+                <span
+                  aria-hidden
+                  style={{
+                    position: "absolute",
+                    top: "100%",
+                    left: "50%",
+                    transform: "translateX(-50%)",
+                    borderLeft: "5px solid transparent",
+                    borderRight: "5px solid transparent",
+                    borderTop: "5px solid #1F2937",
+                  }}
+                />
+              </span>
+            </span>
+          </span>
+        ) : f.label;
         return (
-          <Field key={idx} label={f.label} required={f.req} refKey={refKey(f.key)}>
+          <Field key={idx} label={labelNode} required={f.info ? false : f.req} refKey={refKey(f.key)}>
             <DatePicker value={fv(kk(f.key))} onChange={v => setFv(kk(f.key), v)} inputStyle={inputStyle} c={c} btnGrad={razzGrad} font={font} />
           </Field>
         );
+      }
       case "text":
         return (
           <Field key={idx} label={f.label} required={f.req} refKey={refKey(f.key)} hint={f.hint}>
@@ -928,7 +1031,7 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
         );
       case "header":
         return (
-          <div key={idx} style={{ fontFamily: FONT, fontSize: 12.5, fontWeight: 600, color: c.text, marginTop: 14, marginBottom: 4 }}>
+          <div key={idx} style={{ fontFamily: FONT, fontSize: 12, fontWeight: 700, color: c.text, textTransform: "uppercase", letterSpacing: "0.05em", margin: "22px 0 8px", paddingTop: 16, borderTop: `1px solid ${c.softDivider}` }}>
             {f.text}
           </div>
         );
@@ -942,14 +1045,60 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
             {f.cols.map((c2, i) => renderField(t, c2, i))}
           </div>
         );
-      case "addr":
+      case "addr": {
+        const addrKey  = kk(`${f.prefix}addr`);
+        const cityKey  = kk(`${f.prefix}city`);
+        const stateKey = kk(`${f.prefix}state`);
+        const zipKey   = kk(`${f.prefix}zip`);
+        const addrVal  = fv(addrKey);
+        const showList = openAddr === addrKey && addrVal.trim().length > 0;
+        const tokens   = addrVal.trim().toLowerCase().split(/\s+/).filter(Boolean);
+        const hits     = MOCK_ADDRESSES.filter(a => {
+          const s = `${a.addr} ${a.city} ${a.state} ${a.zip}`.toLowerCase();
+          return tokens.every(tk => s.includes(tk));
+        }).slice(0, 6);
         return (
           <div key={idx}>
-            <Field
-              label="Address" required refKey={refKey(`${f.prefix}addr`)}
-              hint={<><span style={{ color: c.razz }}>◈</span> Autofills from Google Address when a match is found</>}
-            >
-              <input value={fv(kk(`${f.prefix}addr`))} onChange={e => setFv(kk(`${f.prefix}addr`), e.target.value)} placeholder="587 Test St." style={inputStyle} />
+            <Field label="Address" required refKey={refKey(`${f.prefix}addr`)}>
+              <div className="relative">
+                <input
+                  value={addrVal}
+                  onChange={e => { setFv(addrKey, e.target.value); setOpenAddr(addrKey); }}
+                  onFocus={() => setOpenAddr(addrKey)}
+                  placeholder="587 Test St"
+                  style={inputStyle}
+                  autoComplete="off"
+                />
+                {showList && hits.length > 0 && (
+                  <div
+                    className="absolute left-0 right-0 top-full mt-1 z-20 rounded-lg shadow-lg overflow-hidden max-h-[240px] overflow-y-auto"
+                    style={{ background: c.cardBg, border: `1px solid ${c.border}` }}
+                  >
+                    {hits.map((h, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => {
+                          setFv(addrKey,  h.addr);
+                          setFv(cityKey,  h.city);
+                          setFv(stateKey, h.state);
+                          setFv(zipKey,   h.zip);
+                          setOpenAddr(null);
+                        }}
+                        className="w-full text-left px-3 py-2 transition-colors"
+                        style={{ fontFamily: FONT, fontSize: 13, color: c.text, background: "transparent", border: "none", cursor: "pointer" }}
+                        onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+                        onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                      >
+                        <div style={{ fontWeight: 500 }}>{h.addr}</div>
+                        <div style={{ fontSize: 11.5, color: c.muted, marginTop: 1 }}>
+                          {h.city}, {h.state} {h.zip}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </Field>
             <div className="grid gap-3.5 grid-cols-1 sm:grid-cols-[2fr_1fr_1fr]">
               {renderField(t, { k: "text",  key: `${f.prefix}city`,  label: "City",  req: true }, 0)}
@@ -958,6 +1107,7 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
             </div>
           </div>
         );
+      }
       case "showIf": {
         const cur = fv(kk(f.when));
         const active = f.checked ? cur === "true" : (f.equals ? cur === f.equals : !!cur);
@@ -1006,35 +1156,36 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
   // ─── page renderers (content copied 1:1 from the prototype)
   const renderContact = () => (
     <>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-        <Field label="Effective date" required refKey="contact-eff">
-          <DatePicker value={contactEff} onChange={setContactEff} inputStyle={inputStyle} c={c} btnGrad={razzGrad} font={font} />
-        </Field>
-        <Field label="Contact type" required refKey="contact-type">
-          <div className="relative">
-            <button type="button" onClick={() => { closeAll(); setContactTypeOpen(o => !o); }}
-              className="w-full flex items-center justify-between"
-              style={{ ...inputStyle, cursor: "pointer", textAlign: "left", color: contactType ? c.text : c.sub }}>
-              <span>{contactType || "Select…"}</span>
-              <ChevronDown className={`w-4 h-4 transition-transform ${contactTypeOpen ? "rotate-180" : ""}`} style={{ color: c.muted }} />
-            </button>
-            {contactTypeOpen && (
-              <div className="absolute left-0 right-0 top-full mt-1 z-20 rounded-lg shadow-lg overflow-hidden" style={{ background: c.cardBg, border: `1px solid ${c.border}` }}>
-                {["Insured", "Agent"].map(o => (
-                  <button key={o} onClick={() => { setContactType(o); setContactTypeOpen(false); }}
-                    className="w-full text-left px-3 py-2 text-[13px] transition-colors"
-                    style={{ fontFamily: FONT, color: c.text }}
-                    onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
-                    onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
-                  >{o}</button>
-                ))}
-              </div>
-            )}
-          </div>
-        </Field>
+      <Field label="Effective date" required refKey="contact-eff">
+        <DatePicker value={contactEff} onChange={setContactEff} inputStyle={inputStyle} c={c} btnGrad={razzGrad} font={font} />
+      </Field>
+
+      <div style={{ fontFamily: FONT, fontSize: 12, fontWeight: 700, color: c.text, textTransform: "uppercase", letterSpacing: "0.05em", margin: "22px 0 8px", paddingTop: 16, borderTop: `1px solid ${c.softDivider}` }}>
+        Are you updating the insured or the agency contact information?
       </div>
 
-      <Helper>Are you updating the <span style={{ color: c.text, fontWeight: 600 }}>insured</span> or the <span style={{ color: c.text, fontWeight: 600 }}>agency</span> contact information?</Helper>
+      <Field label="Contact type" required refKey="contact-type">
+        <div className="relative">
+          <button type="button" onClick={() => { closeAll(); setContactTypeOpen(o => !o); }}
+            className="w-full flex items-center justify-between"
+            style={{ ...inputStyle, cursor: "pointer", textAlign: "left", color: contactType ? c.text : c.sub }}>
+            <span>{contactType || "Select…"}</span>
+            <ChevronDown className={`w-4 h-4 transition-transform ${contactTypeOpen ? "rotate-180" : ""}`} style={{ color: c.muted }} />
+          </button>
+          {contactTypeOpen && (
+            <div className="absolute left-0 right-0 top-full mt-1 z-20 rounded-lg shadow-lg overflow-hidden" style={{ background: c.cardBg, border: `1px solid ${c.border}` }}>
+              {["Insured", "Agent"].map(o => (
+                <button key={o} onClick={() => { setContactType(o); setContactTypeOpen(false); }}
+                  className="w-full text-left px-3 py-2 text-[13px] transition-colors"
+                  style={{ fontFamily: FONT, color: c.text }}
+                  onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+                  onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                >{o}</button>
+              ))}
+            </div>
+          )}
+        </div>
+      </Field>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5" ref={setRef("contact-any")}>
         <Field label="First name" optional>
@@ -1044,7 +1195,7 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
           <input value={contactLast} onChange={e => setContactLast(e.target.value)} placeholder="Byrne" style={inputStyle} />
         </Field>
         <Field label="Phone" optional>
-          <input value={contactPhone} onChange={e => setContactPhone(e.target.value)} placeholder="916-772-9200" style={inputStyle} />
+          <input value={contactPhone} onChange={e => setContactPhone(formatPhone(e.target.value))} inputMode="numeric" maxLength={12} placeholder="916-772-9200" style={inputStyle} />
         </Field>
         <Field label="Email" optional>
           <input type="email" value={contactEmail} onChange={e => setContactEmail(e.target.value)} placeholder="sbyrne@btisinc.com" style={inputStyle} />
@@ -1140,12 +1291,54 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
       </Field>
 
       <SectionLabel>Location the changes apply to</SectionLabel>
-      <Field
-        label="Address" required
-        refKey="cc-addr"
-        hint={<><span style={{ color: c.razz }}>◈</span> Autofills from Google Address when a match is found</>}
-      >
-        <input value={ccAddress} onChange={e => setCcAddress(e.target.value)} placeholder="587 Test St." style={inputStyle} />
+      <Field label="Address" required refKey="cc-addr">
+        <div className="relative">
+          <input
+            value={ccAddress}
+            onChange={e => { setCcAddress(e.target.value); setOpenAddr("cc-addr"); }}
+            onFocus={() => setOpenAddr("cc-addr")}
+            placeholder="587 Test St"
+            style={inputStyle}
+            autoComplete="off"
+          />
+          {openAddr === "cc-addr" && ccAddress.trim().length > 0 && (() => {
+            const tokens = ccAddress.trim().toLowerCase().split(/\s+/).filter(Boolean);
+            const hits   = MOCK_ADDRESSES.filter(a => {
+              const s = `${a.addr} ${a.city} ${a.state} ${a.zip}`.toLowerCase();
+              return tokens.every(tk => s.includes(tk));
+            }).slice(0, 6);
+            if (!hits.length) return null;
+            return (
+              <div
+                className="absolute left-0 right-0 top-full mt-1 z-20 rounded-lg shadow-lg overflow-hidden max-h-[240px] overflow-y-auto"
+                style={{ background: c.cardBg, border: `1px solid ${c.border}` }}
+              >
+                {hits.map((h, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => {
+                      setCcAddress(h.addr);
+                      setCcCity(h.city);
+                      setCcState(h.state);
+                      setCcZip(h.zip);
+                      setOpenAddr(null);
+                    }}
+                    className="w-full text-left px-3 py-2 transition-colors"
+                    style={{ fontFamily: FONT, fontSize: 13, color: c.text, background: "transparent", border: "none", cursor: "pointer" }}
+                    onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+                    onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                  >
+                    <div style={{ fontWeight: 500 }}>{h.addr}</div>
+                    <div style={{ fontSize: 11.5, color: c.muted, marginTop: 1 }}>
+                      {h.city}, {h.state} {h.zip}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            );
+          })()}
+        </div>
       </Field>
       <div className="grid gap-3.5" style={{ gridTemplateColumns: "2fr 1fr 1fr 0.8fr" }}>
         <Field label="City" required refKey="cc-city">
@@ -1232,7 +1425,7 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
             <div style={{ padding: "0 2px 14px", borderBottom: `1px solid ${c.softDivider}` }}>
               <button
                 type="button"
-                onClick={onBack}
+                onClick={handleBackClick}
                 className="inline-flex items-center gap-1.5 transition-opacity hover:opacity-70"
                 style={{ fontFamily: FONT, fontSize: 12, fontWeight: 500, color: c.muted, background: "transparent", border: "none", cursor: "pointer", padding: 0, marginBottom: 8 }}
               >
@@ -1340,11 +1533,9 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
                 {SPECS[type] && SPECS[type]!.map((f, i) => renderField(type, f, i))}
               </div>
 
-              {/* Supporting Detail — flat, no card */}
+              {/* Additional comment + upload — no section header,
+                  just the fields directly under the type-specific ones. */}
               <div style={{ padding: "20px 4px 24px", borderTop: `1px solid ${c.softDivider}` }}>
-                <div style={{ fontFamily: FONT, fontSize: 12, fontWeight: 700, color: c.text, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>
-                  Supporting detail
-                </div>
                 {supportingDetailFields()}
               </div>
             </div>
@@ -1481,6 +1672,53 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
           </aside>
           </div>
         </div>
+
+        {/* ── Unsaved-changes confirmation — shown when user clicks
+            "Back to results" with any dirty form state. */}
+        {confirmLeaveOpen && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center"
+            style={{ background: "rgba(15,23,42,0.45)", padding: 16 }}
+            onClick={() => setConfirmLeaveOpen(false)}
+          >
+            <div
+              className="rounded-2xl"
+              style={{ background: c.cardBg, border: `1px solid ${c.border}`, maxWidth: 420, width: "100%", boxShadow: "0 20px 50px rgba(15,23,42,0.25)" }}
+              onClick={e => e.stopPropagation()}
+            >
+              <div style={{ padding: "22px 24px 8px" }}>
+                <div style={{ fontFamily: FONT, fontSize: 17, fontWeight: 600, color: c.text, letterSpacing: "-0.01em" }}>
+                  Leave without saving?
+                </div>
+                <p style={{ fontFamily: FONT, fontSize: 13, color: c.muted, margin: "8px 0 0", lineHeight: 1.5 }}>
+                  You have unsaved changes on this endorsement request. If you go back to results now, your changes will not be saved.
+                </p>
+              </div>
+              <div className="flex items-center justify-end gap-2" style={{ padding: "16px 24px 20px" }}>
+                <button
+                  type="button"
+                  onClick={() => setConfirmLeaveOpen(false)}
+                  className="transition-colors"
+                  style={{ fontFamily: FONT, fontSize: 13, fontWeight: 500, color: c.text, background: "transparent", border: `1px solid ${c.border}`, padding: "8px 16px", borderRadius: 8, cursor: "pointer" }}
+                  onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+                  onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                >
+                  Keep editing
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setConfirmLeaveOpen(false); onBack(); }}
+                  className="transition-colors"
+                  style={{ fontFamily: FONT, fontSize: 13, fontWeight: 600, color: "#fff", background: razzGrad, border: "none", padding: "8px 16px", borderRadius: 8, cursor: "pointer" }}
+                  onMouseEnter={e => (e.currentTarget.style.filter = "brightness(1.08)")}
+                  onMouseLeave={e => (e.currentTarget.style.filter = "none")}
+                >
+                  Discard &amp; leave
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
     </div>
   );
 }
