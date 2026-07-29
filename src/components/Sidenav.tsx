@@ -11,6 +11,7 @@ import {
   Briefcase, CreditCard, BookOpen, FileEdit,
   Wrench, HelpCircle, UserCog, Building2, Globe, ChevronDown, Users,
   User, LogOut, X, Images, Pencil, ZoomIn, ZoomOut, AlertTriangle, Rocket,
+  Mail, MessageSquare, Check,
 } from "lucide-react";
 
 interface NavItemProps {
@@ -113,6 +114,19 @@ export default function Sidenav({ isDark = false, onToggleDark, activeItem = "Ma
   const [lastName,  setLastName]  = useState("Smith");
   const [savedFirstName, setSavedFirstName] = useState("John");
   const [savedLastName,  setSavedLastName]  = useState("Smith");
+  // Contact + security fields — profile-scoped so users can add their phone
+  // and choose how they receive the login one-time code. Admin-only fields
+  // (Admin toggle, Job title, Status, Address, Ext) live in the Agencies
+  // user editor, not here.
+  const [mobilePhone, setMobilePhone] = useState("");
+  const [smsOptIn, setSmsOptIn] = useState(false);
+  const [mfaPref, setMfaPref] = useState<"email" | "phone">("email");
+  const formatPhone = (v: string) => {
+    const d = v.replace(/\D/g, "").slice(0, 10);
+    if (d.length <= 3) return d;
+    if (d.length <= 6) return `${d.slice(0, 3)}-${d.slice(3)}`;
+    return `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}`;
+  };
   const userId = "johnsmith01"; // system-assigned, shown as @userId, never edited by the user
   // Inline validation (required-field) for the User Name fields. Duplicates are allowed.
   const [userNameError, setUserNameError] = useState<string | null>(null);
@@ -518,6 +532,102 @@ export default function Sidenav({ isDark = false, onToggleDark, activeItem = "Ma
                         {userNameError}
                       </div>
                     )}
+                  </div>
+
+                  {/* Contact info — personal fields the user can update. Admin-only
+                      fields (Admin toggle, Job Title, Status, Ext) stay in the
+                      Agencies user editor. */}
+                  <div className="px-6 pt-3 pb-2">
+                    <label className="text-[12px] font-semibold block mb-1.5" style={{ color: text }}>Mobile phone</label>
+                    <input
+                      value={mobilePhone}
+                      onChange={e => setMobilePhone(formatPhone(e.target.value))}
+                      inputMode="numeric"
+                      maxLength={12}
+                      placeholder="(555) 555-5555"
+                      className="w-full px-3 py-2 rounded-lg text-[13px] outline-none transition-colors"
+                      style={{ background: cardBg, border: `1px solid ${border}`, color: text }}
+                      onFocus={e => (e.currentTarget.style.borderColor = "#A614C3")}
+                      onBlur={e => (e.currentTarget.style.borderColor = border)}
+                    />
+                    <label className="mt-2 flex items-center gap-2 cursor-pointer" style={{ fontSize: 11.5, color: muted }}>
+                      <input
+                        type="checkbox"
+                        checked={smsOptIn}
+                        onChange={e => setSmsOptIn(e.target.checked)}
+                        className="sr-only"
+                      />
+                      <span
+                        className="flex-shrink-0 flex items-center justify-center"
+                        style={{
+                          width: 14, height: 14, borderRadius: 3,
+                          border: `1.5px solid ${smsOptIn ? "transparent" : border}`,
+                          background: smsOptIn ? "linear-gradient(88.54deg, #5C2ED4 0.1%, #A614C3 63.88%)" : "transparent",
+                        }}
+                      >
+                        {smsOptIn && <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />}
+                      </span>
+                      I agree to receive SMS texts for verification
+                    </label>
+                  </div>
+
+                  <div className="px-6 pt-3 pb-2">
+                    <label className="text-[12px] font-semibold block mb-1.5" style={{ color: text }}>Email</label>
+                    <input
+                      type="email"
+                      placeholder="you@example.com"
+                      defaultValue="john.smith@example.com"
+                      className="w-full px-3 py-2 rounded-lg text-[13px] outline-none transition-colors"
+                      style={{ background: cardBg, border: `1px solid ${border}`, color: text }}
+                      onFocus={e => (e.currentTarget.style.borderColor = "#A614C3")}
+                      onBlur={e => (e.currentTarget.style.borderColor = border)}
+                    />
+                  </div>
+
+                  <div className="px-6 pt-3 pb-2">
+                    <label className="text-[12px] font-semibold block mb-1.5" style={{ color: text }}>Address</label>
+                    <input
+                      placeholder="123 Main Street"
+                      className="w-full px-3 py-2 rounded-lg text-[13px] outline-none transition-colors"
+                      style={{ background: cardBg, border: `1px solid ${border}`, color: text }}
+                      onFocus={e => (e.currentTarget.style.borderColor = "#A614C3")}
+                      onBlur={e => (e.currentTarget.style.borderColor = border)}
+                    />
+                    <div className="flex gap-2 mt-2">
+                      <div className="flex-1 min-w-0">
+                        <label className="text-[11px] block mb-1" style={{ color: muted }}>City</label>
+                        <input
+                          placeholder="Anytown"
+                          className="w-full px-3 py-2 rounded-lg text-[13px] outline-none transition-colors"
+                          style={{ background: cardBg, border: `1px solid ${border}`, color: text }}
+                          onFocus={e => (e.currentTarget.style.borderColor = "#A614C3")}
+                          onBlur={e => (e.currentTarget.style.borderColor = border)}
+                        />
+                      </div>
+                      <div style={{ width: 72 }}>
+                        <label className="text-[11px] block mb-1" style={{ color: muted }}>State</label>
+                        <input
+                          placeholder="CA"
+                          maxLength={2}
+                          className="w-full px-3 py-2 rounded-lg text-[13px] outline-none transition-colors uppercase"
+                          style={{ background: cardBg, border: `1px solid ${border}`, color: text }}
+                          onFocus={e => (e.currentTarget.style.borderColor = "#A614C3")}
+                          onBlur={e => (e.currentTarget.style.borderColor = border)}
+                        />
+                      </div>
+                      <div style={{ width: 96 }}>
+                        <label className="text-[11px] block mb-1" style={{ color: muted }}>Zip</label>
+                        <input
+                          placeholder="21354"
+                          inputMode="numeric"
+                          maxLength={5}
+                          className="w-full px-3 py-2 rounded-lg text-[13px] outline-none transition-colors"
+                          style={{ background: cardBg, border: `1px solid ${border}`, color: text }}
+                          onFocus={e => (e.currentTarget.style.borderColor = "#A614C3")}
+                          onBlur={e => (e.currentTarget.style.borderColor = border)}
+                        />
+                      </div>
+                    </div>
                   </div>
                 </>
               )}

@@ -10,7 +10,7 @@ import loginN from "@/assets/login-n.svg";
 
 const FONT = "var(--font-montserrat), Montserrat, sans-serif";
 
-type Step = "login" | "mfa" | "signup" | "verify" | "create" | "reset";
+type Step = "login" | "mfa" | "addphone" | "signup" | "verify" | "create" | "reset";
 type MfaMethod = "email" | "phone";
 
 interface WebsiteProps {
@@ -139,7 +139,7 @@ export default function Website({ isDark = false }: WebsiteProps) {
         >
         {/* Step indicator (top-right) — clickable for demo navigation */}
         <div className="absolute top-6 right-8 flex items-center gap-2">
-          {(["login", "mfa", "signup", "verify", "create", "reset"] as Step[]).map((s, i) => (
+          {(["login", "mfa", "addphone", "signup", "verify", "create", "reset"] as Step[]).map((s, i) => (
             <button
               key={s}
               onClick={() => setStep(s)}
@@ -163,12 +163,11 @@ export default function Website({ isDark = false }: WebsiteProps) {
           <div className="w-full" style={{ maxWidth: step === "signup" ? 760 : 520, transform: "scale(0.85)", transformOrigin: "center" }}>
             {step === "login"  && <LoginView  c={c} font={font} inputStyle={inputStyle} labelStyle={labelStyle} primaryBtnStyle={primaryBtnStyle} btnGrad={btnGrad}
               onContinue={() => {
-                // Users with a phone number on file get to pick their MFA channel.
-                // Users with only email skip straight to the code entry.
-                // Demo: `userHasPhone` is a state toggle so both flows can be
-                // shown from the login screen.
+                // Users with a phone on file → MFA method picker.
+                // Users with only email → "add phone" reminder page, from
+                // which they can still finish signing in with email.
                 if (userHasPhone) setStep("mfa");
-                else { setMfaMethod("email"); setStep("verify"); }
+                else setStep("addphone");
               }}
               onResetLinkClicked={() => setStep("reset")}
               onCreateLinkClicked={() => setStep("signup")}
@@ -206,6 +205,10 @@ export default function Website({ isDark = false }: WebsiteProps) {
             />}
             {step === "mfa" && <MfaMethodView c={c} font={font} primaryBtnStyle={primaryBtnStyle} btnGrad={btnGrad}
               onSelect={(m) => { setMfaMethod(m); setStep("verify"); }}
+              onBack={() => setStep("login")}
+            />}
+            {step === "addphone" && <AddPhoneView c={c} font={font} primaryBtnStyle={primaryBtnStyle} btnGrad={btnGrad}
+              onContinueEmail={() => { setMfaMethod("email"); setStep("verify"); }}
               onBack={() => setStep("login")}
             />}
             {step === "signup" && <SignupView c={c} font={font} inputStyle={inputStyle} labelStyle={labelStyle} primaryBtnStyle={primaryBtnStyle} btnGrad={btnGrad} isDark={isDark} onContinue={() => setStep("verify")} onSignInClicked={() => setStep("login")} />}
@@ -293,7 +296,6 @@ function LoginView({ c, font, inputStyle, labelStyle, primaryBtnStyle, btnGrad, 
   const [remember, setRemember] = useState(false);
   const [showPw, setShowPw] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
-  const [userIdTipOpen, setUserIdTipOpen] = useState(false);
   // Demo: always allow Continue. Production would require identifier + password.
   const enabled = true;
 
@@ -312,70 +314,22 @@ function LoginView({ c, font, inputStyle, labelStyle, primaryBtnStyle, btnGrad, 
           NorbieLink!
         </span>
       </h1>
-      <p className="mb-8" style={{ ...font, fontSize: 14, color: c.muted }}>
-        Sign in to continue to your account.
+      <p className="mb-8" style={{ ...font, fontSize: 14, color: c.muted, lineHeight: 1.5 }}>
+        User IDs are your first name, last name, and numbers (e.g.,{" "}
+        <span style={{ fontFamily: "monospace", color: c.text }}>johnsmith00110</span>).
+        If that doesn&apos;t work, try your email address.{" "}
+        <span style={{ fontWeight: 600, color: "#A614C3" }}>Agency codes cannot be used as User IDs.</span>
       </p>
 
       <div className="mb-5">
-        {/* Label suffix carries ONLY the warning ("not your agency code") since the input's
-            placeholder already says "Enter your email or User ID" — duplicating that in the
-            label suffix would be redundant. The two pieces complement each other:
-              label → what NOT to use
-              placeholder → what TO use */}
-        {/* "User ID" label + a HelpCircle that reveals the full "what is a User ID" tooltip
-            on hover/focus. The detail (format example, email fallback, agency-code caveat)
-            is too long to live inline next to the label — gating it behind the icon keeps
-            the label calm while still surfacing the explanation to anyone unsure. */}
-        <label style={{ ...labelStyle, display: "flex", alignItems: "center", gap: 6, lineHeight: 1 }}>
-          <span style={{ lineHeight: 1 }}>User ID</span>
-          <span
-            style={{ position: "relative", display: "inline-flex", cursor: "help" }}
-            onMouseEnter={() => setUserIdTipOpen(true)}
-            onMouseLeave={() => setUserIdTipOpen(false)}
-            onFocus={() => setUserIdTipOpen(true)}
-            onBlur={() => setUserIdTipOpen(false)}
-            tabIndex={0}
-            aria-describedby="user-id-tooltip"
-          >
-            <HelpCircle style={{ width: 13, height: 13, color: c.muted, display: "block" }} strokeWidth={2} />
-            {userIdTipOpen && (
-              <div
-                id="user-id-tooltip"
-                role="tooltip"
-                style={{
-                  position: "absolute",
-                  top: "calc(100% + 8px)",
-                  left: -8,
-                  width: 280,
-                  padding: "12px 14px",
-                  background: c.cardBg,
-                  color: c.text,
-                  fontSize: 12,
-                  lineHeight: "17px",
-                  fontWeight: 400,
-                  border: `1px solid ${c.border}`,
-                  borderRadius: 12,
-                  boxShadow: "0 12px 30px rgba(0,0,0,0.12)",
-                  zIndex: 10,
-                  pointerEvents: "none",
-                  fontFamily: FONT,
-                }}
-              >
-                User IDs are your first name, last name, and numbers (e.g.,{" "}
-                <span style={{ fontFamily: "monospace", color: "#4B5563" }}>johnsmith00110</span>).
-                If that doesn&apos;t work, try your email address.{" "}
-                <span style={{ fontWeight: 600, color: "#4B5563" }}>Agency codes cannot be used as User IDs.</span>
-              </div>
-            )}
-          </span>
-        </label>
+        <label style={labelStyle}>User ID</label>
         <input type="text" value={identifier} onChange={e => setIdentifier(e.target.value)}
           onBlur={() => {
             // Detect on blur (when the user leaves the field) rather than every keystroke —
             // avoids firing the toast while they're still typing their actual identifier.
             if (looksLikeAgencyCode(identifier)) onAgencyCodeDetected(identifier.trim());
           }}
-          placeholder="Enter your User ID or email"
+          placeholder="Not your Agency code"
           style={inputStyle} />
         {/* No persistent hint here — most users don't have an agency code at all, so a
             preemptive "agency code isn't a login" line would be both presumptuous and noisy
@@ -424,30 +378,6 @@ function LoginView({ c, font, inputStyle, labelStyle, primaryBtnStyle, btnGrad, 
         </span>
         Remember me
       </label>
-
-      {/* Continuity note — existing users who signed in with an email
-          address before don't need to migrate to a User ID; email still
-          works. Warn Helper look (razz AlertCircle + black text with a
-          razz callout at the front) matches the intake style. */}
-      <div
-        className="mb-4 flex items-start gap-2"
-        style={{
-          fontFamily: FONT,
-          fontSize: 12.5,
-          color: c.text,
-          padding: "10px 12px",
-          background: "#F9FAFB",
-          border: `1px solid ${c.border}`,
-          borderRadius: 8,
-          lineHeight: 1.5,
-        }}
-      >
-        <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#A614C3", marginTop: 3 }} />
-        <span>
-          <span style={{ color: "#A614C3", fontWeight: 600 }}>Your User ID is not your Agency Code.</span>{" "}
-          If you previously signed in with an email address, you can keep using it here.
-        </span>
-      </div>
 
       <button type="button" disabled={!enabled} onClick={onContinue} style={primaryBtnStyle(enabled)}>
         Continue
@@ -880,6 +810,87 @@ function MfaMethodView({ c, font, primaryBtnStyle, btnGrad, onSelect, onBack }: 
         type="button"
         onClick={onBack}
         className="transition-opacity hover:opacity-70"
+        style={{
+          fontFamily: FONT,
+          fontSize: 13,
+          color: c.muted,
+          background: "transparent",
+          border: "none",
+          padding: 0,
+          cursor: "pointer",
+        }}
+      >
+        ← Back to sign in
+      </button>
+    </>
+  );
+}
+
+/* ──────────────────────────── ADD PHONE (nudge, shown when only email is on file) ──────────────────────────── */
+function AddPhoneView({ c, font, primaryBtnStyle, btnGrad, onContinueEmail, onBack }: {
+  c: Record<string, string>;
+  font: React.CSSProperties;
+  primaryBtnStyle: (enabled: boolean) => React.CSSProperties;
+  btnGrad: string;
+  onContinueEmail: () => void;
+  onBack: () => void;
+}) {
+  return (
+    <>
+      <h1 className="mb-3" style={{ ...font, fontSize: 28, fontWeight: 600, lineHeight: "34px", color: c.text, whiteSpace: "nowrap" }}>
+        Add a{" "}
+        <span
+          style={{
+            background: btnGrad,
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+            backgroundClip: "text",
+          }}
+        >
+          Phone Number
+        </span>
+      </h1>
+      <p className="mb-6" style={{ ...font, fontSize: 14, color: c.muted, lineHeight: 1.5 }}>
+        We don&apos;t have a phone number on file for your account, so text-message
+        verification isn&apos;t available yet. You can still sign in with an email
+        code — but adding a phone lets us reach you faster next time.
+      </p>
+
+      {/* Razz-tinted callout — instructions to update phone in the main app */}
+      <div
+        className="mb-6 flex items-start gap-2"
+        style={{
+          fontFamily: FONT,
+          fontSize: 13,
+          color: c.text,
+          padding: "12px 14px",
+          background: "rgba(166,20,195,0.06)",
+          border: `1px solid rgba(166,20,195,0.22)`,
+          borderRadius: 10,
+          lineHeight: 1.5,
+        }}
+      >
+        <AlertCircle className="w-4 h-4 flex-shrink-0" style={{ color: "#A614C3", marginTop: 2 }} />
+        <span>
+          Head to{" "}
+          <span style={{ color: "#A614C3", fontWeight: 600 }}>Profile → Contact info</span>{" "}
+          after you sign in and add your mobile number. Text verification will be
+          available the next time you log in.
+        </span>
+      </div>
+
+      <button
+        type="button"
+        onClick={onContinueEmail}
+        style={primaryBtnStyle(true)}
+      >
+        Continue with email code
+      </button>
+
+      <button
+        type="button"
+        onClick={onBack}
+        className="transition-opacity hover:opacity-70 mt-4"
         style={{
           fontFamily: FONT,
           fontSize: 13,
