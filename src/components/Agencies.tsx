@@ -5744,6 +5744,11 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                   });
                   const clearSel = () => setSelectedStmts(new Set());
                   const closeDropdowns = () => { setStmtFilterOpen(false); setStmtSortOpen(false); setStmtDownloadFor(null); };
+                  // Refs to each folder card so the cadence chips can smooth-scroll to them.
+                  const groupRefs: Record<"comm" | "soa", HTMLDivElement | null> = { comm: null, soa: null };
+                  const jumpTo = (type: "comm" | "soa") => {
+                    groupRefs[type]?.scrollIntoView({ behavior: "smooth", block: "start" });
+                  };
 
                   const StmtRow = ({ s, isLast }: { s: Stmt; isLast: boolean }) => {
                     const selected = selectedStmts.has(s.id);
@@ -5825,7 +5830,10 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                   const renderGroup = (type: "comm" | "soa", rows: Stmt[]) => {
                     if (rows.length === 0) return null;
                     return (
-                      <div key={type} className="rounded-xl overflow-hidden mb-3" style={{ background: c.cardBg, border: `1px solid ${c.border}` }}>
+                      <div key={type}
+                        ref={el => { groupRefs[type] = el; }}
+                        className="rounded-xl overflow-hidden mb-3"
+                        style={{ background: c.cardBg, border: `1px solid ${c.border}`, scrollMarginTop: 12 }}>
                         <div className="flex items-center gap-2 px-5 py-2" style={{ borderBottom: `1px solid ${c.border}`, background: c.hoverBg }}>
                           <FolderOpen className="w-3.5 h-3.5" style={{ color: "#A855F7" }} />
                           <span className="text-[12px] font-semibold" style={{ ...font, color: c.text }}>{TYPE_LABEL[type]}s</span>
@@ -5859,18 +5867,21 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                         </div>
                       </div>
 
-                      {/* Cadence chips — replaces the plain sentence with an at-a-glance rhythm reference */}
+                      {/* Cadence chips — click to jump to the matching folder card below. */}
                       <div className="flex flex-wrap items-stretch gap-2 mb-5">
                         {([
-                          { key: "comm", label: "Commission Statement", cadence: "Posts around the 12th–15th" },
-                          { key: "soa",  label: "Statement of Account", cadence: "Posts the last day of the month" },
-                        ] as const).map(item => (
-                          <div key={item.key}
-                            className="flex items-center gap-2.5 px-3 py-2 rounded-lg flex-1 min-w-[240px]"
+                          { key: "comm" as const, label: "Commission Statement", cadence: "Posts around the 12th–15th" },
+                          { key: "soa"  as const, label: "Statement of Account", cadence: "Posts the last day of the month" },
+                        ]).map(item => (
+                          <button key={item.key} type="button" onClick={() => jumpTo(item.key)}
+                            className="flex items-center gap-2.5 px-3 py-2 rounded-lg flex-1 min-w-[240px] text-left transition-all"
                             style={{
                               background: isDark ? "rgba(255,255,255,0.03)" : "#FAFAFB",
                               border: `1px solid ${c.border}`,
-                            }}>
+                              cursor: "pointer",
+                            }}
+                            onMouseEnter={e => { e.currentTarget.style.borderColor = "#A614C3"; e.currentTarget.style.background = isDark ? "rgba(168,85,247,0.10)" : "rgba(168,85,247,0.05)"; }}
+                            onMouseLeave={e => { e.currentTarget.style.borderColor = c.border; e.currentTarget.style.background = isDark ? "rgba(255,255,255,0.03)" : "#FAFAFB"; }}>
                             <div className="flex items-center justify-center flex-shrink-0 rounded-md"
                               style={{ width: 26, height: 26, background: isDark ? "rgba(168,85,247,0.14)" : "rgba(168,85,247,0.08)" }}>
                               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#A614C3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -5883,7 +5894,10 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                               <div className="text-[12px] font-semibold" style={{ ...font, color: c.text }}>{item.label}</div>
                               <div className="text-[11px]" style={{ ...font, color: c.muted }}>{item.cadence}</div>
                             </div>
-                          </div>
+                            <svg className="flex-shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#A614C3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                              <path d="M12 5v14"/><path d="m19 12-7 7-7-7"/>
+                            </svg>
+                          </button>
                         ))}
                       </div>
 
