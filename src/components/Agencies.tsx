@@ -692,6 +692,25 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
   // changes survive when the user switches agencies.
   const [itcEditing, setItcEditing] = useState(false);
   const [itcDraft, setItcDraft] = useState<ITCRecord | null>(null);
+  // Sub-tabs within the Accounting tab — same segmented-control pattern
+  // as the Documents toolbar so users don't have to scroll to switch
+  // between the ITC record and the monthly statements archive.
+  const [accountingView, setAccountingView] = useState<"record" | "statements">("record");
+  // Statements view state — mirrors the Documents toolbar language
+  // (search, filter by type, sort, select mode, per-item preview).
+  const [stmtSearch, setStmtSearch] = useState("");
+  const [stmtSearchOpen, setStmtSearchOpen] = useState(false);
+  const [stmtFilterOpen, setStmtFilterOpen] = useState(false);
+  const [stmtSortOpen, setStmtSortOpen] = useState(false);
+  const [stmtFilterTypes, setStmtFilterTypes] = useState<Set<"comm" | "soa">>(new Set());
+  const [stmtSortDir, setStmtSortDir] = useState<"desc" | "asc">("desc");
+  const [stmtSelectMode, setStmtSelectMode] = useState(false);
+  const [selectedStmts, setSelectedStmts] = useState<Set<string>>(new Set());
+  const [stmtBulkFormat, setStmtBulkFormat] = useState<"pdf" | "xlsx" | "both">("pdf");
+  const [stmtPreview, setStmtPreview] = useState<{ id: string; type: "comm" | "soa"; label: string; issued: string; sizePdf: string; sizeXls: string } | null>(null);
+  // Row-level Download popover — only one open at a time, keyed by row id.
+  const [stmtDownloadFor, setStmtDownloadFor] = useState<string | null>(null);
+  const [stmtPreviewExpanded, setStmtPreviewExpanded] = useState(false);
   const [detailTab, setDetailTab] = useState<DetailTab>(initialTab ?? "overview");
   const [isEditing, setIsEditing]           = useState(false);
   const [editExpanded, setEditExpanded]     = useState(false);
@@ -3090,19 +3109,12 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
               <LabelValue label="NPN"             value={agency.npn || "—"} />
               <LabelValue label="E&O Policy #"    value={agency.eoPolicyNo || "—"} />
               <LabelValue label="Expiration Date" value={agency.eoExp} />
+              {/* Billing-type fields (Agency Bill / Direct Bill / Premium
+                  Finance) intentionally omitted from the agent-facing
+                  view — accounting-only info, not useful to agents. */}
+              {/* Spacer — pushes Affiliations / Direct Appointments / Tags
+                  onto their own row so the trio reads as one group. */}
               <div />
-              <div>
-                <p className="text-[13px] font-semibold mb-1" style={{ ...font, color: c.text }}>Agency Bill:</p>
-                <p className="text-[13px]" style={{ ...font, color: c.text }}>{agency.agencyBill ? "Yes" : "No"}</p>
-              </div>
-              <div>
-                <p className="text-[13px] font-semibold mb-1" style={{ ...font, color: c.text }}>Direct Bill:</p>
-                <p className="text-[13px]" style={{ ...font, color: c.text }}>{agency.directBill ? "Yes" : "No"}</p>
-              </div>
-              <div>
-                <p className="text-[13px] font-semibold mb-1" style={{ ...font, color: c.text }}>Premium Finance:</p>
-                <p className="text-[13px]" style={{ ...font, color: c.text }}>{agency.premiumFin ? "Yes" : "No"}</p>
-              </div>
               {(() => {
                 const CAP = 5;
                 const affils = effectiveAffils;
@@ -3959,7 +3971,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                   <>
                     <button title="Restore" onClick={() => handleRestore(d)}
                       className="p-1.5 rounded transition-colors" style={{ color: c.muted }}
-                      onMouseEnter={e => { e.currentTarget.style.background = "rgba(16,185,129,0.10)"; e.currentTarget.style.color = "#10B981"; }}
+                      onMouseEnter={e => { e.currentTarget.style.background = "rgba(115,201,183,0.10)"; e.currentTarget.style.color = "#73C9B7"; }}
                       onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = c.muted; }}>
                       <RefreshCw className="w-3.5 h-3.5" />
                     </button>
@@ -5125,8 +5137,8 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                                 </>}
                                 {showTrashed && <>
                                   <button onClick={() => { setTrashedIds(prev => { const s = new Set(prev); s.delete(selectedNote.id); return s; }); setSelectedNote(null); setNoteMoreOpen(false); }}
-                                    className="w-full text-left px-3 py-2 text-[12px] flex items-center gap-2.5" style={{ fontFamily: FONT, color: "#10B981" }}
-                                    onMouseEnter={e=>(e.currentTarget.style.background="rgba(16,185,129,0.08)")} onMouseLeave={e=>(e.currentTarget.style.background="transparent")}>
+                                    className="w-full text-left px-3 py-2 text-[12px] flex items-center gap-2.5" style={{ fontFamily: FONT, color: "#73C9B7" }}
+                                    onMouseEnter={e=>(e.currentTarget.style.background="rgba(115,201,183,0.08)")} onMouseLeave={e=>(e.currentTarget.style.background="transparent")}>
                                     <RefreshCw className="w-3.5 h-3.5" />Restore note
                                   </button>
                                   <button onClick={() => { setDeleteNoteId(selectedNote.id); setSelectedNote(null); setNoteExpanded(false); setNoteMoreOpen(false); }}
@@ -5281,8 +5293,8 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                             </>}
                             {showTrashed && <>
                               <button onClick={() => { setTrashedIds(prev => { const s = new Set(prev); s.delete(selectedNote.id); return s; }); setSelectedNote(null); setNoteMoreOpen(false); }}
-                                className="w-full text-left px-3 py-2 text-[12px] flex items-center gap-2.5" style={{ fontFamily: FONT, color: "#10B981" }}
-                                onMouseEnter={e=>(e.currentTarget.style.background="rgba(16,185,129,0.08)")} onMouseLeave={e=>(e.currentTarget.style.background="transparent")}>
+                                className="w-full text-left px-3 py-2 text-[12px] flex items-center gap-2.5" style={{ fontFamily: FONT, color: "#73C9B7" }}
+                                onMouseEnter={e=>(e.currentTarget.style.background="rgba(115,201,183,0.08)")} onMouseLeave={e=>(e.currentTarget.style.background="transparent")}>
                                 <RefreshCw className="w-3.5 h-3.5" />Restore note
                               </button>
                               <button onClick={() => { setDeleteNoteId(selectedNote.id); setSelectedNote(null); setNoteExpanded(false); setNoteMoreOpen(false); }}
@@ -5379,7 +5391,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
              dashboard and clashed with the rest of the detail view. */}
         {detailTab === "accounting" && (() => {
           const record = itcRecords?.[agency.code] ?? null;
-          const statusColor = (s: ITCStatus) => s === "Active" ? "#10B981"
+          const statusColor = (s: ITCStatus) => s === "Active" ? "#73C9B7"
             : s === "Suspended" ? "#F59E0B"
             : s === "Terminated" ? "#EF4444"
             : "#6366F1";
@@ -5392,8 +5404,8 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
 
           const YesNo = ({ v }: { v: boolean }) => (
             <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11.5px] font-semibold"
-              style={{ background: v ? "rgba(16,185,129,0.10)" : (isDark ? "rgba(255,255,255,0.06)" : "#F3F4F6"), color: v ? "#10B981" : c.muted }}>
-              <span className="w-1.5 h-1.5 rounded-full" style={{ background: v ? "#10B981" : (isDark ? "rgba(255,255,255,0.35)" : "#9CA3AF") }} />
+              style={{ background: v ? "rgba(115,201,183,0.10)" : (isDark ? "rgba(255,255,255,0.06)" : "#F3F4F6"), color: v ? "#73C9B7" : c.muted }}>
+              <span className="w-1.5 h-1.5 rounded-full" style={{ background: v ? "#73C9B7" : (isDark ? "rgba(255,255,255,0.35)" : "#9CA3AF") }} />
               {v ? "Yes" : "No"}
             </span>
           );
@@ -5556,6 +5568,38 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
             const fullAddr = [record.address, [record.city, record.state].filter(Boolean).join(", "), record.zip].filter(Boolean).join(" · ");
             return (
               <div className="flex-1 overflow-y-auto pb-6">
+                {/* Sub-tab toolbar — same segmented-control language as
+                    the Documents tab. Lets users jump directly to
+                    Statements without scrolling past the ITC Record. */}
+                <div
+                  className="flex items-center gap-0.5 pb-3 mb-5"
+                  style={{ borderBottom: `1px solid ${c.border}` }}
+                >
+                  {([
+                    { key: "record" as const,     label: "ITC Record" },
+                    { key: "statements" as const, label: "Statements" },
+                  ]).map(t => {
+                    const active = accountingView === t.key;
+                    return (
+                      <button
+                        key={t.key}
+                        onClick={() => setAccountingView(t.key)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium transition-all whitespace-nowrap"
+                        style={{
+                          fontFamily: FONT,
+                          background: active ? (isDark ? "rgba(255,255,255,0.06)" : "#F3F4F6") : "transparent",
+                          color: active ? c.text : c.muted,
+                        }}
+                        onMouseEnter={e => { if (!active) e.currentTarget.style.background = c.hoverBg; }}
+                        onMouseLeave={e => { if (!active) e.currentTarget.style.background = "transparent"; }}
+                      >
+                        {t.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {accountingView === "record" && (
                 <div className="rounded-2xl p-8 mb-8" style={{ background: c.cardBg, border: `1px solid ${c.border}` }}>
                   <div className="flex items-center justify-between mb-6">
                     <h3 className="text-[17px] font-bold" style={{ ...font, color: c.text }}>ITC Record</h3>
@@ -5643,6 +5687,527 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                     </div>
                   </div>
                 </div>
+                )}
+
+                {/* ── Statements card — 12-month rolling archive.
+                    Phase 1 scope: two statements per month (commission +
+                    statement of account), each in PDF and Excel. Source is
+                    the ITC WIN J-drive path. Older records live with
+                    the accounting team. */}
+                {accountingView === "statements" && (() => {
+                  const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+                  const anchor = { y: 2026, m: 10 }; // Nov 2026
+                  type Stmt = { id: string; type: "comm" | "soa"; label: string; year: number; monthIdx: number; issued: string; sizePdf: string; sizeXls: string };
+                  const all: Stmt[] = [];
+                  for (let i = 0; i < 12; i++) {
+                    let m = anchor.m - i;
+                    let y = anchor.y;
+                    while (m < 0) { m += 12; y -= 1; }
+                    const monthLabel = `${MONTHS[m]} ${y}`;
+                    const lastDay = new Date(y, m + 1, 0).getDate();
+                    all.push({
+                      id: `comm-${y}-${m}`, type: "comm",
+                      label: `Commission Statement — ${monthLabel}`,
+                      year: y, monthIdx: m,
+                      issued: `${MONTHS[m]} 14, ${y}`,
+                      sizePdf: `${180 + ((i * 37) % 90)} KB`,
+                      sizeXls: `${52 + ((i * 13) % 40)} KB`,
+                    });
+                    all.push({
+                      id: `soa-${y}-${m}`, type: "soa",
+                      label: `Statement of Account — ${monthLabel}`,
+                      year: y, monthIdx: m,
+                      issued: `${MONTHS[m]} ${lastDay}, ${y}`,
+                      sizePdf: `${210 + ((i * 41) % 110)} KB`,
+                      sizeXls: `${64 + ((i * 17) % 48)} KB`,
+                    });
+                  }
+
+                  const TYPE_LABEL: Record<"comm" | "soa", string> = { comm: "Commission Statement", soa: "Statement of Account" };
+                  const q = stmtSearch.trim().toLowerCase();
+                  const filtered = all.filter(s =>
+                    (stmtFilterTypes.size === 0 || stmtFilterTypes.has(s.type)) &&
+                    (!q || s.label.toLowerCase().includes(q) || s.issued.toLowerCase().includes(q))
+                  );
+                  filtered.sort((a, b) => {
+                    const ka = a.year * 12 + a.monthIdx;
+                    const kb = b.year * 12 + b.monthIdx;
+                    return stmtSortDir === "desc" ? kb - ka : ka - kb;
+                  });
+                  const groupComm = filtered.filter(s => s.type === "comm");
+                  const groupSoa  = filtered.filter(s => s.type === "soa");
+                  const toggleSel = (id: string) => setSelectedStmts(prev => {
+                    const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s;
+                  });
+                  const toggleFilterType = (t: "comm" | "soa") => setStmtFilterTypes(prev => {
+                    const s = new Set(prev); s.has(t) ? s.delete(t) : s.add(t); return s;
+                  });
+                  const clearSel = () => setSelectedStmts(new Set());
+                  const closeDropdowns = () => { setStmtFilterOpen(false); setStmtSortOpen(false); setStmtDownloadFor(null); };
+
+                  const StmtRow = ({ s, isLast }: { s: Stmt; isLast: boolean }) => {
+                    const selected = selectedStmts.has(s.id);
+                    const isPreview = stmtPreview?.id === s.id;
+                    return (
+                      <div
+                        className="flex items-center gap-3 px-5 py-2 transition-colors cursor-pointer group"
+                        style={{ borderBottom: isLast ? "none" : `1px solid ${c.border}`, background: isPreview ? (isDark ? "rgba(168,85,247,0.10)" : "rgba(168,85,247,0.06)") : "transparent" }}
+                        onClick={() => {
+                          if (stmtSelectMode) toggleSel(s.id);
+                          else setStmtPreview({ id: s.id, type: s.type, label: s.label, issued: s.issued, sizePdf: s.sizePdf, sizeXls: s.sizeXls });
+                        }}
+                        onMouseEnter={e => { if (!isPreview) e.currentTarget.style.background = c.hoverBg; }}
+                        onMouseLeave={e => { if (!isPreview) e.currentTarget.style.background = "transparent"; }}
+                      >
+                        {stmtSelectMode && (
+                          <span
+                            className="flex items-center justify-center flex-shrink-0 rounded"
+                            style={{ width: 16, height: 16, background: selected ? "linear-gradient(88.54deg,#5C2ED4 0.1%,#A614C3 63.88%)" : c.cardBg, border: selected ? "none" : `1.5px solid ${c.borderStrong}` }}
+                          >
+                            {selected && (
+                              <svg width="9" height="7" viewBox="0 0 9 7" fill="none">
+                                <path d="M1 3.5L3.5 6L8 1" stroke="#FFFFFF" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                              </svg>
+                            )}
+                          </span>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="text-[13px] leading-tight" style={{ ...font, color: c.text }}>{MONTHS[s.monthIdx]} {s.year}</div>
+                          <div className="text-[11px] mt-0.5" style={{ ...font, color: c.muted }}>Issued {s.issued}</div>
+                        </div>
+                        <div className="flex items-center gap-1 flex-shrink-0" onClick={e => e.stopPropagation()}>
+                          <button title="Preview" onClick={() => setStmtPreview({ id: s.id, type: s.type, label: s.label, issued: s.issued, sizePdf: s.sizePdf, sizeXls: s.sizeXls })}
+                            className="p-1.5 rounded-md transition-colors"
+                            style={{ color: isPreview ? "#A614C3" : c.muted, background: isPreview ? (isDark ? "rgba(168,85,247,0.14)" : "rgba(168,85,247,0.08)") : "transparent" }}
+                            onMouseEnter={e => { if (!isPreview) { e.currentTarget.style.background = c.hoverBg; e.currentTarget.style.color = c.text; } }}
+                            onMouseLeave={e => { if (!isPreview) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = c.muted; } }}>
+                            <Eye className="w-3.5 h-3.5" />
+                          </button>
+                          <div className="relative">
+                            <button title="Download" onClick={() => setStmtDownloadFor(p => p === s.id ? null : s.id)}
+                              className="p-1.5 rounded-md transition-colors"
+                              style={{ color: stmtDownloadFor === s.id ? "#A614C3" : c.muted, background: stmtDownloadFor === s.id ? (isDark ? "rgba(168,85,247,0.14)" : "rgba(168,85,247,0.08)") : "transparent" }}
+                              onMouseEnter={e => { if (stmtDownloadFor !== s.id) { e.currentTarget.style.background = c.hoverBg; e.currentTarget.style.color = c.text; } }}
+                              onMouseLeave={e => { if (stmtDownloadFor !== s.id) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = c.muted; } }}>
+                              <Download className="w-3.5 h-3.5" />
+                            </button>
+                            {stmtDownloadFor === s.id && (
+                              <div className="absolute right-0 top-full mt-1 z-30 rounded-lg overflow-hidden"
+                                style={{ background: c.cardBg, border: `1px solid ${c.border}`, boxShadow: "0 8px 24px rgba(0,0,0,0.10)", minWidth: 140 }}>
+                                {([
+                                  { fmt: "pdf" as const,  label: "PDF",   size: s.sizePdf },
+                                  { fmt: "xlsx" as const, label: "Excel", size: s.sizeXls },
+                                ]).map(opt => (
+                                  <button key={opt.fmt}
+                                    onClick={() => {
+                                      showToast({ title: `Downloading ${s.label}`, description: `${opt.label} · ${opt.size}` });
+                                      setStmtDownloadFor(null);
+                                    }}
+                                    className="w-full flex items-center justify-between gap-4 px-3 py-2 text-[12px] transition-colors"
+                                    style={{ fontFamily: FONT, color: c.text }}
+                                    onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+                                    onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                                    <span className="flex items-center gap-2">
+                                      <Download className="w-3 h-3" style={{ color: "#A614C3" }} />
+                                      {opt.label}
+                                    </span>
+                                    <span className="text-[11px]" style={{ color: c.muted }}>{opt.size}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  };
+
+                  const renderGroup = (type: "comm" | "soa", rows: Stmt[]) => {
+                    if (rows.length === 0) return null;
+                    return (
+                      <div key={type} className="rounded-xl overflow-hidden mb-3" style={{ background: c.cardBg, border: `1px solid ${c.border}` }}>
+                        <div className="flex items-center gap-2 px-5 py-2" style={{ borderBottom: `1px solid ${c.border}`, background: c.hoverBg }}>
+                          <FolderOpen className="w-3.5 h-3.5" style={{ color: "#A855F7" }} />
+                          <span className="text-[12px] font-semibold" style={{ ...font, color: c.text }}>{TYPE_LABEL[type]}s</span>
+                          <span className="text-[11px]" style={{ ...font, color: c.muted }}>{rows.length}</span>
+                        </div>
+                        {rows.map((r, i) => <StmtRow key={r.id} s={r} isLast={i === rows.length - 1} />)}
+                      </div>
+                    );
+                  };
+
+                  const previewSideOpen = !!stmtPreview;
+                  // Latest posting date across the archive — surfaces "when the newest file dropped".
+                  const latest = filtered.length ? filtered[0] : all[0];
+                  const latestPosted = latest ? `${MONTHS[latest.monthIdx]} ${latest.type === "comm" ? 14 : new Date(latest.year, latest.monthIdx + 1, 0).getDate()}, ${latest.year}` : "";
+                  return (
+                    <div className="rounded-2xl p-8 mb-8" style={{ background: c.cardBg, border: `1px solid ${c.border}` }} onClick={closeDropdowns}>
+                      {/* Header — stacked title/subtitle + last-posted pill */}
+                      <div className="flex items-start justify-between gap-4 mb-4">
+                        <div>
+                          <h3 className="text-[17px] font-bold leading-tight" style={{ ...font, color: c.text }}>Statements</h3>
+                          <div className="text-[11.5px] mt-0.5" style={{ ...font, color: c.muted }}>
+                            12-month rolling archive · sourced from ITC WIN J-drive
+                          </div>
+                        </div>
+                        <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full flex-shrink-0"
+                          style={{ background: "rgba(115,201,183,0.15)" }}>
+                          <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#73C9B7" }} />
+                          <span className="text-[11.5px] font-semibold" style={{ ...font, color: isDark ? "#73C9B7" : "#0F7A63" }}>
+                            Last posted {latestPosted}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Cadence chips — replaces the plain sentence with an at-a-glance rhythm reference */}
+                      <div className="flex flex-wrap items-stretch gap-2 mb-5">
+                        {([
+                          { key: "comm", label: "Commission Statement", cadence: "Posts around the 12th–15th" },
+                          { key: "soa",  label: "Statement of Account", cadence: "Posts the last day of the month" },
+                        ] as const).map(item => (
+                          <div key={item.key}
+                            className="flex items-center gap-2.5 px-3 py-2 rounded-lg flex-1 min-w-[240px]"
+                            style={{
+                              background: isDark ? "rgba(255,255,255,0.03)" : "#FAFAFB",
+                              border: `1px solid ${c.border}`,
+                            }}>
+                            <div className="flex items-center justify-center flex-shrink-0 rounded-md"
+                              style={{ width: 26, height: 26, background: isDark ? "rgba(168,85,247,0.14)" : "rgba(168,85,247,0.08)" }}>
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#A614C3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                                <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
+                                <line x1="3" y1="10" x2="21" y2="10"/>
+                              </svg>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-[12px] font-semibold" style={{ ...font, color: c.text }}>{item.label}</div>
+                              <div className="text-[11px]" style={{ ...font, color: c.muted }}>{item.cadence}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Toolbar — filter / sort / search / select. Bulk Download lives
+                          inside the select-mode action bar below to keep the header quiet. */}
+                      <div className="flex items-center justify-end mb-3 min-w-0">
+                        <div className="flex items-center gap-1">
+                          {/* Filter */}
+                          <div className="relative" onClick={e => e.stopPropagation()}>
+                            <button onClick={() => { setStmtFilterOpen(p => !p); setStmtSortOpen(false); }}
+                              className="p-1.5 rounded-md transition-all"
+                              style={{ color: stmtFilterTypes.size > 0 ? "#A855F7" : c.muted, background: stmtFilterTypes.size > 0 ? "rgba(168,85,247,0.10)" : "transparent" }}>
+                              <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M1 3h14v1.5L9.5 10v5l-3-1.5V10L1 4.5V3z"/></svg>
+                            </button>
+                            {stmtFilterOpen && (
+                              <div className="absolute right-0 top-8 z-30 w-56 rounded-xl shadow-xl py-1.5" style={{ background: c.cardBg, border: `1px solid ${c.border}` }}>
+                                <p className="text-[10px] font-semibold uppercase tracking-wide px-3 py-1.5" style={{ fontFamily: FONT, color: c.muted }}>Filter by Type</p>
+                                <button onClick={() => setStmtFilterTypes(new Set())}
+                                  className="w-full text-left px-3 py-1.5 text-[12px] flex items-center justify-between transition-colors"
+                                  style={{ fontFamily: FONT, color: stmtFilterTypes.size === 0 ? "#A614C3" : c.text, background: stmtFilterTypes.size === 0 ? "rgba(168,85,247,0.08)" : "transparent" }}>
+                                  All Types
+                                  {stmtFilterTypes.size === 0 && <svg width="10" height="8" viewBox="0 0 9 7" fill="none"><path d="M1 3.5L3.5 6L8 1" stroke="#A614C3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                                </button>
+                                {(["comm","soa"] as const).map(t => {
+                                  const checked = stmtFilterTypes.has(t);
+                                  return (
+                                    <button key={t} onClick={() => toggleFilterType(t)}
+                                      className="w-full text-left px-3 py-1.5 text-[12px] flex items-center gap-2.5 transition-colors"
+                                      style={{ fontFamily: FONT, color: c.text }}
+                                      onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+                                      onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                                      <span className="flex items-center justify-center w-4 h-4 rounded flex-shrink-0" style={{ border: `1.5px solid ${c.borderStrong}`, background: c.cardBg }}>
+                                        {checked && <svg width="9" height="7" viewBox="0 0 9 7" fill="none"><path d="M1 3.5L3.5 6L8 1" stroke="#A614C3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                                      </span>
+                                      <span>{TYPE_LABEL[t]}</span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                          {/* Sort */}
+                          <div className="relative" onClick={e => e.stopPropagation()}>
+                            <button onClick={() => { setStmtSortOpen(p => !p); setStmtFilterOpen(false); }}
+                              className="p-1.5 rounded-md transition-all" style={{ color: c.muted }}>
+                              <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M2 4h12v1.5H2V4zm2 3.5h8V9H4V7.5zm2 3.5h4v1.5H6V11z"/></svg>
+                            </button>
+                            {stmtSortOpen && (
+                              <div className="absolute right-0 top-8 z-30 w-40 rounded-xl shadow-xl overflow-hidden" style={{ background: c.cardBg, border: `1px solid ${c.border}` }}>
+                                <p className="text-[10px] font-semibold uppercase tracking-wide px-3 pt-2 pb-1.5" style={{ fontFamily: FONT, color: c.muted }}>Sort by Month</p>
+                                {([["desc","Newest first"],["asc","Oldest first"]] as const).map(([d, label]) => (
+                                  <button key={d} onClick={() => { setStmtSortDir(d); setStmtSortOpen(false); }}
+                                    className="w-full text-left px-3 py-2 text-[12px] flex items-center justify-between"
+                                    style={{ fontFamily: FONT, color: stmtSortDir === d ? "#A614C3" : c.text, background: stmtSortDir === d ? "rgba(168,85,247,0.08)" : "transparent" }}>
+                                    <span>{label}</span>{stmtSortDir === d && <svg width="10" height="8" viewBox="0 0 9 7" fill="none"><path d="M1 3.5L3.5 6L8 1" stroke="#A614C3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          {/* Search */}
+                          <div className="flex items-center transition-all overflow-hidden" style={{ width: stmtSearchOpen ? 180 : 28 }}>
+                            <button onClick={e => { e.stopPropagation(); setStmtSearchOpen(p => !p); if (stmtSearchOpen) setStmtSearch(""); }}
+                              className="p-1.5 rounded-md flex-shrink-0" style={{ color: stmtSearch ? "#A855F7" : c.muted }}>
+                              <Search className="w-3.5 h-3.5" />
+                            </button>
+                            {stmtSearchOpen && (
+                              <input autoFocus value={stmtSearch} onChange={e => setStmtSearch(e.target.value)}
+                                onClick={e => e.stopPropagation()} placeholder="Search month or type…"
+                                className="outline-none text-[12px] flex-1 min-w-0"
+                                style={{ fontFamily: FONT, color: c.text, background: "transparent", borderBottom: `1px solid ${c.border}` }} />
+                            )}
+                          </div>
+                          {/* Select toggle */}
+                          <button title={stmtSelectMode ? "Exit selection" : "Select statements"}
+                            onClick={e => { e.stopPropagation(); setStmtSelectMode(p => { if (p) clearSel(); return !p; }); }}
+                            className="p-1.5 rounded-md transition-all"
+                            style={{ color: stmtSelectMode ? "#A855F7" : c.muted, background: stmtSelectMode ? "rgba(168,85,247,0.10)" : "transparent" }}>
+                            <CheckSquare className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Divider */}
+                      <div className="mb-3" style={{ height: 1, background: c.border }} />
+
+                      {/* Bulk-select action bar — neutral surface, subtle razz accent-bar on
+                          the left. Format pills are outlined-only when active; Download reads
+                          as a real disabled state instead of a ghosted gradient. */}
+                      {stmtSelectMode && (() => {
+                        const hasSel = selectedStmts.size > 0;
+                        const allChecked = filtered.length > 0 && filtered.every(s => selectedStmts.has(s.id));
+                        return (
+                        <div className="flex items-center justify-between gap-4 pl-4 pr-3 py-2 mb-3 rounded-lg"
+                          style={{
+                            background: isDark ? "rgba(255,255,255,0.03)" : "#FAFAFB",
+                            border: `1px solid ${c.border}`,
+                            borderLeft: "3px solid #A614C3",
+                          }}>
+                          <div className="flex items-center gap-3 text-[12px] min-w-0" style={{ ...font, color: c.text }}>
+                            <span className="font-semibold" style={{ color: hasSel ? c.text : c.muted }}>
+                              {hasSel ? `${selectedStmts.size} selected` : "0 selected"}
+                            </span>
+                            <button onClick={() => setSelectedStmts(allChecked ? new Set() : new Set(filtered.map(s => s.id)))}
+                              className="text-[11px] font-medium transition-opacity"
+                              style={{ fontFamily: FONT, color: "#A614C3" }}
+                              onMouseEnter={e => (e.currentTarget.style.opacity = "0.75")}
+                              onMouseLeave={e => (e.currentTarget.style.opacity = "1")}>
+                              {allChecked ? "Clear" : "Select all"}
+                            </button>
+                          </div>
+                          <div className="flex items-center gap-3 flex-shrink-0">
+                            {/* Format — outlined pill group, active state uses razz text + tint, no gradient */}
+                            <div className="flex items-center gap-1">
+                              <span className="text-[10.5px] uppercase tracking-wider" style={{ fontFamily: FONT, color: c.muted, letterSpacing: "0.06em" }}>Format</span>
+                              <div className="flex items-center rounded-md overflow-hidden" style={{ border: `1px solid ${c.border}`, background: c.cardBg }}>
+                                {(["pdf","xlsx","both"] as const).map(f => {
+                                  const active = stmtBulkFormat === f;
+                                  return (
+                                    <button key={f} onClick={() => setStmtBulkFormat(f)}
+                                      className="px-2.5 py-1 text-[11px] font-semibold transition-colors"
+                                      style={{
+                                        fontFamily: FONT,
+                                        color: active ? "#A614C3" : c.muted,
+                                        background: active ? (isDark ? "rgba(168,85,247,0.14)" : "rgba(168,85,247,0.08)") : "transparent",
+                                      }}
+                                      onMouseEnter={e => { if (!active) e.currentTarget.style.color = c.text; }}
+                                      onMouseLeave={e => { if (!active) e.currentTarget.style.color = c.muted; }}>
+                                      {f === "pdf" ? "PDF" : f === "xlsx" ? "Excel" : "Both"}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                            <div className="w-px h-5" style={{ background: c.border }} />
+                            <button onClick={() => { clearSel(); setStmtSelectMode(false); }}
+                              className="px-2 py-1 rounded-md text-[11px] font-medium transition-colors"
+                              style={{ fontFamily: FONT, color: c.muted, background: "transparent" }}
+                              onMouseEnter={e => { e.currentTarget.style.background = c.hoverBg; e.currentTarget.style.color = c.text; }}
+                              onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = c.muted; }}>
+                              Cancel
+                            </button>
+                            <button
+                              disabled={!hasSel}
+                              onClick={() => {
+                                if (!hasSel) return;
+                                const names = all.filter(s => selectedStmts.has(s.id)).map(s => s.label);
+                                const fmt = stmtBulkFormat === "both" ? "PDF + Excel" : stmtBulkFormat === "pdf" ? "PDF" : "Excel";
+                                showToast({
+                                  title: `Downloading ${names.length} ${names.length === 1 ? "statement" : "statements"} (${fmt})`,
+                                  description: names.length <= 3 ? names.join(", ") : `${names.slice(0,2).join(", ")} and ${names.length - 2} more`,
+                                });
+                                clearSel(); setStmtSelectMode(false);
+                              }}
+                              className="flex items-center gap-1.5 px-3 py-1 rounded-md text-[11.5px] font-semibold transition-all"
+                              style={hasSel ? {
+                                background: btnGrad,
+                                color: "#FFFFFF",
+                                fontFamily: FONT,
+                                cursor: "pointer",
+                              } : {
+                                background: c.cardBg,
+                                color: c.muted,
+                                fontFamily: FONT,
+                                border: `1px solid ${c.border}`,
+                                cursor: "not-allowed",
+                              }}
+                              onMouseEnter={e => { if (hasSel) e.currentTarget.style.filter = "brightness(1.10)"; }}
+                              onMouseLeave={e => { e.currentTarget.style.filter = "none"; }}>
+                              <Download className="w-3 h-3" />
+                              Download{hasSel ? ` ${selectedStmts.size}` : ""}
+                            </button>
+                          </div>
+                        </div>
+                        );
+                      })()}
+
+                      {/* Body — list + optional preview side panel */}
+                      <div className="flex gap-4">
+                        <div style={{ flex: previewSideOpen ? "0 0 62%" : "1 1 100%", minWidth: 0 }}>
+                          {filtered.length === 0 ? (
+                            <div className="rounded-xl overflow-hidden px-5 py-10 text-center text-[12px]"
+                              style={{ ...font, color: c.muted, background: c.cardBg, border: `1px solid ${c.border}` }}>
+                              No statements match your search.
+                            </div>
+                          ) : (
+                            <>
+                              {renderGroup("comm", groupComm)}
+                              {renderGroup("soa",  groupSoa)}
+                            </>
+                          )}
+                        </div>
+                        {previewSideOpen && stmtPreview && (
+                          <div className="rounded-2xl overflow-hidden flex flex-col" style={{ flex: "1 1 38%", minWidth: 0, background: c.cardBg, border: `1px solid ${c.border}` }}
+                            onClick={e => e.stopPropagation()}>
+                            {/* Top bar — breadcrumb + action icons, matches the Documents preview */}
+                            <div className="flex items-center justify-between px-4 py-2.5 flex-shrink-0"
+                              style={{ borderBottom: `1px solid ${c.border}`, background: isDark ? "rgba(255,255,255,0.02)" : "rgba(249,250,251,0.80)" }}>
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <FileText className="w-3.5 h-3.5 flex-shrink-0" style={{ color: c.muted }} />
+                                <span className="text-[11px] flex-shrink-0" style={{ fontFamily: FONT, color: c.muted }}>Statements</span>
+                                <ChevronRight className="w-3 h-3 flex-shrink-0" style={{ color: c.muted }} />
+                                <span className="text-[11px] font-medium truncate" style={{ fontFamily: FONT, color: c.text }}>{TYPE_LABEL[stmtPreview.type]}s</span>
+                              </div>
+                              <div className="flex items-center gap-0.5 flex-shrink-0">
+                                <button title="Download PDF"
+                                  onClick={() => showToast({ title: `Downloading ${stmtPreview.label}`, description: `PDF · ${stmtPreview.sizePdf}` })}
+                                  className="p-1.5 rounded-md transition-colors" style={{ color: c.muted }}
+                                  onMouseEnter={e => { e.currentTarget.style.background = c.hoverBg; e.currentTarget.style.color = c.text; }}
+                                  onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = c.muted; }}>
+                                  <Download className="w-3.5 h-3.5" />
+                                </button>
+                                <button title="Open in side drawer" onClick={() => setStmtPreviewExpanded(true)}
+                                  className="p-1.5 rounded-md transition-colors" style={{ color: c.muted }}
+                                  onMouseEnter={e => { e.currentTarget.style.background = c.hoverBg; e.currentTarget.style.color = c.text; }}
+                                  onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = c.muted; }}>
+                                  <Maximize2 className="w-3.5 h-3.5" />
+                                </button>
+                                <button title="Close" onClick={() => setStmtPreview(null)}
+                                  className="p-1.5 rounded-md transition-colors" style={{ color: c.muted }}
+                                  onMouseEnter={e => { e.currentTarget.style.background = c.hoverBg; e.currentTarget.style.color = c.text; }}
+                                  onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = c.muted; }}>
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                            {/* Meta strip — folder chip · issued date · sizes */}
+                            <div className="flex items-center gap-4 px-5 py-3 flex-shrink-0 text-[12px] flex-wrap"
+                              style={{ ...font, color: c.muted, borderBottom: `1px solid ${c.border}` }}>
+                              <span className="flex items-center gap-1.5"><FolderOpen className="w-3.5 h-3.5" style={{ color: "#A855F7" }} />{TYPE_LABEL[stmtPreview.type]}s</span>
+                              <span className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" />Issued {stmtPreview.issued}</span>
+                              <span className="ml-auto flex items-center gap-1.5 text-[11px]">
+                                PDF {stmtPreview.sizePdf} · Excel {stmtPreview.sizeXls}
+                              </span>
+                            </div>
+                            {/* File placeholder — matches Documents preview card */}
+                            <div className="flex-1 min-h-0 overflow-auto p-6" style={{ background: isDark ? "rgba(255,255,255,0.02)" : "#F9FAFB" }}>
+                              <div className="mx-auto rounded shadow-sm flex flex-col items-center justify-center"
+                                style={{ background: "#FFFFFF", border: `1px solid ${c.border}`, aspectRatio: "8.5 / 11", maxWidth: 520, minHeight: 360, fontFamily: FONT }}>
+                                <FileText className="w-16 h-16 mb-3" style={{ color: "#D1D5DB" }} />
+                                <div className="text-[13px] font-semibold mb-1" style={{ color: "#374151" }}>{stmtPreview.label}.pdf</div>
+                                <div className="text-[11px]" style={{ color: "#9CA3AF" }}>Preview not available in demo</div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      <div
+                        className="mt-4 flex items-start gap-2 px-3 py-2.5 rounded-lg"
+                        style={{
+                          fontFamily: FONT,
+                          fontSize: 12,
+                          color: c.text,
+                          background: isDark ? "rgba(255,255,255,0.03)" : "#F9FAFB",
+                          border: `1px solid ${c.border}`,
+                          lineHeight: 1.5,
+                        }}
+                      >
+                        <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#A614C3", marginTop: 2 }} />
+                        <span>
+                          Need older statements? The accounting team keeps a full history —
+                          reach out to <a href="mailto:accounting@norbielink.com" className="font-semibold" style={{ color: "#A614C3" }}>accounting@norbielink.com</a> with the agency code and the month you need.
+                        </span>
+                      </div>
+
+                      {/* Expanded side drawer — mirrors the Documents expanded preview */}
+                      {stmtPreviewExpanded && stmtPreview && (
+                        <div className="fixed inset-y-0 right-0 z-50 flex" style={{ width: "58vw" }}>
+                          <div className="flex-1 cursor-pointer"
+                            onClick={() => setStmtPreviewExpanded(false)}
+                            style={{ background: "rgba(0,0,0,0.25)" }} />
+                          <div className="flex flex-col h-full shadow-2xl"
+                            style={{ width: "100%", background: c.cardBg, borderLeft: `1px solid ${c.border}` }}>
+                            <div className="flex items-center justify-between px-6 py-3 flex-shrink-0"
+                              style={{ borderBottom: `1px solid ${c.border}`, background: isDark ? "rgba(255,255,255,0.02)" : "rgba(249,250,251,0.80)" }}>
+                              <div className="flex items-center gap-2 min-w-0">
+                                <FileText className="w-3.5 h-3.5 flex-shrink-0" style={{ color: c.muted }} />
+                                <span className="text-[11px] flex-shrink-0" style={{ fontFamily: FONT, color: c.muted }}>Statements</span>
+                                <ChevronRight className="w-3 h-3 flex-shrink-0" style={{ color: c.muted }} />
+                                <span className="text-[12px] font-semibold truncate max-w-[420px]" style={{ fontFamily: FONT, color: c.text }}>{TYPE_LABEL[stmtPreview.type]}s</span>
+                              </div>
+                              <div className="flex items-center gap-0.5 flex-shrink-0">
+                                <button title="Download PDF"
+                                  onClick={() => showToast({ title: `Downloading ${stmtPreview.label}`, description: `PDF · ${stmtPreview.sizePdf}` })}
+                                  className="p-1.5 rounded-md transition-colors" style={{ color: c.muted }}
+                                  onMouseEnter={e => { e.currentTarget.style.background = c.hoverBg; e.currentTarget.style.color = c.text; }}
+                                  onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = c.muted; }}>
+                                  <Download className="w-3.5 h-3.5" />
+                                </button>
+                                <button title="Collapse" onClick={() => setStmtPreviewExpanded(false)}
+                                  className="p-1.5 rounded-md transition-colors">
+                                  <Minimize2 className="w-3.5 h-3.5" style={{ color: "#A855F7" }} />
+                                </button>
+                                <button title="Close" onClick={() => { setStmtPreviewExpanded(false); setStmtPreview(null); }}
+                                  className="p-1.5 rounded-md transition-colors" style={{ color: c.muted }}
+                                  onMouseEnter={e => { e.currentTarget.style.background = c.hoverBg; e.currentTarget.style.color = c.text; }}
+                                  onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = c.muted; }}>
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-4 px-6 py-3 flex-shrink-0 text-[12px] flex-wrap"
+                              style={{ ...font, color: c.muted, borderBottom: `1px solid ${c.border}` }}>
+                              <span className="flex items-center gap-1.5"><FolderOpen className="w-3.5 h-3.5" style={{ color: "#A855F7" }} />{TYPE_LABEL[stmtPreview.type]}s</span>
+                              <span className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" />Issued {stmtPreview.issued}</span>
+                              <span className="ml-auto flex items-center gap-1.5 text-[11px]">
+                                PDF {stmtPreview.sizePdf} · Excel {stmtPreview.sizeXls}
+                              </span>
+                            </div>
+                            <div className="flex-1 min-h-0 overflow-auto p-8" style={{ background: isDark ? "rgba(255,255,255,0.02)" : "#F9FAFB" }}>
+                              <div className="mx-auto rounded shadow-sm flex flex-col items-center justify-center"
+                                style={{ background: "#FFFFFF", border: `1px solid ${c.border}`, aspectRatio: "8.5 / 11", maxWidth: 620, minHeight: 600, fontFamily: FONT }}>
+                                <FileText className="w-20 h-20 mb-4" style={{ color: "#D1D5DB" }} />
+                                <div className="text-[14px] font-semibold mb-1" style={{ color: "#374151" }}>{stmtPreview.label}.pdf</div>
+                                <div className="text-[12px]" style={{ color: "#9CA3AF" }}>Preview not available in demo</div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             );
           }
@@ -6378,7 +6943,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                                 disabled={isUnlockDisabled}
                                 title={isUnlockDisabled ? "Account is currently active — nothing to unlock." : undefined}
                                 style={{ fontFamily:FONT,
-                                  color: isUnlockDisabled ? c.muted : action==="Remove"?"#EF4444":action==="Reactivate"?"#10B981":c.text,
+                                  color: isUnlockDisabled ? c.muted : action==="Remove"?"#EF4444":action==="Reactivate"?"#73C9B7":c.text,
                                   cursor: isUnlockDisabled ? "not-allowed" : "pointer",
                                   opacity: isUnlockDisabled ? 0.55 : 1 }}
                                 onMouseEnter={e=>{ if (!isUnlockDisabled) e.currentTarget.style.background=c.hoverBg; }}
@@ -11026,7 +11591,7 @@ export default function Agencies({ isDark, clientMode = false }: { isDark: boole
                       {!usersHiddenCols.has("status") && (() => {
                         const showInactive = isInactive || statusInactiveUserIds.has(u.id);
                         const bg = showInactive ? (isDark ? "rgba(255,255,255,0.08)" : "#F3F4F6") : "rgba(115,201,183,0.15)";
-                        const fg = showInactive ? c.muted : "#10B981";
+                        const fg = showInactive ? c.muted : "#73C9B7";
                         return (
                           <td className="py-3 pr-6 text-center">
                             <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded inline-block"

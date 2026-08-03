@@ -321,7 +321,7 @@ export default function Endorsements({ isDark }: { isDark: boolean }) {
             ].map((r, i, arr) => {
               const statusColor = r.status === "Processing"
                 ? { color: "#B45309", bg: isDark ? "rgba(245,158,11,0.15)" : "rgba(245,158,11,0.12)" }
-                : { color: "#047857", bg: isDark ? "rgba(16,185,129,0.15)" : "rgba(16,185,129,0.12)" };
+                : { color: "#0F7A63", bg: isDark ? "rgba(115,201,183,0.15)" : "rgba(115,201,183,0.12)" };
               return (
                 <div key={r.id} className="grid px-6 py-3.5 items-center gap-4 transition-colors"
                   style={{ gridTemplateColumns: "1.2fr 1.6fr 1.4fr 1fr 1fr", borderBottom: i !== arr.length - 1 ? `1px solid ${c.border}` : "none" }}

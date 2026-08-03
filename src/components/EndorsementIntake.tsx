@@ -222,7 +222,17 @@ interface Props {
 }
 
 export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, isDark }: Props) {
-  const [type, setType] = useState<EndorsementType>("contact");
+  // Multi-select: the user builds a request out of ONE OR MORE endorsement
+  // types. Each selected type's form stacks in the center; the submit gate
+  // aggregates requirements across all of them.
+  const [selectedTypes, setSelectedTypes] = useState<Set<EndorsementType>>(new Set(["contact"]));
+  const toggleType = (t: EndorsementType) => {
+    setSelectedTypes(prev => {
+      const next = new Set(prev);
+      if (next.has(t)) next.delete(t); else next.add(t);
+      return next;
+    });
+  };
   const [carrier, setCarrier] = useState<Carrier>("amtrust");
   const [carrierOpen, setCarrierOpen] = useState(false);
 
@@ -711,51 +721,62 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
 
   const requirements = useMemo<Requirement[]>(() => {
     const R = (label: string, done: boolean, refKey: string): Requirement => ({ label, done, refKey });
-    switch (type) {
-      case "contact": {
-        const anyContact = [contactFirst, contactLast, contactPhone, contactEmail].some(v => v.trim());
-        return [
-          R("Effective date",             !!contactEff.trim(),          "contact-eff"),
-          R("Contact type",               !!contactType.trim(),         "contact-type"),
-          R("At least one contact field", anyContact,                   "contact-any"),
-        ];
+    const perType = (t: EndorsementType): Requirement[] => {
+      switch (t) {
+        case "contact": {
+          const anyContact = [contactFirst, contactLast, contactPhone, contactEmail].some(v => v.trim());
+          return [
+            R("Effective date",             !!contactEff.trim(),          "contact-eff"),
+            R("Contact type",               !!contactType.trim(),         "contact-type"),
+            R("At least one contact field", anyContact,                   "contact-any"),
+          ];
+        }
+        case "mcp65":
+          return [
+            R("Effective date", !!mcpEff.trim(),    "mcp-eff"),
+            R("MCP 65 number",  !!mcpNumber.trim(), "mcp-num"),
+          ];
+        case "puc":
+          return [
+            R("Effective date",    !!pucEff.trim(),    "puc-eff"),
+            R("PUC filing number", !!pucNumber.trim(), "puc-num"),
+          ];
+        case "classcode": {
+          const rowReqs: Requirement[] = ccRows.flatMap((r, i) => {
+            const line = i + 1;
+            const items: Requirement[] = [R(`Class code (line ${line})`, !!r.code.trim(), `cc-code-${r.id}`)];
+            if (r.action !== "Remove Class Code") {
+              items.push(R(`Payroll (line ${line})`, !!r.payroll.trim(), `cc-pay-${r.id}`));
+              items.push(R(`FT (line ${line})`,      r.ft.trim().length > 0, `cc-ft-${r.id}`));
+              items.push(R(`PT (line ${line})`,      r.pt.trim().length > 0, `cc-pt-${r.id}`));
+            }
+            return items;
+          });
+          return [
+            R("Effective date",    !!ccEff.trim(),    "cc-eff"),
+            ...rowReqs,
+            R("Reason for change", !!ccReason.trim(), "cc-reason"),
+            R("Location address",  !!ccAddress.trim(),"cc-addr"),
+            R("City",              !!ccCity.trim(),   "cc-city"),
+            R("State",             !!ccState.trim(),  "cc-state"),
+            R("Zip",               !!ccZip.trim(),    "cc-zip"),
+          ];
+        }
+        default:
+          return specRequirements(t);
       }
-      case "mcp65":
-        return [
-          R("Effective date", !!mcpEff.trim(),    "mcp-eff"),
-          R("MCP 65 number",  !!mcpNumber.trim(), "mcp-num"),
-        ];
-      case "puc":
-        return [
-          R("Effective date",    !!pucEff.trim(),    "puc-eff"),
-          R("PUC filing number", !!pucNumber.trim(), "puc-num"),
-        ];
-      case "classcode": {
-        const rowReqs: Requirement[] = ccRows.flatMap((r, i) => {
-          const line = i + 1;
-          const items: Requirement[] = [R(`Class code (line ${line})`, !!r.code.trim(), `cc-code-${r.id}`)];
-          if (r.action !== "Remove Class Code") {
-            items.push(R(`Payroll (line ${line})`, !!r.payroll.trim(), `cc-pay-${r.id}`));
-            items.push(R(`FT (line ${line})`,      r.ft.trim().length > 0, `cc-ft-${r.id}`));
-            items.push(R(`PT (line ${line})`,      r.pt.trim().length > 0, `cc-pt-${r.id}`));
-          }
-          return items;
-        });
-        return [
-          R("Effective date",    !!ccEff.trim(),    "cc-eff"),
-          ...rowReqs,
-          R("Reason for change", !!ccReason.trim(), "cc-reason"),
-          R("Location address",  !!ccAddress.trim(),"cc-addr"),
-          R("City",              !!ccCity.trim(),   "cc-city"),
-          R("State",             !!ccState.trim(),  "cc-state"),
-          R("Zip",               !!ccZip.trim(),    "cc-zip"),
-        ];
-      }
-      default:
-        return specRequirements(type);
+    };
+    // Iterate over selected types in NAV order (deterministic UI order).
+    const out: Requirement[] = [];
+    for (const g of NAV) for (const it of g.items) {
+      if (!it.key || !selectedTypes.has(it.key)) continue;
+      const reqs = perType(it.key);
+      const prefix = PAGE_META[it.key].title;
+      for (const r of reqs) out.push({ ...r, label: `${prefix} · ${r.label}` });
     }
+    return out;
   }, [
-    type,
+    selectedTypes,
     contactEff, contactType, contactFirst, contactLast, contactPhone, contactEmail,
     mcpEff, mcpNumber,
     pucEff, pucNumber,
@@ -1386,7 +1407,6 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
     </>
   );
 
-  const meta = PAGE_META[type];
 
   const statusDot = selectedPolicy.status === "Bound" ? "#73C9B7"
                   : selectedPolicy.status === "Cancelled" ? "#EF4444"
@@ -1403,53 +1423,40 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
       }}
       onClick={closeAll}
     >
-      {/* 3-column shell. Intake outer is the scroll container and it extends
-          past main's px-12 padding via negative left/right margins so the
-          sidebar bg tint reaches the app sidenav on one side and the
-          viewport edge on the other. */}
+      {/* 2-column shell. Main column holds the policy header + a
+          categorized endorsement-type picker + the stacked forms for
+          whatever the user picks. Right rail keeps the carrier + submit
+          gate + CTA. Left-side type list is gone — the manager felt it
+          duplicated the picker in the center. */}
       <div
-        className="grid items-stretch grid-cols-1 lg:grid-cols-[300px_1fr_340px]"
+        className="grid items-stretch grid-cols-1 lg:grid-cols-[1fr_340px]"
         style={{
           minHeight: 0,
           flex: 1,
         }}
       >
 
-          {/* ── LEFT: sidebar — just progress + nav, no policy header
-              (moved to the top strip). Stacks above main on narrow. */}
-          <div
-            className="border-b lg:border-b-0 lg:border-r"
-            style={{
-              borderColor: c.border,
-              padding: "28px 32px 32px",
-            }}
-          >
-          <nav
-            className="flex flex-col"
-            style={{ position: "sticky", top: 20, alignSelf: "flex-start" }}
-            onClick={e => e.stopPropagation()}
-          >
-            {/* Policy identity + scope pills — stacked above the progress bar
-                so all page-context bits live in the left rail together.
-                Tight vertical rhythm: back → applicant → meta → pills, single
-                soft divider, no double margins with the progress row. */}
-            <div style={{ padding: "0 2px 14px", borderBottom: `1px solid ${c.softDivider}` }}>
+          {/* ── MAIN: policy header on top, then the endorsement-type
+              picker grid, then the stacked forms for each selected type. */}
+          <main style={{ padding: "28px 32px 96px" }} onClick={e => e.stopPropagation()}>
+            {/* Top strip — back link + policy identity, sits above the picker. */}
+            <div style={{ padding: "0 4px 20px", borderBottom: `1px solid ${c.softDivider}`, marginBottom: 20 }}>
               <button
                 type="button"
                 onClick={handleBackClick}
                 className="inline-flex items-center gap-1.5 transition-opacity hover:opacity-70"
-                style={{ fontFamily: FONT, fontSize: 12, fontWeight: 500, color: c.muted, background: "transparent", border: "none", cursor: "pointer", padding: 0, marginBottom: 8 }}
+                style={{ fontFamily: FONT, fontSize: 12, fontWeight: 500, color: c.muted, background: "transparent", border: "none", cursor: "pointer", padding: 0, marginBottom: 10 }}
               >
                 <ArrowLeft className="w-3.5 h-3.5" /> Back to results
               </button>
               <div
                 className="truncate"
                 title={selectedPolicy.applicant}
-                style={{ fontFamily: FONT, fontSize: 13.5, fontWeight: 600, color: c.text, letterSpacing: "-0.01em", lineHeight: 1.35 }}
+                style={{ fontFamily: FONT, fontSize: 18, fontWeight: 600, color: c.text, letterSpacing: "-0.01em", lineHeight: 1.3 }}
               >
                 {selectedPolicy.applicant}
               </div>
-              <div style={{ fontFamily: FONT, fontSize: 12, color: c.razz, fontWeight: 500, marginTop: 2, lineHeight: 1.5 }}>
+              <div style={{ fontFamily: FONT, fontSize: 12.5, color: c.razz, fontWeight: 500, marginTop: 2, lineHeight: 1.5 }}>
                 {selectedPolicy.policyNumber}
                 {selectedPolicy.submissionId && (
                   <> · {selectedPolicy.submissionId}</>
@@ -1457,97 +1464,126 @@ export default function EndorsementIntake({ selectedPolicy, onBack, onSubmit, is
               </div>
             </div>
 
-            <div className="flex flex-col" style={{ marginTop: 14 }}>
-            {NAV.map((g, gi) => (
-              <div key={g.label ?? `group-${gi}`} style={{
-                marginBottom: 10,
-                paddingTop: gi === 0 ? 0 : 12,
-                borderTop: gi === 0 ? "none" : `1px solid ${c.softDivider}`,
-              }}>
-                {g.items.map((it, i) => {
-                  const active = it.key === type;
-                  const disabled = !!it.disabled || it.key === null;
-                  const done     = !disabled && it.key ? isTypeDone(it.key) : false;
-                  const started  = !disabled && it.key ? isTypeStarted(it.key) && !done : false;
-                  const statusEl = disabled ? null : done ? (
-                    <span
-                      className="inline-flex items-center justify-center rounded-full"
-                      style={{ width: 16, height: 16, background: c.razz, color: "#fff" }}
-                      title="All required fields complete"
-                    >
-                      <Check className="w-2.5 h-2.5" strokeWidth={3.5} />
-                    </span>
-                  ) : started ? (
-                    <span
-                      className="rounded-full"
-                      style={{ width: 8, height: 8, background: c.razz, boxShadow: `0 0 0 3px ${c.softBg}` }}
-                      title="In progress"
-                    />
-                  ) : (
-                    <span
-                      className="rounded-full"
-                      style={{ width: 10, height: 10, background: "transparent", border: `1.5px solid ${c.border}` }}
-                      title="Not started"
-                    />
-                  );
-                  return (
-                    <button
-                      key={i}
-                      type="button"
-                      disabled={disabled}
-                      onClick={() => { if (it.key) setType(it.key); }}
-                      className="w-full flex items-center justify-between gap-2 transition-colors"
-                      style={{
-                        fontFamily: FONT,
-                        textAlign: "left",
-                        background: active ? c.softBg : "transparent",
-                        color: active ? c.razz : (disabled ? c.sub : c.text),
-                        padding: "10px 12px",
-                        border: "none",
-                        borderRadius: 8,
-                        fontSize: 13.5,
-                        fontWeight: active ? 600 : 500,
-                        cursor: disabled ? "not-allowed" : "pointer",
-                        marginBottom: 2,
-                      }}
-                      onMouseEnter={e => { if (!disabled && !active) e.currentTarget.style.background = c.hoverBg; }}
-                      onMouseLeave={e => { if (!active) e.currentTarget.style.background = "transparent"; }}
-                    >
-                      <span className="min-w-0 truncate">{it.label}</span>
-                      {statusEl && <span className="flex-shrink-0 flex items-center">{statusEl}</span>}
-                    </button>
-                  );
-                })}
+            {/* Endorsement-type picker — replaces the old sidebar list.
+                Multi-column categorized checkboxes; selecting one adds
+                its form section below. */}
+            <div style={{ padding: "0 4px 24px" }}>
+              <h1 style={{ fontFamily: FONT, fontSize: 22, fontWeight: 600, color: c.text, letterSpacing: "-0.01em", margin: 0 }}>
+                What are we changing on this policy?
+              </h1>
+              <div
+                className="flex items-start gap-2"
+                style={{
+                  fontFamily: FONT,
+                  fontSize: 12.5,
+                  color: c.text,
+                  padding: "10px 12px",
+                  background: c.helperBg,
+                  border: `1px solid ${c.border}`,
+                  borderRadius: 8,
+                  lineHeight: 1.5,
+                  marginTop: 14,
+                  marginBottom: 20,
+                }}
+              >
+                <CircleAlert className="w-3.5 h-3.5 flex-shrink-0" style={{ color: c.razz, marginTop: 3 }} />
+                <span>
+                  Pick one or more endorsement types below — each one adds a section further down.{" "}
+                  <span style={{ fontWeight: 600 }}>Certain endorsements may generate additional premium.</span>
+                </span>
               </div>
-            ))}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-6">
+                {NAV.map((g, gi) => (
+                  <div key={g.label ?? `group-${gi}`}>
+                    {g.label && (
+                      <div style={{ fontFamily: FONT, fontSize: 11, fontWeight: 700, color: c.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>
+                        {g.label}
+                      </div>
+                    )}
+                    <div className="flex flex-col">
+                      {g.items.map((it, i) => {
+                        const disabled = !!it.disabled || it.key === null;
+                        const selected = !disabled && it.key ? selectedTypes.has(it.key) : false;
+                        const done     = !disabled && it.key ? isTypeDone(it.key) : false;
+                        return (
+                          <button
+                            key={i}
+                            type="button"
+                            disabled={disabled}
+                            onClick={() => { if (it.key) toggleType(it.key); }}
+                            className="w-full flex items-center gap-2.5 transition-colors"
+                            style={{
+                              fontFamily: FONT,
+                              textAlign: "left",
+                              background: "transparent",
+                              color: selected ? c.text : (disabled ? c.sub : c.text),
+                              padding: "8px 4px",
+                              border: "none",
+                              fontSize: 13.5,
+                              fontWeight: selected ? 600 : 500,
+                              cursor: disabled ? "not-allowed" : "pointer",
+                            }}
+                          >
+                            <span
+                              className="flex-shrink-0 flex items-center justify-center rounded"
+                              style={{
+                                width: 16, height: 16,
+                                border: `1.5px solid ${selected ? c.razz : c.border}`,
+                                background: selected ? c.razz : "transparent",
+                              }}
+                            >
+                              {selected && <Check className="w-2.5 h-2.5 text-white" strokeWidth={3.5} />}
+                            </span>
+                            <span className="flex-1 min-w-0 truncate">{it.label}</span>
+                            {done && selected && (
+                              <span
+                                className="inline-flex items-center justify-center rounded-full flex-shrink-0"
+                                style={{ width: 14, height: 14, background: c.razz, color: "#fff" }}
+                                title="All required fields complete"
+                              >
+                                <Check className="w-2 h-2" strokeWidth={3.5} />
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
-          </nav>
-          </div>
 
-          {/* ── CENTER: white background, no card. Sections split by
-              soft dividers + section labels. */}
-          <main style={{ padding: "28px 32px 96px" }} onClick={e => e.stopPropagation()}>
             <div>
-              {/* Header: h1 + subtitle. WC scope + status live in
-                  the shared top strip above the 3-column grid. */}
-              <div style={{ padding: "0 4px 20px", borderBottom: `1px solid ${c.softDivider}` }}>
-                <h1 style={{ fontFamily: FONT, fontSize: 22, fontWeight: 600, color: c.text, letterSpacing: "-0.01em", margin: 0 }}>{meta.title}</h1>
-                <p style={{ margin: "8px 0 0", color: c.muted, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{meta.subtitle}</p>
-              </div>
 
-              {/* Fields section — flat, no card */}
-              <div style={{ padding: "10px 4px 22px" }}>
-                {type === "contact"   && renderContact()}
-                {type === "mcp65"     && renderMcp65()}
-                {type === "puc"       && renderPuc()}
-                {type === "classcode" && renderClassCode()}
-                {SPECS[type] && SPECS[type]!.map((f, i) => renderField(type, f, i))}
-              </div>
+              {/* Render one section per selected type, in NAV order for
+                  a stable page layout. Each section has its own h1 +
+                  subtitle and its own form fields. */}
+              {NAV.flatMap(g => g.items).filter(it => it.key && selectedTypes.has(it.key)).map((it, ix) => {
+                const t = it.key!;
+                const m = PAGE_META[t];
+                return (
+                  <div key={t}>
+                    <div style={{ padding: ix === 0 ? "0 4px 20px" : "28px 4px 20px", borderTop: ix === 0 ? "none" : `1px solid ${c.softDivider}`, borderBottom: `1px solid ${c.softDivider}`, marginTop: ix === 0 ? 0 : 16 }}>
+                      <h1 style={{ fontFamily: FONT, fontSize: 22, fontWeight: 600, color: c.text, letterSpacing: "-0.01em", margin: 0 }}>{m.title}</h1>
+                      <p style={{ margin: "8px 0 0", color: c.muted, fontSize: 13 }}>{m.subtitle}</p>
+                    </div>
+                    <div style={{ padding: "10px 4px 22px" }}>
+                      {t === "contact"   && renderContact()}
+                      {t === "mcp65"     && renderMcp65()}
+                      {t === "puc"       && renderPuc()}
+                      {t === "classcode" && renderClassCode()}
+                      {SPECS[t] && SPECS[t]!.map((f, i) => renderField(t, f, i))}
+                    </div>
+                  </div>
+                );
+              })}
 
               {/* Universal Additional comment + Upload supporting document.
-                  Hidden for types that already have their own dedicated
-                  comment or upload field baked into the spec. */}
-              {!SKIP_UNIVERSAL_SUPPORTING.has(type) && (
+                  Rendered once at the bottom, applied to the whole request.
+                  Hidden only when every selected type has its own dedicated
+                  comment/upload baked into its spec. */}
+              {selectedTypes.size > 0 && Array.from(selectedTypes).some(t => !SKIP_UNIVERSAL_SUPPORTING.has(t)) && (
                 <div style={{ padding: "20px 4px 24px", borderTop: `1px solid ${c.softDivider}` }}>
                   {supportingDetailFields()}
                 </div>

@@ -4060,7 +4060,7 @@ export default function Clients({ isDark = false }: { isDark?: boolean }) {
                             {showTrashed && <>
                               <button onClick={() => { setTrashedNoteIds(prev => { const s = new Set(prev); s.delete(selectedNote.id); return s; }); setSelectedNote(null); setNoteMoreOpen(false); }}
                                 className="w-full text-left px-3 py-2 text-[12px] flex items-center gap-2.5"
-                                style={{ fontFamily: FONT, color: "#10B981" }} onMouseEnter={e => (e.currentTarget.style.background = "rgba(16,185,129,0.08)")} onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                                style={{ fontFamily: FONT, color: "#73C9B7" }} onMouseEnter={e => (e.currentTarget.style.background = "rgba(115,201,183,0.08)")} onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
                                 <RefreshCw className="w-3.5 h-3.5" />Restore note
                               </button>
                               <button onClick={() => { setDeleteNoteId(selectedNote.id); setSelectedNote(null); setNoteExpanded(false); setNoteMoreOpen(false); }}

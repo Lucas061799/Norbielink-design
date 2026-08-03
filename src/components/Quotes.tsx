@@ -66,8 +66,8 @@ const STATUS_DOT: Record<string, string> = {
   "File Closed":           "#64748B", // slate — closed file
   "Cancelled":             "#EF4444", // red — cancelled
   "Renewal Pending":       "#F59E0B", // amber — awaiting renewal
-  "Renewal Created":       "#10B981", // emerald — renewal ready
-  "Approved":              "#10B981", // emerald — success/affirmative
+  "Renewal Created":       "#73C9B7", // emerald — renewal ready
+  "Approved":              "#73C9B7", // emerald — success/affirmative
   "Bound":                 "#73C9B7", // brand teal — bound
   "Paid-Bind Incomplete":  "#F59E0B", // amber — paid but pending bind
   "Submission Incomplete": "#9CA3AF",

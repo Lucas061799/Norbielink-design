@@ -1208,11 +1208,11 @@ function SignupView({ c, font, inputStyle, labelStyle, primaryBtnStyle, btnGrad,
       <div className="mb-6 grid grid-cols-2 gap-x-4 gap-y-1.5">
         {rules.map(r => (
           <div key={r.label} className="flex items-center gap-2"
-            style={{ ...font, fontSize: 12, color: r.ok ? "#10B981" : c.muted }}>
+            style={{ ...font, fontSize: 12, color: r.ok ? "#73C9B7" : c.muted }}>
             <span className="flex items-center justify-center flex-shrink-0"
               style={{ width: 14, height: 14, borderRadius: 9999,
-                background: r.ok ? "rgba(16,185,129,0.14)" : (isDark ? "rgba(255,255,255,0.06)" : "#E5E7EB") }}>
-              {r.ok && <Check className="w-2.5 h-2.5" style={{ color: "#10B981" }} strokeWidth={3} />}
+                background: r.ok ? "rgba(115,201,183,0.14)" : (isDark ? "rgba(255,255,255,0.06)" : "#E5E7EB") }}>
+              {r.ok && <Check className="w-2.5 h-2.5" style={{ color: "#73C9B7" }} strokeWidth={3} />}
             </span>
             {r.label}
           </div>
@@ -1360,11 +1360,11 @@ function CreateView({ c, font, inputStyle, labelStyle, primaryBtnStyle, btnGrad,
       <div className="mb-6 grid grid-cols-2 gap-x-4 gap-y-1.5">
         {rules.map(r => (
           <div key={r.label} className="flex items-center gap-2"
-            style={{ ...font, fontSize: 12, color: r.ok ? "#10B981" : c.muted }}>
+            style={{ ...font, fontSize: 12, color: r.ok ? "#73C9B7" : c.muted }}>
             <span className="flex items-center justify-center flex-shrink-0"
               style={{ width: 14, height: 14, borderRadius: 9999,
-                background: r.ok ? "rgba(16,185,129,0.12)" : (isDark ? "rgba(255,255,255,0.06)" : "#F3F4F6") }}>
-              {r.ok && <Check className="w-2.5 h-2.5" style={{ color: "#10B981" }} strokeWidth={3} />}
+                background: r.ok ? "rgba(115,201,183,0.12)" : (isDark ? "rgba(255,255,255,0.06)" : "#F3F4F6") }}>
+              {r.ok && <Check className="w-2.5 h-2.5" style={{ color: "#73C9B7" }} strokeWidth={3} />}
             </span>
             {r.label}
           </div>
@@ -1544,11 +1544,11 @@ function ResetPasswordView({ c, font, inputStyle, labelStyle, primaryBtnStyle, b
       <div className="mb-6 grid grid-cols-2 gap-x-4 gap-y-1.5">
         {rules.map(r => (
           <div key={r.label} className="flex items-center gap-2"
-            style={{ ...font, fontSize: 12, color: r.ok ? "#10B981" : c.muted }}>
+            style={{ ...font, fontSize: 12, color: r.ok ? "#73C9B7" : c.muted }}>
             <span className="flex items-center justify-center flex-shrink-0"
               style={{ width: 14, height: 14, borderRadius: 9999,
-                background: r.ok ? "rgba(16,185,129,0.12)" : (isDark ? "rgba(255,255,255,0.06)" : "#F3F4F6") }}>
-              {r.ok && <Check className="w-2.5 h-2.5" style={{ color: "#10B981" }} strokeWidth={3} />}
+                background: r.ok ? "rgba(115,201,183,0.12)" : (isDark ? "rgba(255,255,255,0.06)" : "#F3F4F6") }}>
+              {r.ok && <Check className="w-2.5 h-2.5" style={{ color: "#73C9B7" }} strokeWidth={3} />}
             </span>
             {r.label}
           </div>
