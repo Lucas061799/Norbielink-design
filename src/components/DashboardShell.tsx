@@ -53,10 +53,11 @@ export default function DashboardShell({ children, pageTitle }: DashboardShellPr
       case "Policies":
         return <Policies isDark={darkMode} />;
       case "Endorsements":
-      case "Endorsements · Design Option 1":
         return <Endorsements key="endorsements-3col" isDark={darkMode} layout="3col" />;
+      case "Endorsements · Design Option 1":
+        return <Endorsements key="endorsements-opt1" isDark={darkMode} layout="3col" skipSearch />;
       case "Endorsements · Design Option 2":
-        return <Endorsements key="endorsements-2col" isDark={darkMode} layout="2col" />;
+        return <Endorsements key="endorsements-opt2" isDark={darkMode} layout="2col" skipSearch />;
       case "Endorsements · Design Option 3":
         return <EndorsementBoard isDark={darkMode} />;
       case "Pricing":

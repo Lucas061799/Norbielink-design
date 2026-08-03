@@ -56,8 +56,11 @@ const SEARCH_RESULTS: SearchResult[] = [
 
 const SEARCH_OPTIONS: SearchBy[] = ["Select", "Policy Number", "DBA", "Applicant Name", "Bond Number"];
 
-export default function Endorsements({ isDark, layout = "3col" }: { isDark: boolean; layout?: "3col" | "2col" }) {
-  const [view, setView] = useState<View>("search");
+export default function Endorsements({ isDark, layout = "3col", skipSearch = false }: { isDark: boolean; layout?: "3col" | "2col"; skipSearch?: boolean }) {
+  // When `skipSearch` is on, land directly on the intake with the first
+  // sample policy pre-selected. Used by the Design Option variants so
+  // clicking the sidebar link jumps straight to the intake.
+  const [view, setView] = useState<View>(skipSearch ? "form" : "search");
 
   const [searchBy, setSearchBy] = useState<SearchBy>("Policy Number");
   const [searchByOpen, setSearchByOpen] = useState(false);
@@ -71,7 +74,7 @@ export default function Endorsements({ isDark, layout = "3col" }: { isDark: bool
   // The row the intake is currently anchored to. Snapshotted at New Request
   // time so re-opening the chooser without navigating doesn't retarget the
   // in-flight intake.
-  const [intakePolicy, setIntakePolicy] = useState<SearchResult | null>(null);
+  const [intakePolicy, setIntakePolicy] = useState<SearchResult | null>(skipSearch ? SEARCH_RESULTS[0] : null);
 
   // Pagination — matches the Policies table footer (10 / 20 / 50 per page).
   const [page, setPage] = useState(1);

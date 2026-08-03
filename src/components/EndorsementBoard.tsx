@@ -483,10 +483,27 @@ export default function EndorsementBoard({ isDark }: Props) {
                                 <span style={{ color: c.razz }}>*</span>
                               </label>
                               {f.type === "select" ? (
-                                <select value={val} onChange={e => setValue(k, i, e.target.value)} style={{ ...inputStyle, paddingRight: 28 }}>
-                                  <option value="">{f.placeholder ?? "Select…"}</option>
-                                  {f.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                                </select>
+                                <div className="relative">
+                                  <select
+                                    value={val}
+                                    onChange={e => setValue(k, i, e.target.value)}
+                                    style={{
+                                      ...inputStyle,
+                                      appearance: "none",
+                                      WebkitAppearance: "none",
+                                      MozAppearance: "none",
+                                      paddingRight: 34,
+                                      cursor: "pointer",
+                                    }}
+                                  >
+                                    <option value="">{f.placeholder ?? "Select…"}</option>
+                                    {f.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                  </select>
+                                  <ChevronDown
+                                    className="w-3.5 h-3.5 absolute pointer-events-none"
+                                    style={{ right: 12, top: "50%", transform: "translateY(-50%)", color: c.muted }}
+                                  />
+                                </div>
                               ) : f.type === "textarea" ? (
                                 <textarea
                                   value={val}
