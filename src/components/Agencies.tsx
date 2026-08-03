@@ -709,6 +709,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
   const [selectedStmts, setSelectedStmts] = useState<Set<string>>(new Set());
   const [stmtBulkFormat, setStmtBulkFormat] = useState<"pdf" | "xlsx" | "both">("pdf");
   const [stmtPreview, setStmtPreview] = useState<{ id: string; type: "comm" | "soa"; label: string; issued: string; sizePdf: string; sizeXls: string } | null>(null);
+  const [stmtPreviewFormat, setStmtPreviewFormat] = useState<"pdf" | "xlsx">("pdf");
   // Row-level Download popover — only one open at a time, keyed by row id.
   const [stmtDownloadFor, setStmtDownloadFor] = useState<string | null>(null);
   const [stmtPreviewExpanded, setStmtPreviewExpanded] = useState(false);
@@ -6132,8 +6133,12 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                                 <span className="text-[11px] font-medium truncate" style={{ fontFamily: FONT, color: c.text }}>{TYPE_LABEL[stmtPreview.type]}s</span>
                               </div>
                               <div className="flex items-center gap-0.5 flex-shrink-0">
-                                <button title="Download PDF"
-                                  onClick={() => showToast({ title: `Downloading ${stmtPreview.label}`, description: `PDF · ${stmtPreview.sizePdf}` })}
+                                <button title={`Download ${stmtPreviewFormat === "pdf" ? "PDF" : "Excel"}`}
+                                  onClick={() => {
+                                    const label = stmtPreviewFormat === "pdf" ? "PDF" : "Excel";
+                                    const size = stmtPreviewFormat === "pdf" ? stmtPreview.sizePdf : stmtPreview.sizeXls;
+                                    showToast({ title: `Downloading ${stmtPreview.label}`, description: `${label} · ${size}` });
+                                  }}
                                   className="p-1.5 rounded-md transition-colors" style={{ color: c.muted }}
                                   onMouseEnter={e => { e.currentTarget.style.background = c.hoverBg; e.currentTarget.style.color = c.text; }}
                                   onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = c.muted; }}>
@@ -6153,18 +6158,32 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                                 </button>
                               </div>
                             </div>
-                            {/* Meta strip — just the issued date. */}
+                            {/* Meta strip — issued date on the left, PDF/Excel view toggle on the right */}
                             <div className="flex items-center gap-4 px-5 py-3 flex-shrink-0 text-[12px] flex-wrap"
                               style={{ ...font, color: c.muted, borderBottom: `1px solid ${c.border}` }}>
                               <span className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" />Issued {stmtPreview.issued}</span>
+                              <div className="ml-auto flex items-center rounded-md overflow-hidden" style={{ border: `1px solid ${c.border}`, background: c.cardBg }}>
+                                {(["pdf","xlsx"] as const).map(f => {
+                                  const active = stmtPreviewFormat === f;
+                                  return (
+                                    <button key={f} type="button" onClick={() => setStmtPreviewFormat(f)}
+                                      className="px-2.5 py-1 text-[11px] font-semibold transition-colors"
+                                      style={{ fontFamily: FONT, color: active ? "#A614C3" : c.muted, background: active ? (isDark ? "rgba(168,85,247,0.14)" : "rgba(168,85,247,0.08)") : "transparent" }}
+                                      onMouseEnter={e => { if (!active) e.currentTarget.style.color = c.text; }}
+                                      onMouseLeave={e => { if (!active) e.currentTarget.style.color = c.muted; }}>
+                                      {f === "pdf" ? "PDF" : "Excel"}
+                                    </button>
+                                  );
+                                })}
+                              </div>
                             </div>
-                            {/* File placeholder — matches Documents preview card */}
+                            {/* File placeholder — icon/extension follow the format toggle */}
                             <div className="flex-1 min-h-0 overflow-auto p-6" style={{ background: isDark ? "rgba(255,255,255,0.02)" : "#F9FAFB" }}>
                               <div className="mx-auto rounded shadow-sm flex flex-col items-center justify-center"
                                 style={{ background: "#FFFFFF", border: `1px solid ${c.border}`, aspectRatio: "8.5 / 11", maxWidth: 520, minHeight: 360, fontFamily: FONT }}>
                                 <FileText className="w-16 h-16 mb-3" style={{ color: "#D1D5DB" }} />
-                                <div className="text-[13px] font-semibold mb-1" style={{ color: "#374151" }}>{stmtPreview.label}.pdf</div>
-                                <div className="text-[11px]" style={{ color: "#9CA3AF" }}>Preview not available in demo</div>
+                                <div className="text-[13px] font-semibold mb-1" style={{ color: "#374151" }}>{stmtPreview.label}.{stmtPreviewFormat === "pdf" ? "pdf" : "xlsx"}</div>
+                                <div className="text-[11px]" style={{ color: "#9CA3AF" }}>{stmtPreviewFormat === "pdf" ? "PDF" : "Excel"} preview not available in demo</div>
                               </div>
                             </div>
                           </div>
@@ -6206,8 +6225,12 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                                 <span className="text-[12px] font-semibold truncate max-w-[420px]" style={{ fontFamily: FONT, color: c.text }}>{TYPE_LABEL[stmtPreview.type]}s</span>
                               </div>
                               <div className="flex items-center gap-0.5 flex-shrink-0">
-                                <button title="Download PDF"
-                                  onClick={() => showToast({ title: `Downloading ${stmtPreview.label}`, description: `PDF · ${stmtPreview.sizePdf}` })}
+                                <button title={`Download ${stmtPreviewFormat === "pdf" ? "PDF" : "Excel"}`}
+                                  onClick={() => {
+                                    const label = stmtPreviewFormat === "pdf" ? "PDF" : "Excel";
+                                    const size = stmtPreviewFormat === "pdf" ? stmtPreview.sizePdf : stmtPreview.sizeXls;
+                                    showToast({ title: `Downloading ${stmtPreview.label}`, description: `${label} · ${size}` });
+                                  }}
                                   className="p-1.5 rounded-md transition-colors" style={{ color: c.muted }}
                                   onMouseEnter={e => { e.currentTarget.style.background = c.hoverBg; e.currentTarget.style.color = c.text; }}
                                   onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = c.muted; }}>
@@ -6228,13 +6251,27 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                             <div className="flex items-center gap-4 px-6 py-3 flex-shrink-0 text-[12px] flex-wrap"
                               style={{ ...font, color: c.muted, borderBottom: `1px solid ${c.border}` }}>
                               <span className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" />Issued {stmtPreview.issued}</span>
+                              <div className="ml-auto flex items-center rounded-md overflow-hidden" style={{ border: `1px solid ${c.border}`, background: c.cardBg }}>
+                                {(["pdf","xlsx"] as const).map(f => {
+                                  const active = stmtPreviewFormat === f;
+                                  return (
+                                    <button key={f} type="button" onClick={() => setStmtPreviewFormat(f)}
+                                      className="px-2.5 py-1 text-[11px] font-semibold transition-colors"
+                                      style={{ fontFamily: FONT, color: active ? "#A614C3" : c.muted, background: active ? (isDark ? "rgba(168,85,247,0.14)" : "rgba(168,85,247,0.08)") : "transparent" }}
+                                      onMouseEnter={e => { if (!active) e.currentTarget.style.color = c.text; }}
+                                      onMouseLeave={e => { if (!active) e.currentTarget.style.color = c.muted; }}>
+                                      {f === "pdf" ? "PDF" : "Excel"}
+                                    </button>
+                                  );
+                                })}
+                              </div>
                             </div>
                             <div className="flex-1 min-h-0 overflow-auto p-8" style={{ background: isDark ? "rgba(255,255,255,0.02)" : "#F9FAFB" }}>
                               <div className="mx-auto rounded shadow-sm flex flex-col items-center justify-center"
                                 style={{ background: "#FFFFFF", border: `1px solid ${c.border}`, aspectRatio: "8.5 / 11", maxWidth: 620, minHeight: 600, fontFamily: FONT }}>
                                 <FileText className="w-20 h-20 mb-4" style={{ color: "#D1D5DB" }} />
-                                <div className="text-[14px] font-semibold mb-1" style={{ color: "#374151" }}>{stmtPreview.label}.pdf</div>
-                                <div className="text-[12px]" style={{ color: "#9CA3AF" }}>Preview not available in demo</div>
+                                <div className="text-[14px] font-semibold mb-1" style={{ color: "#374151" }}>{stmtPreview.label}.{stmtPreviewFormat === "pdf" ? "pdf" : "xlsx"}</div>
+                                <div className="text-[12px]" style={{ color: "#9CA3AF" }}>{stmtPreviewFormat === "pdf" ? "PDF" : "Excel"} preview not available in demo</div>
                               </div>
                             </div>
                           </div>
