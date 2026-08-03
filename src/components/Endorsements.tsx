@@ -56,7 +56,7 @@ const SEARCH_RESULTS: SearchResult[] = [
 
 const SEARCH_OPTIONS: SearchBy[] = ["Select", "Policy Number", "DBA", "Applicant Name", "Bond Number"];
 
-export default function Endorsements({ isDark }: { isDark: boolean }) {
+export default function Endorsements({ isDark, layout = "3col" }: { isDark: boolean; layout?: "3col" | "2col" }) {
   const [view, setView] = useState<View>("search");
 
   const [searchBy, setSearchBy] = useState<SearchBy>("Policy Number");
@@ -178,6 +178,7 @@ export default function Endorsements({ isDark }: { isDark: boolean }) {
           onBack={handleBack}
           onSubmit={handleSubmit}
           isDark={isDark}
+          layout={layout}
         />
       )}
 

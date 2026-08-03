@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import norbielinkLogo from "@/assets/norbielink-logo.png";
 import norbielinkLogoDark from "@/assets/norbielink-logo-dark.png";
@@ -160,7 +160,15 @@ export default function Sidenav({ isDark = false, onToggleDark, activeItem = "Ma
 
   const darkMode = isDark;
 
-  const navItems = [
+  // Endorsements has three design-variant sub-items so the team can
+  // explore alternate intake designs side-by-side. Clicking the parent
+  // toggles the sub-list instead of navigating anywhere itself.
+  const ENDORSEMENT_CHILDREN = [
+    { label: "Design Option 1" },
+    { label: "Design Option 2" },
+    { label: "Design Option 3" },
+  ];
+  const navItems: { label: string; icon: React.ReactNode; badge?: string; hasChevron?: boolean; children?: { label: string }[] }[] = [
     { label: "Marketplace",       icon: <LayoutGrid className="w-[18px] h-[18px]" /> },
     { label: "Appetite Assistant", icon: <Sparkles  className="w-[16px] h-[16px]" /> },
     { label: "Quotes",            icon: <FileText   className="w-[18px] h-[18px]" /> },
@@ -169,7 +177,7 @@ export default function Sidenav({ isDark = false, onToggleDark, activeItem = "Ma
     { label: "ProSuite",          icon: <Briefcase  className="w-[18px] h-[18px]" />, badge: "PRO", hasChevron: true },
     { label: "Make a Payment",    icon: <CreditCard className="w-[18px] h-[18px]" /> },
     { label: "Accounting",        icon: <BookOpen   className="w-[18px] h-[18px]" />, hasChevron: true },
-    { label: "Endorsements",      icon: <FileEdit   className="w-[18px] h-[18px]" /> },
+    { label: "Endorsements",      icon: <FileEdit   className="w-[18px] h-[18px]" />, hasChevron: true, children: ENDORSEMENT_CHILDREN },
     { label: "Tools & Resources", icon: <Wrench     className="w-[18px] h-[18px]" />, hasChevron: true },
     { label: "Support",           icon: <HelpCircle className="w-[18px] h-[18px]" /> },
     { label: "Admin",             icon: <UserCog    className="w-[18px] h-[18px]" /> },
@@ -177,6 +185,11 @@ export default function Sidenav({ isDark = false, onToggleDark, activeItem = "Ma
     { label: "Website",           icon: <Globe      className="w-[18px] h-[18px]" /> },
     { label: "Pricing",           icon: <Rocket     className="w-[18px] h-[18px]" /> },
   ];
+
+  // Which parent nav is currently showing its children. Auto-open when a
+  // child is the active page so navigating in from a link keeps the tree open.
+  const endorsementChildActive = ENDORSEMENT_CHILDREN.some(ch => activeItem === `Endorsements · ${ch.label}`);
+  const [expandedNav, setExpandedNav] = useState<string | null>(endorsementChildActive ? "Endorsements" : null);
 
   return (
     <aside
@@ -303,18 +316,53 @@ export default function Sidenav({ isDark = false, onToggleDark, activeItem = "Ma
 
       {/* Nav Items */}
       <nav className="flex-1 px-2 space-y-0.5 overflow-y-auto relative z-10" style={{ scrollbarWidth: "none" }}>
-        {navItems.map((item) => (
-          <NavItem
-            key={item.label}
-            icon={item.icon}
-            label={item.label}
-            active={activeItem === item.label}
-            badge={item.badge}
-            hasChevron={item.hasChevron}
-            isDark={isDark}
-            onClick={() => onActiveChange?.(item.label)}
-          />
-        ))}
+        {navItems.map((item) => {
+          const hasKids = !!item.children?.length;
+          const isExpanded = expandedNav === item.label;
+          const childActive = hasKids && item.children!.some(ch => activeItem === `${item.label} · ${ch.label}`);
+          return (
+            <React.Fragment key={item.label}>
+              <NavItem
+                icon={item.icon}
+                label={item.label}
+                // Parent lights up as "active" whenever one of its children is the current page.
+                active={activeItem === item.label || childActive}
+                badge={item.badge}
+                hasChevron={item.hasChevron}
+                isDark={isDark}
+                onClick={() => {
+                  if (hasKids) setExpandedNav(prev => (prev === item.label ? null : item.label));
+                  else onActiveChange?.(item.label);
+                }}
+              />
+              {hasKids && isExpanded && (
+                <div className="pl-8 py-0.5 space-y-0.5">
+                  {item.children!.map(ch => {
+                    const childLabel = `${item.label} · ${ch.label}`;
+                    const isActive = activeItem === childLabel;
+                    return (
+                      <button
+                        key={ch.label}
+                        onClick={() => onActiveChange?.(childLabel)}
+                        className="w-full text-left px-2 py-1 rounded-md text-[12px] transition-colors"
+                        style={{
+                          fontFamily: "var(--font-montserrat), Montserrat, sans-serif",
+                          fontWeight: isActive ? 600 : 500,
+                          color: isActive ? "#A614C3" : (isDark ? "#8B8FA8" : "#6B7280"),
+                          background: isActive ? (isDark ? "rgba(168,85,247,0.14)" : "rgba(168,85,247,0.08)") : "transparent",
+                        }}
+                        onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = isDark ? "rgba(255,255,255,0.05)" : "#F3F4F6"; }}
+                        onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = "transparent"; }}
+                      >
+                        {ch.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </React.Fragment>
+          );
+        })}
       </nav>
 
       {/* Bottom Section */}
