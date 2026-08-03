@@ -12,6 +12,7 @@ import {
   Landmark,
 } from "lucide-react";
 import { AddressAutocomplete } from "./AddressAutocomplete";
+import { StyledSelect } from "./StyledSelect";
 
 const FONT = "var(--font-montserrat), Montserrat, sans-serif";
 const AGENCY_PHONE = "+1 (888) 555-0188";
@@ -1787,8 +1788,11 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
   };
   const selectStyle: React.CSSProperties = {
     ...inputStyle, appearance: "none", cursor: "pointer",
+    // Right padding gives text room; chevron sits 12px from the border so it
+    // doesn't hug the stroke.
+    paddingRight: 32,
     backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239CA3AF' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`,
-    backgroundRepeat: "no-repeat", backgroundPosition: "right 10px center",
+    backgroundRepeat: "no-repeat", backgroundPosition: "right 12px center",
   };
   // External-client mode: only the agency principal can edit Agency Address / Phone
   // Number / Agency Contact. Every other Agency Information field mirrors the Agency
@@ -5404,8 +5408,8 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
 
           const YesNo = ({ v }: { v: boolean }) => (
             <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11.5px] font-semibold"
-              style={{ background: v ? "rgba(115,201,183,0.10)" : (isDark ? "rgba(255,255,255,0.06)" : "#F3F4F6"), color: v ? "#73C9B7" : c.muted }}>
-              <span className="w-1.5 h-1.5 rounded-full" style={{ background: v ? "#73C9B7" : (isDark ? "rgba(255,255,255,0.35)" : "#9CA3AF") }} />
+              style={{ background: v ? (isDark ? "rgba(168,85,247,0.14)" : "rgba(168,85,247,0.10)") : (isDark ? "rgba(255,255,255,0.06)" : "#F3F4F6"), color: v ? "#A614C3" : c.muted }}>
+              <span className="w-1.5 h-1.5 rounded-full" style={{ background: v ? "#A614C3" : (isDark ? "rgba(255,255,255,0.35)" : "#9CA3AF") }} />
               {v ? "Yes" : "No"}
             </span>
           );
@@ -5431,11 +5435,21 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
           // ── Edit mode ──
           if (itcEditing && itcDraft) {
             const set = <K extends keyof ITCRecord>(k: K, v: ITCRecord[K]) => setItcDraft(prev => prev ? { ...prev, [k]: v } : prev);
+            // Tokens the StyledSelect needs — c doesn't ship razz, so provide it here.
+            const selectC = {
+              text: c.text, muted: c.muted, border: c.border, cardBg: c.cardBg, hoverBg: c.hoverBg,
+              razz: "#A614C3", razzTintBg: isDark ? "rgba(168,85,247,0.14)" : "rgba(168,85,247,0.08)",
+            };
             const YesNoSelect = <K extends keyof ITCRecord>({ k }: { k: K }) => (
-              <select value={String(itcDraft[k])} onChange={e => set(k, (e.target.value === "true") as ITCRecord[K])} style={selectStyle}>
-                <option value="true">Yes</option>
-                <option value="false">No</option>
-              </select>
+              <StyledSelect<"true" | "false">
+                value={String(itcDraft[k]) as "true" | "false"}
+                onChange={v => set(k, (v === "true") as ITCRecord[K])}
+                options={["true", "false"] as const}
+                labelFor={v => v === "true" ? "Yes" : "No"}
+                triggerStyle={selectStyle}
+                c={selectC}
+                font={font}
+              />
             );
             return (
               <div className="flex-1 overflow-y-auto pb-6">
@@ -5466,13 +5480,23 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                     <div><label style={labelStyle}>Producer Code:</label>
                       <input value={itcDraft.producerCode} onChange={e => set("producerCode", e.target.value)} style={inputStyle} /></div>
                     <div><label style={labelStyle}>Agent / Broker:</label>
-                      <select value={itcDraft.agentOrBroker} onChange={e => set("agentOrBroker", e.target.value as AgentBroker)} style={selectStyle}>
-                        {(["Agent","Broker"] as AgentBroker[]).map(s => <option key={s} value={s}>{s}</option>)}
-                      </select></div>
+                      <StyledSelect<AgentBroker>
+                        value={itcDraft.agentOrBroker}
+                        onChange={v => set("agentOrBroker", v)}
+                        options={["Agent","Broker"] as const}
+                        triggerStyle={selectStyle}
+                        c={selectC}
+                        font={font}
+                      /></div>
                     <div><label style={labelStyle}>Status:</label>
-                      <select value={itcDraft.status} onChange={e => set("status", e.target.value as ITCStatus)} style={selectStyle}>
-                        {(["Active","Suspended","Terminated","Pending"] as ITCStatus[]).map(s => <option key={s} value={s}>{s}</option>)}
-                      </select></div>
+                      <StyledSelect<ITCStatus>
+                        value={itcDraft.status}
+                        onChange={v => set("status", v)}
+                        options={["Active","Suspended","Terminated","Pending"] as const}
+                        triggerStyle={selectStyle}
+                        c={selectC}
+                        font={font}
+                      /></div>
                     <div><label style={labelStyle}>Short Name:</label>
                       <input value={itcDraft.shortName} onChange={e => set("shortName", e.target.value)} style={inputStyle} /></div>
                     <div className="col-span-2"><label style={labelStyle}>Name:</label>
@@ -5517,9 +5541,14 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                     <div><label style={labelStyle}>Tax ID:</label>
                       <input value={itcDraft.taxId} onChange={e => set("taxId", e.target.value)} style={inputStyle} /></div>
                     <div><label style={labelStyle}>1099 Type:</label>
-                      <select value={itcDraft.tax1099Type} onChange={e => set("tax1099Type", e.target.value as Tax1099Type)} style={selectStyle}>
-                        {(["Individual","Corporation","Partnership","LLC"] as Tax1099Type[]).map(s => <option key={s} value={s}>{s}</option>)}
-                      </select></div>
+                      <StyledSelect<Tax1099Type>
+                        value={itcDraft.tax1099Type}
+                        onChange={v => set("tax1099Type", v)}
+                        options={["Individual","Corporation","Partnership","LLC"] as const}
+                        triggerStyle={selectStyle}
+                        c={selectC}
+                        font={font}
+                      /></div>
                     <div><label style={labelStyle}>1099 Name:</label>
                       <input value={itcDraft.tax1099Name} onChange={e => set("tax1099Name", e.target.value)} style={inputStyle} /></div>
                   </div>
@@ -6124,14 +6153,10 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                                 </button>
                               </div>
                             </div>
-                            {/* Meta strip — folder chip · issued date · sizes */}
+                            {/* Meta strip — just the issued date. */}
                             <div className="flex items-center gap-4 px-5 py-3 flex-shrink-0 text-[12px] flex-wrap"
                               style={{ ...font, color: c.muted, borderBottom: `1px solid ${c.border}` }}>
-                              <span className="flex items-center gap-1.5"><FolderOpen className="w-3.5 h-3.5" style={{ color: "#A855F7" }} />{TYPE_LABEL[stmtPreview.type]}s</span>
                               <span className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" />Issued {stmtPreview.issued}</span>
-                              <span className="ml-auto flex items-center gap-1.5 text-[11px]">
-                                PDF {stmtPreview.sizePdf} · Excel {stmtPreview.sizeXls}
-                              </span>
                             </div>
                             {/* File placeholder — matches Documents preview card */}
                             <div className="flex-1 min-h-0 overflow-auto p-6" style={{ background: isDark ? "rgba(255,255,255,0.02)" : "#F9FAFB" }}>
@@ -6202,11 +6227,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                             </div>
                             <div className="flex items-center gap-4 px-6 py-3 flex-shrink-0 text-[12px] flex-wrap"
                               style={{ ...font, color: c.muted, borderBottom: `1px solid ${c.border}` }}>
-                              <span className="flex items-center gap-1.5"><FolderOpen className="w-3.5 h-3.5" style={{ color: "#A855F7" }} />{TYPE_LABEL[stmtPreview.type]}s</span>
                               <span className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" />Issued {stmtPreview.issued}</span>
-                              <span className="ml-auto flex items-center gap-1.5 text-[11px]">
-                                PDF {stmtPreview.sizePdf} · Excel {stmtPreview.sizeXls}
-                              </span>
                             </div>
                             <div className="flex-1 min-h-0 overflow-auto p-8" style={{ background: isDark ? "rgba(255,255,255,0.02)" : "#F9FAFB" }}>
                               <div className="mx-auto rounded shadow-sm flex flex-col items-center justify-center"
@@ -8734,8 +8755,11 @@ function AddAgencyForm({ isDark, onSaveForLater, onDiscard, initialDraft, c, btn
   };
   const selectStyle: React.CSSProperties = {
     ...inputStyle, appearance: "none", cursor: "pointer",
+    // Right padding gives text room; chevron sits 12px from the border so it
+    // doesn't hug the stroke.
+    paddingRight: 32,
     backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239CA3AF' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`,
-    backgroundRepeat: "no-repeat", backgroundPosition: "right 10px center",
+    backgroundRepeat: "no-repeat", backgroundPosition: "right 12px center",
   };
 
   const Radio = ({ checked, onClick }: { checked: boolean; onClick: () => void }) => (
