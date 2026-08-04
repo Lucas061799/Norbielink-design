@@ -302,15 +302,15 @@ export default function EndorsementBoard({ isDark }: Props) {
         {/* ── LEFT: nested navigator, softer gray bg, no borders on rows */}
         <aside
           className="flex-shrink-0 overflow-y-auto"
-          style={{ width: 220, background: c.railBg, borderRight: `1px solid ${c.border}`, padding: "16px 10px" }}
+          style={{ width: 220, background: c.railBg, borderRight: `1px solid ${c.border}`, padding: "24px 10px 16px" }}
         >
-          {/* Policy identity — matches the applicant + policy header pattern
-              used in Options 1 & 2 (bold applicant, razz policy · submission). */}
-          <div className="px-2 pb-3 mb-3" style={{ borderBottom: `1px solid ${c.softDivider}` }}>
+          {/* Policy identity — top-aligned with the first center card's
+              outer border (both sit at aside/main padding-top = 24px). */}
+          <div className="px-2 pb-3 mb-3" style={{ borderBottom: `1px solid ${c.border}` }}>
             <div className="text-[13.5px] font-semibold leading-tight truncate" title="Byrne Insurance Group" style={{ fontFamily: FONT, color: c.text, letterSpacing: "-0.01em" }}>
               Byrne Insurance Group
             </div>
-            <div className="text-[12px] mt-1 leading-tight" style={{ fontFamily: FONT, color: c.razz, fontWeight: 500 }}>
+            <div className="text-[12px] mt-1.5 leading-tight" style={{ fontFamily: FONT, color: c.razz, fontWeight: 500 }}>
               7038911131 · VIC00003362
             </div>
           </div>
