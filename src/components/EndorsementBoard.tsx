@@ -3,6 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import { ArrowLeft, Check, ChevronDown, ChevronRight, FileEdit, HelpCircle, Layers, Plus, Send, Shield, X } from "lucide-react";
 import { DatePicker } from "./DatePicker";
+import { StyledSelect } from "./StyledSelect";
 
 const FONT = "var(--font-montserrat), Montserrat, sans-serif";
 
@@ -60,8 +61,11 @@ const NAV: { label: string; items: { key: EndorsementKey; label: string }[] }[] 
   },
 ];
 
-type FieldType = "date" | "text" | "select" | "textarea";
-type Field = { label: string; type: FieldType; placeholder?: string; options?: string[]; span?: 1 | 2 };
+type FieldType = "date" | "text" | "select" | "textarea" | "file";
+type Field = { label: string; type: FieldType; placeholder?: string; options?: string[]; span?: 1 | 2; optional?: boolean };
+// Types with their own required supporting field baked in — everyone else
+// falls back to the shared "Notes & documents" block at the bottom of the request.
+const SKIP_UNIVERSAL_SUPPORTING = new Set<EndorsementKey>(["reinstate", "cancel", "xmod", "namedinsured"]);
 const CARD_META: Record<EndorsementKey, { blurb: string; fields: Field[] }> = {
   contact:      { blurb: "Update the insured or agency contact on file.",  fields: [
                     { label: "Effective date", type: "date", span: 1 },
@@ -74,9 +78,10 @@ const CARD_META: Record<EndorsementKey, { blurb: string; fields: Field[] }> = {
                     { label: "Effective date",     type: "date", span: 1 },
                     { label: "Current legal name", type: "text", placeholder: "e.g. Byrne Insurance Group", span: 2 },
                     { label: "New legal name",     type: "text", placeholder: "e.g. Byrne Insurance Solutions", span: 2 },
+                    { label: "Additional comment (please clearly explain the changes)", type: "textarea", placeholder: "Reason for the name change, any related restructuring…", span: 2 },
                   ] },
   mailing:      { blurb: "Change the mailing address on the policy.",      fields: [
-                    { label: "Effective date", type: "date", span: 1 },
+                    { label: "Effective date", type: "date", span: 2 },
                     { label: "Street",         type: "text", placeholder: "123 Main St", span: 2 },
                     { label: "City",           type: "text", placeholder: "Des Moines", span: 1 },
                     { label: "State",          type: "text", placeholder: "IA", span: 1 },
@@ -137,6 +142,7 @@ const CARD_META: Record<EndorsementKey, { blurb: string; fields: Field[] }> = {
                     { label: "Effective date", type: "date", span: 1 },
                     { label: "State",          type: "text", placeholder: "CA", span: 1 },
                     { label: "New mod factor", type: "text", placeholder: "e.g. 0.95", span: 2 },
+                    { label: "Upload Ex-Mod worksheet", type: "file", span: 2 },
                   ] },
   location:     { blurb: "Add or remove a location on the policy.",        fields: [
                     { label: "Effective date",  type: "date", span: 1 },
@@ -152,10 +158,12 @@ const CARD_META: Record<EndorsementKey, { blurb: string; fields: Field[] }> = {
   reinstate:    { blurb: "Request reinstatement of a cancelled policy.",   fields: [
                     { label: "Effective date", type: "date", span: 1 },
                     { label: "Reason",         type: "textarea", placeholder: "Why should this policy be reinstated?", span: 2 },
+                    { label: "Upload Acord 37 No Loss Statement", type: "file", span: 2 },
                   ] },
   cancel:       { blurb: "Cancel the policy on or after a date.",          fields: [
                     { label: "Cancellation date", type: "date", span: 1 },
                     { label: "Reason",            type: "textarea", placeholder: "Reason for cancellation", span: 2 },
+                    { label: "Upload Acord 25 LPR / Replacement Coverage Document", type: "file", span: 2 },
                   ] },
   other:        { blurb: "Anything else — free-form request.",             fields: [
                     { label: "Describe the request", type: "textarea", placeholder: "Tell the underwriter what you need…", span: 2 },
@@ -201,6 +209,9 @@ export default function EndorsementBoard({ isDark }: Props) {
   const [values, setValues] = useState<Record<string, Record<number, string>>>({});
   const [addOpen, setAddOpen] = useState(false);
   const [addPicks, setAddPicks] = useState<Set<EndorsementKey>>(new Set());
+  // Single universal supporting block for the whole request (matches Option 1).
+  const [notes, setNotes] = useState("");
+  const [fileAttached, setFileAttached] = useState<string | null>(null);
   // Collapsible section headers in the left rail — all open by default.
   const [openSections, setOpenSections] = useState<Set<string>>(new Set(["request", "policy", "help"]));
   const CARRIERS = ["AmTrust", "Clearspring", "CNA"] as const;
@@ -212,9 +223,13 @@ export default function EndorsementBoard({ isDark }: Props) {
     return order.filter(k => selected.has(k));
   }, [selected]);
 
+  // Only required (non-optional) fields count toward the progress gate; the
+  // universal comment/upload appended for non-SKIP types is optional and
+  // never blocks submit.
   const doneCount = (k: EndorsementKey) =>
-    CARD_META[k].fields.reduce((n, _, i) => n + ((values[k]?.[i] ?? "").trim() ? 1 : 0), 0);
-  const totalRequired = orderedSelected.reduce((sum, k) => sum + CARD_META[k].fields.length, 0);
+    CARD_META[k].fields.reduce((n, f, i) => n + (!f.optional && (values[k]?.[i] ?? "").trim() ? 1 : 0), 0);
+  const requiredCount = (k: EndorsementKey) => CARD_META[k].fields.filter(f => !f.optional).length;
+  const totalRequired = orderedSelected.reduce((sum, k) => sum + requiredCount(k), 0);
   const totalDone     = orderedSelected.reduce((sum, k) => sum + doneCount(k), 0);
   const submitReady   = orderedSelected.length > 0 && totalRequired === totalDone;
 
@@ -396,8 +411,8 @@ export default function EndorsementBoard({ isDark }: Props) {
         <main className="flex-1 min-w-0 overflow-y-auto" style={{ padding: "24px 28px" }}>
           {orderedSelected.length === 0 ? (
             <div
-              className="mx-auto max-w-lg text-center rounded-2xl p-10"
-              style={{ background: c.cardBg, border: `1px solid ${c.border}`, fontFamily: FONT }}
+              className="text-center rounded-2xl"
+              style={{ background: c.cardBg, border: `1px solid ${c.border}`, fontFamily: FONT, padding: "72px 32px" }}
             >
               <div
                 className="mx-auto flex items-center justify-center rounded-2xl mb-3"
@@ -405,7 +420,7 @@ export default function EndorsementBoard({ isDark }: Props) {
               >
                 <Plus className="w-6 h-6" style={{ color: c.razz }} />
               </div>
-              <div className="text-[15px] font-semibold mb-1" style={{ color: c.text }}>Add your first change</div>
+              <div className="text-[15px] font-semibold mb-1" style={{ color: c.text }}>What&apos;s changing on this policy?</div>
               <div className="text-[12.5px] mb-4" style={{ color: c.muted, lineHeight: 1.5 }}>
                 Each change becomes a card on this page. The whole request submits together.
               </div>
@@ -464,13 +479,12 @@ export default function EndorsementBoard({ isDark }: Props) {
                       <div className="grid grid-cols-2 gap-x-4 gap-y-4">
                         {cm.fields.map((f, i) => {
                           const val = values[k]?.[i] ?? "";
-                          const filled = !!val.trim();
                           const inputStyle: React.CSSProperties = {
                             fontFamily: FONT,
                             fontSize: 13,
                             color: c.text,
                             background: c.cardBg,
-                            border: `1px solid ${filled ? "rgba(115,201,183,0.55)" : c.border}`,
+                            border: `1px solid ${c.border}`,
                             borderRadius: 8,
                             padding: "9px 12px",
                             outline: "none",
@@ -480,30 +494,21 @@ export default function EndorsementBoard({ isDark }: Props) {
                             <div key={i} className="flex flex-col gap-1.5" style={{ gridColumn: `span ${f.span ?? 2}` }}>
                               <label className="text-[11.5px] font-semibold flex items-center gap-1" style={{ fontFamily: FONT, color: c.text }}>
                                 {f.label}
-                                <span style={{ color: c.razz }}>*</span>
+                                {f.optional ? (
+                                  <span className="text-[10.5px] font-medium" style={{ color: c.muted }}>optional</span>
+                                ) : (
+                                  <span style={{ color: c.razz }}>*</span>
+                                )}
                               </label>
                               {f.type === "select" ? (
-                                <div className="relative">
-                                  <select
-                                    value={val}
-                                    onChange={e => setValue(k, i, e.target.value)}
-                                    style={{
-                                      ...inputStyle,
-                                      appearance: "none",
-                                      WebkitAppearance: "none",
-                                      MozAppearance: "none",
-                                      paddingRight: 34,
-                                      cursor: "pointer",
-                                    }}
-                                  >
-                                    <option value="">{f.placeholder ?? "Select…"}</option>
-                                    {f.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                                  </select>
-                                  <ChevronDown
-                                    className="w-3.5 h-3.5 absolute pointer-events-none"
-                                    style={{ right: 12, top: "50%", transform: "translateY(-50%)", color: c.muted }}
-                                  />
-                                </div>
+                                <StyledSelect<string>
+                                  value={val || (f.placeholder ?? "")}
+                                  onChange={v => setValue(k, i, v === (f.placeholder ?? "") ? "" : v)}
+                                  options={[(f.placeholder ?? "Select…"), ...(f.options ?? [])]}
+                                  triggerStyle={inputStyle}
+                                  c={{ text: c.text, muted: c.muted, border: c.border, cardBg: c.cardBg, hoverBg: c.hoverBg, razz: c.razz, razzTintBg: c.razzTintBg }}
+                                  font={{ fontFamily: FONT }}
+                                />
                               ) : f.type === "textarea" ? (
                                 <textarea
                                   value={val}
@@ -521,6 +526,47 @@ export default function EndorsementBoard({ isDark }: Props) {
                                   btnGrad={razzGrad}
                                   font={{ fontFamily: FONT }}
                                 />
+                              ) : f.type === "file" ? (
+                                <label
+                                  className="flex items-center justify-center gap-2 rounded-lg cursor-pointer transition-colors"
+                                  style={{
+                                    fontFamily: FONT,
+                                    fontSize: 12.5,
+                                    color: val ? c.text : c.muted,
+                                    background: val ? c.helperBg : "transparent",
+                                    border: `1.5px dashed ${val ? c.border : c.border}`,
+                                    padding: "16px 12px",
+                                  }}
+                                  onMouseEnter={e => { if (!val) { e.currentTarget.style.borderColor = c.razz; e.currentTarget.style.background = c.razzTintBg; } }}
+                                  onMouseLeave={e => { if (!val) { e.currentTarget.style.borderColor = c.border; e.currentTarget.style.background = "transparent"; } }}
+                                >
+                                  <input
+                                    type="file"
+                                    className="hidden"
+                                    onChange={e => setValue(k, i, e.target.files?.[0]?.name ?? "")}
+                                  />
+                                  {val ? (
+                                    <>
+                                      <Check className="w-3.5 h-3.5" style={{ color: "#0F7A63" }} strokeWidth={3} />
+                                      <span className="font-semibold truncate">{val}</span>
+                                      <button
+                                        type="button"
+                                        onClick={e => { e.preventDefault(); setValue(k, i, ""); }}
+                                        className="ml-1 text-[11px] font-medium transition-opacity hover:opacity-70"
+                                        style={{ color: c.muted, background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
+                                      >
+                                        Replace
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
+                                      </svg>
+                                      <span>Drag &amp; drop or click to upload</span>
+                                    </>
+                                  )}
+                                </label>
                               ) : (
                                 <input
                                   type="text"
@@ -538,6 +584,100 @@ export default function EndorsementBoard({ isDark }: Props) {
                   </section>
                 );
               })}
+
+              {/* Universal supporting details — one comment + one file for the
+                  whole request. Hidden when every selected type has its own
+                  supporting field baked into the spec (Reinstate / Cancel /
+                  XMOD / Named Insured). Matches Design Option 1's pattern. */}
+              {orderedSelected.some(k => !SKIP_UNIVERSAL_SUPPORTING.has(k)) && (
+                <section
+                  className="rounded-2xl"
+                  style={{ background: c.cardBg, border: `1px solid ${c.border}`, boxShadow: isDark ? "none" : "0 1px 2px rgba(15,23,42,0.04)" }}
+                >
+                  <div className="px-6 pt-5 pb-3">
+                    <div className="text-[10.5px] font-bold uppercase tracking-wider mb-1" style={{ fontFamily: FONT, color: c.muted, letterSpacing: "0.08em" }}>
+                      Supporting detail
+                    </div>
+                    <h2 className="text-[16px] font-semibold" style={{ fontFamily: FONT, color: c.text }}>Notes &amp; documents</h2>
+                    <p className="text-[12px] mt-1" style={{ fontFamily: FONT, color: c.muted }}>
+                      Optional context that applies to the whole request — the underwriter sees it alongside every change above.
+                    </p>
+                  </div>
+                  <div className="px-6 pb-5 flex flex-col gap-4">
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[11.5px] font-semibold flex items-center gap-1" style={{ fontFamily: FONT, color: c.text }}>
+                        Additional comment
+                        <span className="text-[10.5px] font-medium" style={{ color: c.muted }}>optional</span>
+                      </label>
+                      <textarea
+                        value={notes}
+                        onChange={e => setNotes(e.target.value)}
+                        placeholder="Please provide detailed information about the changes you're requesting…"
+                        rows={3}
+                        style={{
+                          fontFamily: FONT, fontSize: 13, color: c.text, background: c.cardBg,
+                          border: `1px solid ${c.border}`, borderRadius: 8, padding: "9px 12px",
+                          outline: "none", width: "100%", resize: "vertical", minHeight: 80,
+                        }}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[11.5px] font-semibold flex items-center gap-1" style={{ fontFamily: FONT, color: c.text }}>
+                        Upload supporting document
+                        <span className="text-[10.5px] font-medium" style={{ color: c.muted }}>optional</span>
+                      </label>
+                      <p className="text-[11.5px]" style={{ fontFamily: FONT, color: c.muted, marginBottom: 4 }}>
+                        Attach any forms, letters, or documentation that are required for processing.
+                      </p>
+                      <label
+                        className="flex items-center justify-center gap-2 rounded-lg cursor-pointer transition-colors"
+                        style={{
+                          fontFamily: FONT,
+                          fontSize: 13,
+                          fontWeight: 500,
+                          color: fileAttached ? c.text : c.muted,
+                          background: fileAttached ? c.helperBg : "transparent",
+                          border: `1.5px dashed ${c.border}`,
+                          padding: "18px 12px",
+                        }}
+                        onMouseEnter={e => { if (!fileAttached) { e.currentTarget.style.borderColor = c.razz; e.currentTarget.style.background = c.razzTintBg; } }}
+                        onMouseLeave={e => { if (!fileAttached) { e.currentTarget.style.borderColor = c.border; e.currentTarget.style.background = "transparent"; } }}
+                      >
+                        <input
+                          type="file"
+                          className="hidden"
+                          onChange={e => setFileAttached(e.target.files?.[0]?.name ?? null)}
+                        />
+                        {fileAttached ? (
+                          <>
+                            <Check className="w-3.5 h-3.5" style={{ color: "#0F7A63" }} strokeWidth={3} />
+                            <span className="font-semibold truncate">{fileAttached}</span>
+                            <button
+                              type="button"
+                              onClick={e => { e.preventDefault(); setFileAttached(null); }}
+                              className="ml-1 text-[11px] font-medium transition-opacity hover:opacity-70"
+                              style={{ color: c.muted, background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
+                            >
+                              Replace
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={c.razz} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
+                            </svg>
+                            <span style={{ color: c.text }}>Drag &amp; Drop or browse</span>
+                          </>
+                        )}
+                      </label>
+                      <p className="text-[11px] mt-1" style={{ fontFamily: FONT, color: c.muted }}>
+                        Accepted file formats: PDF, JPG, PNG, DOC, DOCX. Max. file size: 10MB
+                      </p>
+                    </div>
+                  </div>
+                </section>
+              )}
+
               <button
                 type="button"
                 onClick={openAdd}
@@ -767,7 +907,7 @@ export default function EndorsementBoard({ isDark }: Props) {
                   onMouseEnter={e => { if (addPicks.size > 0) e.currentTarget.style.filter = "brightness(1.08)"; }}
                   onMouseLeave={e => (e.currentTarget.style.filter = "none")}
                 >
-                  Add {addPicks.size > 0 ? addPicks.size : ""}
+                  Add to request
                 </button>
               </div>
             </div>

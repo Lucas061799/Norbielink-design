@@ -696,7 +696,10 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
   // Sub-tabs within the Accounting tab — same segmented-control pattern
   // as the Documents toolbar so users don't have to scroll to switch
   // between the ITC record and the monthly statements archive.
-  const [accountingView, setAccountingView] = useState<"record" | "statements">("record");
+  // Sub-tabs across the top of the Accounting tab. Splitting Statements into
+  // Commission vs Account lets users jump straight to the file type they want
+  // without a second-level tab switch inside the Statements card.
+  const [accountingView, setAccountingView] = useState<"record" | "comm" | "soa">("record");
   // Statements view state — mirrors the Documents toolbar language
   // (search, filter by type, sort, select mode, per-item preview).
   const [stmtSearch, setStmtSearch] = useState("");
@@ -763,9 +766,6 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
   const [eLicExp,     setELicExp]     = useState(agency.licenseExp);
   const [eEoNo,       setEEoNo]       = useState(agency.eoPolicyNo);
   const [eEoExp,      setEEoExp]      = useState(agency.eoExp);
-  const [eAgencyBill, setEAgencyBill] = useState(agency.agencyBill);
-  const [eDirectBill, setEDirectBill] = useState(agency.directBill);
-  const [ePremFin,    setEPremFin]    = useState(agency.premiumFin);
   const [eAffil,      setEAffil]      = useState<Set<string>>(new Set(agency.affiliations));
   const [eWC,         setEWC]         = useState<Set<string>>(new Set(agency.workersComp));
   // "Show all / Show less" toggle for the long read-only Affiliations and Workers Comp lists.
@@ -1878,12 +1878,10 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
     ...(viewMode === "internal"
       ? [["notes", "Notes", <CopyPlus className="w-[15px] h-[15px]" />] as [DetailTab, string, React.ReactElement]]
       : []),
-    // Accounting — internal only. Surfaces the agency's ITC record (see mock
-    // data). Sits at the end because it's a specialized accounting view rather
-    // than day-to-day workflow.
-    ...(viewMode === "internal"
-      ? [["accounting", "Accounting", <Landmark className="w-[15px] h-[15px]" />] as [DetailTab, string, React.ReactElement]]
-      : []),
+    // Accounting — surfaces the agency's ITC record + statements. Available
+    // to both internal staff and Admin (agency-facing) users. Sits at the
+    // end because it's a specialized view rather than day-to-day workflow.
+    ["accounting", "Accounting", <Landmark className="w-[15px] h-[15px]" />] as [DetailTab, string, React.ReactElement],
   ];
 
   /* ── helpers ── */
@@ -3551,45 +3549,6 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                   : <DatePicker value={eEoExp} onChange={setEEoExp} inputStyle={inputStyle} c={c} btnGrad={btnGrad} font={font} />}
               </div>
               <div />
-            </div>
-
-            {/* Agency Bill | Direct Bill | Premium Finance */}
-            <div className="grid grid-cols-3 gap-6 mb-2">
-              {([
-                ["Agency Bill:", eAgencyBill, setEAgencyBill],
-                ["Direct Bill:", eDirectBill, setEDirectBill],
-                ["Premium Finance:", ePremFin, setEPremFin],
-              ] as [string, boolean, (v: boolean) => void][]).map(([lbl, val, set]) => (
-                <div key={lbl}>
-                  <label style={labelStyle}>{lbl}</label>
-                  {clientLocked ? <LockedInput value={val ? "Yes" : "No"} /> : (
-                    <div className="flex gap-3">
-                      {([["Yes", true], ["No", false]] as [string, boolean][]).map(([opt, bool]) => {
-                        const active = val === bool;
-                        return (
-                          <button key={opt} onClick={() => set(bool)}
-                            className="flex items-center gap-1.5 rounded-lg text-[12px] font-semibold whitespace-nowrap justify-center transition-all"
-                            style={{ ...font, width: 120, height: 40, boxSizing: "border-box",
-                              border: active ? "1.65px solid transparent" : `1.65px solid ${c.border}`,
-                              background: active ? undefined : c.cardBg,
-                              backgroundImage: active
-                                ? `linear-gradient(88.54deg, rgba(92,46,212,0.06) 0.1%, rgba(166,20,195,0.06) 63.88%), linear-gradient(${c.cardBg}, ${c.cardBg}), linear-gradient(88.54deg, #5C2ED4 0.1%, #A614C3 63.88%)`
-                                : undefined,
-                              backgroundOrigin: active ? "padding-box, padding-box, border-box" : undefined,
-                              backgroundClip: active ? "padding-box, padding-box, border-box" : undefined,
-                            }}>
-                            <Radio checked={active} onClick={() => set(bool)} />
-                            {active
-                              ? <span style={isDark ? { color: "#FFFFFF" } : { backgroundImage: "linear-gradient(88.54deg, #5C2ED4 0.1%, #A614C3 63.88%)", backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>{opt}</span>
-                              : <span style={{ color: c.muted }}>{opt}</span>
-                            }
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              ))}
             </div>
 
             {/* Affiliations — checkbox grid, wrapped in LockedGroupOverlay for client mode so
@@ -5408,11 +5367,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
           );
 
           const YesNo = ({ v }: { v: boolean }) => (
-            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11.5px] font-semibold"
-              style={{ background: v ? (isDark ? "rgba(168,85,247,0.14)" : "rgba(168,85,247,0.10)") : (isDark ? "rgba(255,255,255,0.06)" : "#F3F4F6"), color: v ? "#A614C3" : c.muted }}>
-              <span className="w-1.5 h-1.5 rounded-full" style={{ background: v ? "#A614C3" : (isDark ? "rgba(255,255,255,0.35)" : "#9CA3AF") }} />
-              {v ? "Yes" : "No"}
-            </span>
+            <span className="text-[13px]" style={{ ...font, color: c.text }}>{v ? "Yes" : "No"}</span>
           );
 
           // ── Empty state ──
@@ -5441,17 +5396,62 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
               text: c.text, muted: c.muted, border: c.border, cardBg: c.cardBg, hoverBg: c.hoverBg,
               razz: "#A614C3", razzTintBg: isDark ? "rgba(168,85,247,0.14)" : "rgba(168,85,247,0.08)",
             };
-            const YesNoSelect = <K extends keyof ITCRecord>({ k }: { k: K }) => (
-              <StyledSelect<"true" | "false">
-                value={String(itcDraft[k]) as "true" | "false"}
-                onChange={v => set(k, (v === "true") as ITCRecord[K])}
-                options={["true", "false"] as const}
-                labelFor={v => v === "true" ? "Yes" : "No"}
-                triggerStyle={selectStyle}
-                c={selectC}
-                font={font}
-              />
-            );
+            // Segmented radio pair — Yes / No pills side by side. Active pill
+            // uses the razz gradient border + tinted bg + inner-dot radio.
+            const YesNoSelect = <K extends keyof ITCRecord>({ k }: { k: K }) => {
+              const v = itcDraft[k] as unknown as boolean;
+              const PillBtn = ({ label, active, onClick }: { label: "Yes" | "No"; active: boolean; onClick: () => void }) => (
+                <button
+                  type="button"
+                  onClick={onClick}
+                  className="flex items-center gap-1.5 rounded-lg text-[12px] font-semibold whitespace-nowrap justify-center transition-all"
+                  style={{
+                    fontFamily: FONT,
+                    width: 120,
+                    height: 40,
+                    boxSizing: "border-box",
+                    border: active ? "1.65px solid transparent" : `1.65px solid ${c.border}`,
+                    ...(active
+                      ? {
+                          backgroundImage: `linear-gradient(88.54deg, rgba(92,46,212,0.06) 0.1%, rgba(166,20,195,0.06) 63.88%), linear-gradient(${c.cardBg}, ${c.cardBg}), linear-gradient(88.54deg, #5C2ED4 0.1%, #A614C3 63.88%)`,
+                          backgroundOrigin: "padding-box, padding-box, border-box",
+                          backgroundClip: "padding-box, padding-box, border-box",
+                        }
+                      : { background: c.cardBg }),
+                    cursor: "pointer",
+                  }}
+                >
+                  <span
+                    role="radio"
+                    aria-checked={active}
+                    className="inline-flex items-center justify-center w-5 h-5 rounded-full flex-shrink-0 transition-all"
+                    style={{ border: `2px solid ${active ? "#A855F7" : "#D1D5DB"}`, background: "transparent" }}
+                  >
+                    {active && <span className="w-2.5 h-2.5 rounded-full" style={{ background: "#A855F7" }} />}
+                  </span>
+                  {active ? (
+                    <span
+                      style={{
+                        backgroundImage: "linear-gradient(88.54deg, #5C2ED4 0.1%, #A614C3 63.88%)",
+                        backgroundClip: "text",
+                        WebkitBackgroundClip: "text",
+                        WebkitTextFillColor: "transparent",
+                      }}
+                    >
+                      {label}
+                    </span>
+                  ) : (
+                    <span style={{ color: c.muted }}>{label}</span>
+                  )}
+                </button>
+              );
+              return (
+                <div className="flex gap-3">
+                  <PillBtn label="Yes" active={v}  onClick={() => set(k, true  as unknown as ITCRecord[K])} />
+                  <PillBtn label="No"  active={!v} onClick={() => set(k, false as unknown as ITCRecord[K])} />
+                </div>
+              );
+            };
             return (
               <div className="flex-1 overflow-y-auto pb-6">
                 <div className="rounded-2xl p-6 mb-6" style={{ background: c.cardBg, border: `1px solid ${c.border}` }}>
@@ -5468,6 +5468,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                       <button onClick={() => {
                         if (itcDraft && setItcRecords) setItcRecords(prev => ({ ...prev, [agency.code]: itcDraft }));
                         setItcEditing(false); setItcDraft(null);
+                        showToast({ title: "Changes saved", description: `ITC Record updated for ${agency.name}.` });
                       }}
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold text-white transition-colors"
                         style={{ ...font, background: btnGrad }}>
@@ -5565,18 +5566,18 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                   </div>
 
                   <SectionHeader title="Consolidated Billing" />
-                  <div className="grid grid-cols-3 gap-6">
+                  <div className="grid grid-cols-3 gap-6 items-start">
                     <div><label style={labelStyle}>Use Consolidated Billing ID:</label><YesNoSelect k="useConsolidatedBillingId" /></div>
                     <div><label style={labelStyle}>Consolidated Billing ID:</label>
-                      <input value={itcDraft.consolidatedBillingId} onChange={e => set("consolidatedBillingId", e.target.value)} style={inputStyle} /></div>
+                      <input value={itcDraft.consolidatedBillingId} onChange={e => set("consolidatedBillingId", e.target.value)} style={{ ...inputStyle, height: 40, boxSizing: "border-box", display: "block" }} /></div>
                     <div><label style={labelStyle}>Is Consolidated Billing Producer:</label><YesNoSelect k="isConsolidatedBillingProducer" /></div>
                   </div>
 
                   <SectionHeader title="Affiliation" />
-                  <div className="grid grid-cols-3 gap-6">
+                  <div className="grid grid-cols-3 gap-6 items-start">
                     <div><label style={labelStyle}>Is Affiliated With:</label><YesNoSelect k="isAffiliatedWith" /></div>
                     <div><label style={labelStyle}>Affiliated With ID:</label>
-                      <input value={itcDraft.affiliatedWithId} onChange={e => set("affiliatedWithId", e.target.value)} style={inputStyle} /></div>
+                      <input value={itcDraft.affiliatedWithId} onChange={e => set("affiliatedWithId", e.target.value)} style={{ ...inputStyle, height: 40, boxSizing: "border-box", display: "block" }} /></div>
                     <div><label style={labelStyle}>Is Affiliation Main:</label><YesNoSelect k="isAffiliationMain" /></div>
                     <div className="col-span-3"><label style={labelStyle}>Sub-Producer Name:</label>
                       <input value={itcDraft.subProducerName} onChange={e => set("subProducerName", e.target.value)} style={inputStyle} /></div>
@@ -5606,8 +5607,9 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                   style={{ borderBottom: `1px solid ${c.border}` }}
                 >
                   {([
-                    { key: "record" as const,     label: "ITC Record" },
-                    { key: "statements" as const, label: "Statements" },
+                    { key: "record" as const, label: "ITC Record" },
+                    { key: "comm"   as const, label: "Commission Statement" },
+                    { key: "soa"    as const, label: "Statement of Account" },
                   ]).map(t => {
                     const active = accountingView === t.key;
                     return (
@@ -5724,7 +5726,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                     statement of account), each in PDF and Excel. Source is
                     the ITC WIN J-drive path. Older records live with
                     the accounting team. */}
-                {accountingView === "statements" && (() => {
+                {(accountingView === "comm" || accountingView === "soa") && (() => {
                   const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
                   const anchor = { y: 2026, m: 10 }; // Nov 2026
                   type Stmt = { id: string; type: "comm" | "soa"; label: string; year: number; monthIdx: number; issued: string; sizePdf: string; sizeXls: string };
@@ -5883,7 +5885,9 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                       {/* Header — stacked title/subtitle + last-posted pill */}
                       <div className="flex items-start justify-between gap-4 mb-4">
                         <div>
-                          <h3 className="text-[17px] font-bold leading-tight" style={{ ...font, color: c.text }}>Statements</h3>
+                          <h3 className="text-[17px] font-bold leading-tight" style={{ ...font, color: c.text }}>
+                            {accountingView === "soa" ? "Statement of Account" : "Commission Statement"}
+                          </h3>
                           <div className="text-[11.5px] mt-0.5" style={{ ...font, color: c.muted }}>
                             12-month rolling archive · sourced from ITC WIN J-drive
                           </div>
@@ -5897,38 +5901,25 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                         </div>
                       </div>
 
-                      {/* Cadence chips — click to jump to the matching folder card below. */}
-                      <div className="flex flex-wrap items-stretch gap-2 mb-5">
-                        {([
-                          { key: "comm" as const, label: "Commission Statement", cadence: "Posts around the 12th–15th" },
-                          { key: "soa"  as const, label: "Statement of Account", cadence: "Posts the last day of the month" },
-                        ]).map(item => (
-                          <button key={item.key} type="button" onClick={() => jumpTo(item.key)}
-                            className="flex items-center gap-2.5 px-3 py-2 rounded-lg flex-1 min-w-[240px] text-left transition-all"
-                            style={{
-                              background: isDark ? "rgba(255,255,255,0.03)" : "#FAFAFB",
-                              border: `1px solid ${c.border}`,
-                              cursor: "pointer",
-                            }}
-                            onMouseEnter={e => { e.currentTarget.style.borderColor = "#A614C3"; e.currentTarget.style.background = isDark ? "rgba(168,85,247,0.10)" : "rgba(168,85,247,0.05)"; }}
-                            onMouseLeave={e => { e.currentTarget.style.borderColor = c.border; e.currentTarget.style.background = isDark ? "rgba(255,255,255,0.03)" : "#FAFAFB"; }}>
-                            <div className="flex items-center justify-center flex-shrink-0 rounded-md"
-                              style={{ width: 26, height: 26, background: isDark ? "rgba(168,85,247,0.14)" : "rgba(168,85,247,0.08)" }}>
-                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#A614C3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-                                <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
-                                <line x1="3" y1="10" x2="21" y2="10"/>
-                              </svg>
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="text-[12px] font-semibold" style={{ ...font, color: c.text }}>{item.label}</div>
-                              <div className="text-[11px]" style={{ ...font, color: c.muted }}>{item.cadence}</div>
-                            </div>
-                            <svg className="flex-shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#A614C3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                              <path d="M12 5v14"/><path d="m19 12-7 7-7-7"/>
-                            </svg>
-                          </button>
-                        ))}
+                      {/* Cadence hint — matches the razz-tinted info callout
+                          language used elsewhere in the app. */}
+                      <div
+                        className="flex items-start gap-2 mb-4 px-3 py-2.5 rounded-lg"
+                        style={{
+                          fontFamily: FONT,
+                          fontSize: 12.5,
+                          color: c.text,
+                          background: isDark ? "rgba(255,255,255,0.03)" : "#F9FAFB",
+                          border: `1px solid ${c.border}`,
+                          lineHeight: 1.5,
+                        }}
+                      >
+                        <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#A614C3", marginTop: 2 }} />
+                        <span>
+                          {accountingView === "soa"
+                            ? <>Statements of account post the <b>last day</b> of each month.</>
+                            : <>Commission statements post around the <b>12th–15th</b> of each month.</>}
+                        </span>
                       </div>
 
                       {/* Toolbar — filter / sort / search / select. Bulk Download lives
@@ -6108,16 +6099,13 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                       {/* Body — list + optional preview side panel */}
                       <div className="flex gap-4">
                         <div style={{ flex: previewSideOpen ? "0 0 62%" : "1 1 100%", minWidth: 0 }}>
-                          {filtered.length === 0 ? (
+                          {((accountingView === "soa" ? "soa" : "comm") === "comm" ? groupComm : groupSoa).length === 0 ? (
                             <div className="rounded-xl overflow-hidden px-5 py-10 text-center text-[12px]"
                               style={{ ...font, color: c.muted, background: c.cardBg, border: `1px solid ${c.border}` }}>
                               No statements match your search.
                             </div>
                           ) : (
-                            <>
-                              {renderGroup("comm", groupComm)}
-                              {renderGroup("soa",  groupSoa)}
-                            </>
+                            renderGroup((accountingView === "soa" ? "soa" : "comm"), (accountingView === "soa" ? "soa" : "comm") === "comm" ? groupComm : groupSoa)
                           )}
                         </div>
                         {previewSideOpen && stmtPreview && (
@@ -6204,7 +6192,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                         <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#A614C3", marginTop: 2 }} />
                         <span>
                           Need older statements? The accounting team keeps a full history —
-                          reach out to <a href="mailto:accounting@norbielink.com" className="font-semibold" style={{ color: "#A614C3" }}>accounting@norbielink.com</a> with the agency code and the month you need.
+                          reach out to <a href="mailto:AccountingTeam@btisinc.com" className="font-semibold" style={{ color: "#A614C3" }}>AccountingTeam@btisinc.com</a> with the agency code and the month you need.
                         </span>
                       </div>
 
@@ -8627,9 +8615,6 @@ function AddAgencyForm({ isDark, onSaveForLater, onDiscard, initialDraft, c, btn
   const [licenseExp, setLicenseExp]   = useState(initialDraft?.licenseExp ?? "03/24/2026");
   const [eoPolicyNo, setEoPolicyNo]   = useState(initialDraft?.eoPolicyNo ?? "");
   const [eoExp, setEoExp]             = useState(initialDraft?.eoExp ?? "03/24/2026");
-  const [agencyBill, setAgencyBill]   = useState(initialDraft?.agencyBill ?? true);
-  const [directBill, setDirectBill]   = useState(initialDraft?.directBill ?? true);
-  const [premiumFin, setPremiumFin]   = useState(initialDraft?.premiumFin ?? true);
   const [affiliations, setAffiliations] = useState<Set<string>>(new Set(initialDraft?.affiliations ?? ["AAA/ACG (AC364)"]));
   const [workersComp, setWorkersComp]   = useState<Set<string>>(new Set(initialDraft?.workersComp ?? ["AIG"]));
   const [badges, setBadges]             = useState<Set<string>>(new Set(initialDraft?.badges ?? []));
@@ -8774,7 +8759,7 @@ function AddAgencyForm({ isDark, onSaveForLater, onDiscard, initialDraft, c, btn
     status, apptDate, contact, email,
     bizType, taxId, website, phone, tollFree,
     npn, licenseNo, licenseExp, eoPolicyNo, eoExp,
-    agencyBill, directBill, premiumFin,
+    agencyBill: true, directBill: true, premiumFin: true,
     affiliations: Array.from(affiliations), workersComp: Array.from(workersComp),
     badges: Array.from(badges),
   });
@@ -9233,43 +9218,6 @@ function AddAgencyForm({ isDark, onSaveForLater, onDiscard, initialDraft, c, btn
               <ErrMsg k="website" />
             </div>
             <div />
-          </div>
-
-          {/* Agency Bill | Direct Bill | Premium Finance */}
-          <div className="grid grid-cols-3 gap-6 mb-2">
-            {([
-              ["Agency Bill:", agencyBill, setAgencyBill],
-              ["Direct Bill:", directBill, setDirectBill],
-              ["Premium Finance:", premiumFin, setPremiumFin],
-            ] as [string, boolean, (v:boolean)=>void][]).map(([label, val, set]) => (
-              <div key={label}>
-                <label style={labelStyle}>{label}</label>
-                <div className="flex gap-3">
-                  {([["Yes", true],["No", false]] as [string, boolean][]).map(([opt, bool]) => {
-                    const active = val === bool;
-                    return (
-                      <button key={opt} onClick={() => set(bool)}
-                        className="flex items-center gap-1.5 rounded-lg text-[12px] font-semibold whitespace-nowrap justify-center transition-all"
-                        style={{ ...font, width: 120, height: 40, boxSizing: "border-box",
-                          border: active ? "1.65px solid transparent" : `1.65px solid ${c.border}`,
-                          backgroundColor: active ? undefined : c.cardBg,
-                          backgroundImage: active
-                            ? `linear-gradient(88.54deg, rgba(92,46,212,0.06) 0.1%, rgba(166,20,195,0.06) 63.88%), linear-gradient(${c.cardBg}, ${c.cardBg}), linear-gradient(88.54deg, #5C2ED4 0.1%, #A614C3 63.88%)`
-                            : undefined,
-                          backgroundOrigin: active ? "padding-box, padding-box, border-box" : undefined,
-                          backgroundClip: active ? "padding-box, padding-box, border-box" : undefined,
-                        }}>
-                        <Radio checked={active} onClick={() => set(bool)} />
-                        {active
-                          ? <span style={isDark ? { color: "#FFFFFF" } : { backgroundImage: "linear-gradient(88.54deg, #5C2ED4 0.1%, #A614C3 63.88%)", backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>{opt}</span>
-                          : <span style={{ color: c.muted }}>{opt}</span>
-                        }
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
           </div>
 
           {/* Affiliations */}

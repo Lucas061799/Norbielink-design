@@ -58,6 +58,10 @@ export function StyledSelect<T extends string>({
           backgroundImage: "none",
           backgroundColor: c.cardBg,
           paddingRight: 12,
+          // Match sibling <input> vertical rhythm so the trigger height doesn't
+          // creep above/below neighbouring text inputs and DatePickers.
+          boxSizing: "border-box",
+          lineHeight: 1.5,
         }}
       >
         <span style={{ ...font, color: c.text }}>{display}</span>

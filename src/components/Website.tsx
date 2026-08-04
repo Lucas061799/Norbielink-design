@@ -329,7 +329,7 @@ function LoginView({ c, font, inputStyle, labelStyle, primaryBtnStyle, btnGrad, 
             // avoids firing the toast while they're still typing their actual identifier.
             if (looksLikeAgencyCode(identifier)) onAgencyCodeDetected(identifier.trim());
           }}
-          placeholder="Not your Agency code"
+          placeholder="Cannot be your Agency code"
           style={inputStyle} />
         {/* No persistent hint here — most users don't have an agency code at all, so a
             preemptive "agency code isn't a login" line would be both presumptuous and noisy
@@ -835,10 +835,17 @@ function AddPhoneView({ c, font, primaryBtnStyle, btnGrad, onContinueEmail, onBa
   onContinueEmail: () => void;
   onBack: () => void;
 }) {
+  void primaryBtnStyle;
+  // Same shape as MfaMethodView options — but here "phone" is unavailable
+  // (no mobile on file) so it renders as a disabled row.
+  const options: { key: MfaMethod; icon: typeof Mail; title: string; detail: string; disabled: boolean }[] = [
+    { key: "email", icon: Mail,          title: "Email me a code",  detail: "l***********e@amyntagroup.com", disabled: false },
+    { key: "phone", icon: MessageSquare, title: "Text me a code",   detail: "No mobile number on file",       disabled: true  },
+  ];
   return (
     <>
       <h1 className="mb-3" style={{ ...font, fontSize: 28, fontWeight: 600, lineHeight: "34px", color: c.text, whiteSpace: "nowrap" }}>
-        Add a{" "}
+        Choose your{" "}
         <span
           style={{
             background: btnGrad,
@@ -847,16 +854,57 @@ function AddPhoneView({ c, font, primaryBtnStyle, btnGrad, onContinueEmail, onBa
             backgroundClip: "text",
           }}
         >
-          Phone Number
+          Verification Method
         </span>
       </h1>
-      <p className="mb-6" style={{ ...font, fontSize: 14, color: c.muted, lineHeight: 1.5 }}>
-        We don&apos;t have a phone number on file for your account, so text-message
-        verification isn&apos;t available yet. You can still sign in with an email
-        code — but adding a phone lets us reach you faster next time.
+      <p className="mb-8" style={{ ...font, fontSize: 14, color: c.muted }}>
+        Pick how you&apos;d like to receive your one-time code.
       </p>
 
-      {/* Razz-tinted callout — instructions to update phone in the main app */}
+      <div className="flex flex-col gap-3 mb-6">
+        {options.map(o => {
+          const Icon = o.icon;
+          const disabled = o.disabled;
+          return (
+            <button
+              key={o.key}
+              type="button"
+              disabled={disabled}
+              onClick={() => { if (!disabled) onContinueEmail(); }}
+              className="w-full flex items-center gap-3 text-left transition-colors group"
+              style={{
+                fontFamily: FONT,
+                background: c.cardBg,
+                border: `1px solid ${c.border}`,
+                borderRadius: 12,
+                padding: "14px 16px",
+                cursor: disabled ? "not-allowed" : "pointer",
+                opacity: disabled ? 0.55 : 1,
+              }}
+              onMouseEnter={e => { if (disabled) return; e.currentTarget.style.borderColor = "#A614C3"; e.currentTarget.style.background = "rgba(166,20,195,0.04)"; }}
+              onMouseLeave={e => { if (disabled) return; e.currentTarget.style.borderColor = c.border; e.currentTarget.style.background = c.cardBg; }}
+            >
+              <span
+                className="flex-shrink-0 flex items-center justify-center"
+                style={{
+                  width: 36, height: 36, borderRadius: 10,
+                  background: disabled ? (c.hoverBg || "rgba(0,0,0,0.05)") : "rgba(166,20,195,0.10)",
+                  color: disabled ? c.muted : "#A614C3",
+                }}
+              >
+                <Icon className="w-4 h-4" />
+              </span>
+              <span className="flex-1 min-w-0">
+                <div style={{ fontSize: 14, fontWeight: 600, color: c.text }}>{o.title}</div>
+                <div style={{ fontSize: 12.5, color: c.muted, marginTop: 1 }}>{o.detail}</div>
+              </span>
+              {!disabled && <ChevronRight className="w-4 h-4 flex-shrink-0" style={{ color: c.muted }} />}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Razz-tinted callout — explains why text is disabled and how to enable it */}
       <div
         className="mb-6 flex items-start gap-2"
         style={{
@@ -872,25 +920,15 @@ function AddPhoneView({ c, font, primaryBtnStyle, btnGrad, onContinueEmail, onBa
       >
         <AlertCircle className="w-4 h-4 flex-shrink-0" style={{ color: "#A614C3", marginTop: 2 }} />
         <span>
-          Head to{" "}
-          <span style={{ color: "#A614C3", fontWeight: 600 }}>Profile → Contact info</span>{" "}
-          after you sign in and add your mobile number. Text verification will be
-          available the next time you log in.
+          Text verification isn&apos;t available because no mobile number is on file. Sign in with an email code, then once you&apos;re in the NorbieLink Marketplace, click your name, go to{" "}
+          <span style={{ color: "#A614C3", fontWeight: 600 }}>Profile</span>, and add your mobile number to enable text verification next time.
         </span>
       </div>
 
       <button
         type="button"
-        onClick={onContinueEmail}
-        style={primaryBtnStyle(true)}
-      >
-        Continue with email code
-      </button>
-
-      <button
-        type="button"
         onClick={onBack}
-        className="transition-opacity hover:opacity-70 mt-4"
+        className="transition-opacity hover:opacity-70"
         style={{
           fontFamily: FONT,
           fontSize: 13,
