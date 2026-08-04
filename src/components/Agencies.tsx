@@ -5916,9 +5916,12 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                       >
                         <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#A614C3", marginTop: 2 }} />
                         <span>
-                          {accountingView === "soa"
-                            ? <>Statements of account post the <b>last day</b> of each month.</>
-                            : <>Commission statements post around the <b>12th–15th</b> of each month.</>}
+                          {(() => {
+                            const gradB: React.CSSProperties = { backgroundImage: btnGrad, backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", fontWeight: 700 };
+                            return accountingView === "soa"
+                              ? <>Statements of account post the <b style={gradB}>last day</b> of each month.</>
+                              : <>Commission statements post around the <b style={gradB}>12th–15th</b> of each month.</>;
+                          })()}
                         </span>
                       </div>
 
