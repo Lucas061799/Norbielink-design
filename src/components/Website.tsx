@@ -871,7 +871,7 @@ function AddPhoneView({ c, font, primaryBtnStyle, btnGrad, onContinueEmail, onBa
               type="button"
               disabled={disabled}
               onClick={() => { if (!disabled) onContinueEmail(); }}
-              className="w-full flex items-center gap-3 text-left transition-colors group"
+              className="w-full text-left transition-colors group"
               style={{
                 fontFamily: FONT,
                 background: c.cardBg,
@@ -879,50 +879,64 @@ function AddPhoneView({ c, font, primaryBtnStyle, btnGrad, onContinueEmail, onBa
                 borderRadius: 12,
                 padding: "14px 16px",
                 cursor: disabled ? "not-allowed" : "pointer",
-                opacity: disabled ? 0.55 : 1,
               }}
               onMouseEnter={e => { if (disabled) return; e.currentTarget.style.borderColor = "#A614C3"; e.currentTarget.style.background = "rgba(166,20,195,0.04)"; }}
               onMouseLeave={e => { if (disabled) return; e.currentTarget.style.borderColor = c.border; e.currentTarget.style.background = c.cardBg; }}
             >
-              <span
-                className="flex-shrink-0 flex items-center justify-center"
-                style={{
-                  width: 36, height: 36, borderRadius: 10,
-                  background: disabled ? (c.hoverBg || "rgba(0,0,0,0.05)") : "rgba(166,20,195,0.10)",
-                  color: disabled ? c.muted : "#A614C3",
-                }}
-              >
-                <Icon className="w-4 h-4" />
-              </span>
-              <span className="flex-1 min-w-0">
-                <div style={{ fontSize: 14, fontWeight: 600, color: c.text }}>{o.title}</div>
-                <div style={{ fontSize: 12.5, color: c.muted, marginTop: 1 }}>{o.detail}</div>
-              </span>
-              {!disabled && <ChevronRight className="w-4 h-4 flex-shrink-0" style={{ color: c.muted }} />}
+              <div className="flex items-center gap-3">
+                <span
+                  className="flex-shrink-0 flex items-center justify-center"
+                  style={{
+                    width: 36, height: 36, borderRadius: 10,
+                    background: disabled ? (c.hoverBg || "rgba(0,0,0,0.05)") : "rgba(166,20,195,0.10)",
+                    color: disabled ? c.muted : "#A614C3",
+                  }}
+                >
+                  <Icon className="w-4 h-4" />
+                </span>
+                <span className="flex-1 min-w-0">
+                  <div style={{ fontSize: 14, fontWeight: 600, color: disabled ? c.muted : c.text }}>{o.title}</div>
+                  <div style={{ fontSize: 12.5, color: c.muted, marginTop: 1 }}>{o.detail}</div>
+                </span>
+                {!disabled && <ChevronRight className="w-4 h-4 flex-shrink-0" style={{ color: c.muted }} />}
+              </div>
+
+              {/* Inline explanation — only for the unavailable option. Text
+                  is indented 48px (36px icon + 12px gap) so it flows under
+                  the "Text me a code" text column above, and paragraphs use
+                  a small "How to enable" eyebrow for structure. */}
+              {disabled && (
+                <div
+                  className="mt-3 pt-3"
+                  style={{
+                    borderTop: `1px solid ${c.border}`,
+                    paddingLeft: 48,
+                    fontSize: 13,
+                    color: c.text,
+                    lineHeight: 1.5,
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      letterSpacing: "0.08em",
+                      textTransform: "uppercase",
+                      color: "#A614C3",
+                      marginBottom: 6,
+                    }}
+                  >
+                    How to enable
+                  </div>
+                  <p style={{ margin: 0 }}>
+                    Sign in with an email code, then in the NorbieLink Marketplace click your name, select{" "}
+                    <span style={{ color: "#A614C3", fontWeight: 600 }}>Profile</span>, and add your mobile number. Text verification will be available on your next login.
+                  </p>
+                </div>
+              )}
             </button>
           );
         })}
-      </div>
-
-      {/* Razz-tinted callout — explains why text is disabled and how to enable it */}
-      <div
-        className="mb-6 flex items-start gap-2"
-        style={{
-          fontFamily: FONT,
-          fontSize: 13,
-          color: c.text,
-          padding: "12px 14px",
-          background: "rgba(166,20,195,0.06)",
-          border: `1px solid rgba(166,20,195,0.22)`,
-          borderRadius: 10,
-          lineHeight: 1.5,
-        }}
-      >
-        <AlertCircle className="w-4 h-4 flex-shrink-0" style={{ color: "#A614C3", marginTop: 2 }} />
-        <span>
-          Text verification isn&apos;t available because no mobile number is on file. Sign in with an email code, then once you&apos;re in the NorbieLink Marketplace, click your name, go to{" "}
-          <span style={{ color: "#A614C3", fontWeight: 600 }}>Profile</span>, and add your mobile number to enable text verification next time.
-        </span>
       </div>
 
       <button

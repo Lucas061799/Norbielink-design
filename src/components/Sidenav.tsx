@@ -176,7 +176,7 @@ export default function Sidenav({ isDark = false, onToggleDark, activeItem = "Ma
     { label: "Clients",           icon: <Users      className="w-[18px] h-[18px]" /> },
     { label: "ProSuite",          icon: <Briefcase  className="w-[18px] h-[18px]" />, badge: "PRO", hasChevron: true },
     { label: "Make a Payment",    icon: <CreditCard className="w-[18px] h-[18px]" /> },
-    { label: "Accounting",        icon: <BookOpen   className="w-[18px] h-[18px]" />, hasChevron: true },
+    { label: "Payment Info",      icon: <BookOpen   className="w-[18px] h-[18px]" />, hasChevron: true },
     { label: "Endorsements",      icon: <FileEdit   className="w-[18px] h-[18px]" />, hasChevron: true, children: ENDORSEMENT_CHILDREN },
     { label: "Tools & Resources", icon: <Wrench     className="w-[18px] h-[18px]" />, hasChevron: true },
     { label: "Support",           icon: <HelpCircle className="w-[18px] h-[18px]" /> },
