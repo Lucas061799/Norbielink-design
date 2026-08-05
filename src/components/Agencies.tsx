@@ -5996,7 +5996,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                           lineHeight: 1.5,
                         }}
                       >
-                        <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" style={{ color: isDark ? "#D8B4FE" : "#A614C3", marginTop: 2 }} />
+                        <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" style={{ color: isDark ? "#A855F7" : "#A614C3", marginTop: 2 }} />
                         <span>
                           {(() => {
                             // Brighter razz in dark mode so the emphasized dates
