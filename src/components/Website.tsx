@@ -315,10 +315,8 @@ function LoginView({ c, font, inputStyle, labelStyle, primaryBtnStyle, btnGrad, 
         </span>
       </h1>
       <p className="mb-8" style={{ ...font, fontSize: 14, color: c.muted, lineHeight: 1.5 }}>
-        User IDs are your first name, last name, and numbers (e.g.,{" "}
-        <span style={{ fontFamily: "monospace", color: c.text }}>johnsmith00110</span>).
-        If that doesn&apos;t work, try your email address.{" "}
-        <span style={{ fontWeight: 600, color: "#A614C3" }}>Agency codes cannot be used as User IDs.</span>
+        Your User ID can be found in your invitation email. Otherwise, sign in with your email address.{" "}
+        <span style={{ fontWeight: 600, color: "#A614C3" }}>Agency codes cannot be used as your User ID.</span>
       </p>
 
       <div className="mb-5">

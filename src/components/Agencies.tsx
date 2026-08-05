@@ -918,6 +918,9 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
         style={{ fontFamily: FONT, color: filter.size > 0 ? "#A614C3" : c.muted }}>
         {label}<span className="inline-flex ml-1"><svg width="7" height="5" viewBox="0 0 7 5" fill="none"><path d="M3.5 5L0.5 0H6.5L3.5 5Z" fill={filter.size > 0 ? "#A614C3" : sub}/></svg></span>
       </button>
+      {/* Full-screen click catcher — closes the popover when anywhere
+          outside is clicked. Sits below the popover z-order. */}
+      {open && <div className="fixed inset-0 z-20" onClick={() => setOpen(false)} />}
       {open && (
         <div className="absolute top-full mt-1 z-30 rounded-xl shadow-lg overflow-hidden min-w-[220px]"
           style={{ background: c.cardBg, border: `1px solid ${c.border}`, left: 0 }}>
