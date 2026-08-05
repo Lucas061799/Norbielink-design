@@ -6910,8 +6910,8 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                         const fg = showInactive ? c.muted : (isDark ? "#4ECDC4" : "#73C9B7");
                         return (
                           <div className="flex items-center justify-center">
-                            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded"
-                              style={{ fontFamily:FONT, background: bg, color: fg, letterSpacing: "0.04em" }}>
+                            <span className="inline-flex items-center px-3 py-[3px] rounded-full text-[11px] font-semibold w-fit"
+                              style={{ fontFamily:FONT, background: bg, color: fg }}>
                               {showInactive ? "Inactive" : "Active"}
                             </span>
                           </div>
