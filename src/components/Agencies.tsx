@@ -4109,7 +4109,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
           );
 
           return (
-            <div className="flex flex-1 min-h-0 gap-4 pb-4" onClick={() => { setDocFilterOpen(false); setDocSortOpen(false); setDocUploadOpen(false); setDocByTypeFilterOpen(false); }}>
+            <div className="flex gap-4 pb-4" onClick={() => { setDocFilterOpen(false); setDocSortOpen(false); setDocUploadOpen(false); setDocByTypeFilterOpen(false); }}>
             {/* Left panel */}
             <div className="flex flex-col min-h-0 transition-all"
               style={{ flex: previewDoc && !previewExpanded ? "0 0 38%" : "1 1 100%", minWidth: 0 }}>
@@ -4444,7 +4444,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                 </div>
               )}
 
-              <div className="flex-1 min-h-0 overflow-y-auto">
+              <div>
 
                 {/* By Type view — grouped by category so each type is visually separated. */}
                 {!showDocArchived && !showDocTrashed && docView === "byType" && (() => {
@@ -4698,7 +4698,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
 
         {/* ── Notes tab ── */}
         {detailTab === "notes" && (
-          <div className="flex flex-1 min-h-0 gap-4 pb-4" onClick={() => { setNoteFilterOpen(false); setNoteSortOpen(false); setNoteNewOpen(false); setNoteMoreOpen(false); }}>
+          <div className="flex gap-4 pb-4" onClick={() => { setNoteFilterOpen(false); setNoteSortOpen(false); setNoteNewOpen(false); setNoteMoreOpen(false); }}>
 
             {/* Left panel */}
             <div className="flex flex-col min-h-0 transition-all"
@@ -5925,53 +5925,22 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                   const latestPosted = latest ? `${MONTHS[latest.monthIdx]} ${latest.type === "comm" ? 14 : new Date(latest.year, latest.monthIdx + 1, 0).getDate()}, ${latest.year}` : "";
                   return (
                     <div className="rounded-2xl p-8 mb-8" style={{ background: c.cardBg, border: `1px solid ${c.border}` }} onClick={closeDropdowns}>
-                      {/* Header — stacked title/subtitle + last-posted pill */}
-                      <div className="flex items-start justify-between gap-4 mb-4">
-                        <div>
-                          <h3 className="text-[17px] font-bold leading-tight" style={{ ...font, color: c.text }}>
-                            {accountingView === "soa" ? "Statement of Account" : "Commission Statement"}
-                          </h3>
-                          <div className="text-[11.5px] mt-0.5" style={{ ...font, color: c.muted }}>
-                            12-month rolling archive
+                      {/* Header — title on the left, last-posted pill + toolbar
+                          on the right, vertically centered on the same line. */}
+                      <div className="flex items-center justify-between gap-4 mb-4">
+                        <h3 className="text-[17px] font-bold leading-tight" style={{ ...font, color: c.text }}>
+                          {accountingView === "soa" ? "Statement of Account" : "Commission Statement"}
+                        </h3>
+                        <div className="flex items-center gap-3 flex-shrink-0">
+                          <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full"
+                            style={{ background: "rgba(115,201,183,0.15)" }}>
+                            <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#73C9B7" }} />
+                            <span className="text-[11.5px] font-semibold" style={{ ...font, color: isDark ? "#73C9B7" : "#0F7A63" }}>
+                              Last posted {latestPosted}
+                            </span>
                           </div>
-                        </div>
-                        <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full flex-shrink-0"
-                          style={{ background: "rgba(115,201,183,0.15)" }}>
-                          <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#73C9B7" }} />
-                          <span className="text-[11.5px] font-semibold" style={{ ...font, color: isDark ? "#73C9B7" : "#0F7A63" }}>
-                            Last posted {latestPosted}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Cadence hint — matches the razz-tinted info callout
-                          language used elsewhere in the app. */}
-                      <div
-                        className="flex items-start gap-2 mb-4 px-3 py-2.5 rounded-lg"
-                        style={{
-                          fontFamily: FONT,
-                          fontSize: 12.5,
-                          color: c.text,
-                          background: isDark ? "rgba(255,255,255,0.03)" : "#F9FAFB",
-                          border: `1px solid ${c.border}`,
-                          lineHeight: 1.5,
-                        }}
-                      >
-                        <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#A614C3", marginTop: 2 }} />
-                        <span>
-                          {(() => {
-                            const gradB: React.CSSProperties = { backgroundImage: btnGrad, backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", fontWeight: 700 };
-                            return accountingView === "soa"
-                              ? <>Statements of account post the <b style={gradB}>first day</b> of each month.</>
-                              : <>Commission statements post around the <b style={gradB}>12th–15th</b> of each month.</>;
-                          })()}
-                        </span>
-                      </div>
-
-                      {/* Toolbar — filter / sort / search / select. Bulk Download lives
-                          inside the select-mode action bar below to keep the header quiet. */}
-                      <div className="flex items-center justify-end mb-3 min-w-0">
-                        <div className="flex items-center gap-1">
+                          <div className="w-px h-5" style={{ background: c.border }} />
+                          <div className="flex items-center gap-1">
                           {/* Sort */}
                           <div className="relative" onClick={e => e.stopPropagation()}>
                             <button onClick={() => { setStmtSortOpen(p => !p); setStmtFilterOpen(false); }}
@@ -6011,7 +5980,36 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                             style={{ color: stmtSelectMode ? "#A855F7" : c.muted, background: stmtSelectMode ? "rgba(168,85,247,0.10)" : "transparent" }}>
                             <CheckSquare className="w-3.5 h-3.5" />
                           </button>
+                          </div>
                         </div>
+                      </div>
+
+                      {/* Cadence callout — full-width secondary row under the header. */}
+                      <div
+                        className="flex items-start gap-2 mb-4 px-3 py-2.5 rounded-lg"
+                        style={{
+                          fontFamily: FONT,
+                          fontSize: 12.5,
+                          color: c.text,
+                          background: isDark ? "rgba(255,255,255,0.03)" : "#F9FAFB",
+                          border: `1px solid ${c.border}`,
+                          lineHeight: 1.5,
+                        }}
+                      >
+                        <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" style={{ color: isDark ? "#D8B4FE" : "#A614C3", marginTop: 2 }} />
+                        <span>
+                          {(() => {
+                            // Brighter razz in dark mode so the emphasized dates
+                            // stay legible against the dark navy background.
+                            const razzGrad = isDark
+                              ? "linear-gradient(90deg, #C084FC 0%, #E879F9 65%)"
+                              : "linear-gradient(90deg, #5C2ED4 0%, #A614C3 65%)";
+                            const gradB: React.CSSProperties = { backgroundImage: razzGrad, backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", fontWeight: 700 };
+                            return accountingView === "soa"
+                              ? <>12-month rolling archive — new statements post on the <b style={gradB}>first day</b> of each month.</>
+                              : <>12-month rolling archive — new statements post around the <b style={gradB}>12th–15th</b> of each month.</>;
+                          })()}
+                        </span>
                       </div>
 
                       {/* Divider */}
@@ -6626,7 +6624,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
 
         {/* ── Users tab ── */}
         {detailTab === "users" && (
-          <div className="flex flex-col flex-1 min-h-0" onClick={() => { setUserMenuId(null); setUserMenuPos(null); setJobTitleOpen(false); }}>
+          <div className="flex flex-col" onClick={() => { setUserMenuId(null); setUserMenuPos(null); setJobTitleOpen(false); }}>
             {/* Toolbar */}
             <div className="flex items-center gap-2 mb-4 flex-shrink-0">
               <div className="flex items-stretch overflow-hidden transition-all"
