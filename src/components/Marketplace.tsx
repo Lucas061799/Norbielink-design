@@ -170,6 +170,7 @@ export default function Marketplace({ isDark = false }: MarketplaceProps) {
   const [inlandOpen, setInlandOpen] = useState(false);
   const [personalOpen, setPersonalOpen] = useState(false);
   const [affinityOpen, setAffinityOpen] = useState(false);
+  const [buildersOpen, setBuildersOpen] = useState(false);
   // Hero is HIGHLIGHTS[0] and stays fixed regardless of filter. The rest of
   // the list is what the tabs toggle. "All" bypasses the category check.
   const visibleMinis = HIGHLIGHTS.slice(1).filter(
@@ -277,6 +278,7 @@ export default function Marketplace({ isDark = false }: MarketplaceProps) {
                     cat.label === "Inland Marine"   ? () => setInlandOpen(true)
                     : cat.label === "Personal Lines" ? () => setPersonalOpen(true)
                     : cat.label === "Non-Profit Risks" ? () => setAffinityOpen(true)
+                    : cat.label === "Builders Risk" ? () => setBuildersOpen(true)
                     : undefined
                   }
                   className="group flex flex-col items-center justify-center gap-3 rounded-2xl transition-all cursor-pointer relative"
@@ -622,6 +624,7 @@ export default function Marketplace({ isDark = false }: MarketplaceProps) {
       </div>
 
       <InlandMarineModal open={inlandOpen} onClose={() => setInlandOpen(false)} />
+      <BuildersRiskModal open={buildersOpen} onClose={() => setBuildersOpen(false)} />
       <PortalListModal
         open={personalOpen}
         onClose={() => setPersonalOpen(false)}
@@ -966,6 +969,108 @@ function PortalListModal({ open, onClose, pill, cards }: PortalListModalProps) {
               <ExternalLink size={19} color="#E3E3E3" strokeWidth={1.8} style={{ flexShrink: 0 }} />
             </div>
           ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface BuildersRiskModalProps {
+  open: boolean;
+  onClose: () => void;
+}
+
+// Modal opened from the Builders Risk tile. Two vendor square-cards
+// (Rivet, One-Shot) in a 2-col grid — no marketplace hero.
+function BuildersRiskModal({ open, onClose }: BuildersRiskModalProps) {
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  const squareCardStyle: React.CSSProperties = {
+    aspectRatio: "1 / 1",
+    background: "#ffffff",
+    border: "1px solid #E5E7EB",
+    borderRadius: 10,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+    cursor: "pointer",
+    transition: "border-color 0.15s ease",
+    padding: 16,
+  };
+
+  const externalIconStyle: React.CSSProperties = {
+    position: "absolute",
+    top: 12,
+    right: 12,
+    color: "#E3E3E3",
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ background: "rgba(0,0,0,0.45)", fontFamily: "var(--font-montserrat), Montserrat, sans-serif" }}
+      onClick={onClose}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          background: "#ffffff",
+          border: "1px solid #E5E7EB",
+          borderRadius: 16,
+          boxShadow: "0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)",
+          width: 512,
+          maxWidth: "calc(100% - 32px)",
+          maxHeight: "calc(100vh - 40px)",
+          overflowY: "auto",
+        }}
+      >
+        {/* Header */}
+        <div style={{ padding: "29px 26px 16px", display: "flex", flexDirection: "column", gap: 19 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ padding: "4px 14px", border: "1.5px solid #A614C3", borderRadius: 15, color: "#A614C3", fontWeight: 500, fontSize: 12, lineHeight: "14px" }}>
+              Builders Risk
+            </span>
+            <button
+              onClick={onClose}
+              aria-label="Close"
+              style={{ background: "none", border: "none", cursor: "pointer", color: "#9CA3AF", width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
+            >
+              <X size={20} strokeWidth={1.8} />
+            </button>
+          </div>
+          <h3 style={{ fontWeight: 400, fontSize: 24, lineHeight: "28px", color: "#101828", margin: 0 }}>
+            Where would you like to shop?
+          </h3>
+        </div>
+
+        {/* Body — 2-col square-card grid */}
+        <div style={{ padding: "0 32px 32px", display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 14 }}>
+          <div
+            style={squareCardStyle}
+            onMouseEnter={e => (e.currentTarget.style.borderColor = "#A614C3")}
+            onMouseLeave={e => (e.currentTarget.style.borderColor = "#E5E7EB")}
+          >
+            <ExternalLink size={19} strokeWidth={1.8} style={externalIconStyle} />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/vendor-logos/rivet.png" alt="Rivet" style={{ maxWidth: "70%", maxHeight: "60%", objectFit: "contain" }} />
+          </div>
+          <div
+            style={squareCardStyle}
+            onMouseEnter={e => (e.currentTarget.style.borderColor = "#A614C3")}
+            onMouseLeave={e => (e.currentTarget.style.borderColor = "#E5E7EB")}
+          >
+            <ExternalLink size={19} strokeWidth={1.8} style={externalIconStyle} />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/vendor-logos/one-shot.png" alt="One-Shot" style={{ maxWidth: "70%", maxHeight: "60%", objectFit: "contain" }} />
+          </div>
         </div>
       </div>
     </div>
