@@ -521,20 +521,20 @@ interface AgencyPolicy {
 }
 
 const mockAgencyQuotes: AgencyQuote[] = [
-  { id:"aq1",  quoteId:"QMWC-A001-2026", applicant:"Riverside Auto LLC",   dba:"Riverside",    createdDate:"2026-01-10", effectiveDate:"2026-02-01", lob:"Commercial Auto",  status:"Sold/Issued", producer:"Jane Smith",    agencyId:"1", premium:14200 },
-  { id:"aq2",  quoteId:"QMWC-A002-2026", applicant:"Summit Builders Inc",  dba:"SummitBuild",  createdDate:"2026-02-05", effectiveDate:"2026-03-01", lob:"General Liability", status:"Pending",     producer:"Sarah Johnson", agencyId:"1", premium:8500  },
-  { id:"aq3",  quoteId:"QMWC-A003-2026", applicant:"NorthStar Logistics",  dba:"NSL",          createdDate:"2026-02-18", effectiveDate:"2026-04-01", lob:"Worker's Comp",    status:"Approved",    producer:"Jane Smith",    agencyId:"1", premium:22000 },
-  { id:"aq4",  quoteId:"QMWC-A004-2026", applicant:"Prairie Home Rentals", dba:"PHR",          createdDate:"2026-03-01", effectiveDate:"2026-04-15", lob:"Property",          status:"Incomplete",  producer:"Mike Chen",     agencyId:"1", premium:6800  },
-  { id:"aq5",  quoteId:"QMWC-A005-2026", applicant:"Keystone Transport",                       createdDate:"2026-03-15", effectiveDate:"2026-05-01", lob:"Commercial Auto",  status:"Declined",    producer:"Sarah Johnson", agencyId:"1", premium:9300  },
-  { id:"aq6",  quoteId:"QMWC-B001-2026", applicant:"Great Lakes Freight",  dba:"GLF",          createdDate:"2026-01-20", effectiveDate:"2026-02-15", lob:"Worker's Comp",    status:"Sold/Issued", producer:"Maria Chen",    agencyId:"2", premium:31500 },
-  { id:"aq7",  quoteId:"QMWC-B002-2026", applicant:"Lakeview Contractors",                     createdDate:"2026-03-08", effectiveDate:"2026-04-01", lob:"General Liability", status:"Pending",     producer:"Tom Harris",    agencyId:"2", premium:7200  },
+  { id:"aq1",  quoteId:"QMWC-A001-2026", applicant:"Riverside Auto LLC",   dba:"Riverside",    createdDate:"2026-01-10", effectiveDate:"2026-02-01", lob:"Commercial Auto",   status:"Issued",         producer:"Jane Smith",    agencyId:"1", premium:14200 },
+  { id:"aq2",  quoteId:"QMWC-A002-2026", applicant:"Summit Builders Inc",  dba:"SummitBuild",  createdDate:"2026-02-05", effectiveDate:"2026-03-01", lob:"General Liability", status:"Under Review",   producer:"Sarah Johnson", agencyId:"1", premium:8500  },
+  { id:"aq3",  quoteId:"QMWC-A003-2026", applicant:"NorthStar Logistics",  dba:"NSL",          createdDate:"2026-02-18", effectiveDate:"2026-04-01", lob:"Worker's Comp",     status:"Approved",       producer:"Jane Smith",    agencyId:"1", premium:22000 },
+  { id:"aq4",  quoteId:"QMWC-A004-2026", applicant:"Prairie Home Rentals", dba:"PHR",          createdDate:"2026-03-01", effectiveDate:"2026-04-15", lob:"Property",          status:"Incomplete",     producer:"Mike Chen",     agencyId:"1", premium:6800  },
+  { id:"aq5",  quoteId:"QMWC-A005-2026", applicant:"Keystone Transport",                       createdDate:"2026-03-15", effectiveDate:"2026-05-01", lob:"Commercial Auto",   status:"Declined",       producer:"Sarah Johnson", agencyId:"1", premium:9300  },
+  { id:"aq6",  quoteId:"QMWC-B001-2026", applicant:"Great Lakes Freight",  dba:"GLF",          createdDate:"2026-01-20", effectiveDate:"2026-02-15", lob:"Worker's Comp",     status:"Bound",          producer:"Maria Chen",    agencyId:"2", premium:31500 },
+  { id:"aq7",  quoteId:"QMWC-B002-2026", applicant:"Lakeview Contractors",                     createdDate:"2026-03-08", effectiveDate:"2026-04-01", lob:"General Liability", status:"Requested Info", producer:"Tom Harris",    agencyId:"2", premium:7200  },
 ];
 const mockAgencyPolicies: AgencyPolicy[] = [
-  { id:"ap1", policyNumber:"POL-A-10041", applicant:"Riverside Auto LLC",  dba:"Riverside",   createdDate:"2026-02-01", effectiveDate:"2026-02-01", lob:"Commercial Auto",  status:"Active",           producer:"Jane Smith",    agencyId:"1", premium:14200 },
-  { id:"ap2", policyNumber:"POL-A-10042", applicant:"NorthStar Logistics", dba:"NSL",         createdDate:"2026-04-01", effectiveDate:"2026-04-01", lob:"Worker's Comp",    status:"Active",           producer:"Jane Smith",    agencyId:"1", premium:22000 },
-  { id:"ap3", policyNumber:"POL-A-10039", applicant:"Clearfield Bakery",   dba:"CB Sweets",   createdDate:"2025-06-01", effectiveDate:"2025-06-01", lob:"General Liability", status:"Upcoming Renewal", producer:"Sarah Johnson", agencyId:"1", premium:5500  },
-  { id:"ap4", policyNumber:"POL-A-10022", applicant:"Delta Roofing Co",                       createdDate:"2025-01-15", effectiveDate:"2025-01-15", lob:"Property",          status:"Expired",          producer:"Mike Chen",     agencyId:"1", premium:8100  },
-  { id:"ap5", policyNumber:"POL-B-20011", applicant:"Great Lakes Freight", dba:"GLF",         createdDate:"2026-02-15", effectiveDate:"2026-02-15", lob:"Worker's Comp",    status:"Active",           producer:"Maria Chen",    agencyId:"2", premium:31500 },
+  { id:"ap1", policyNumber:"POL-A-10041", applicant:"Riverside Auto LLC",  dba:"Riverside",   createdDate:"2026-02-01", effectiveDate:"2026-02-01", lob:"Commercial Auto",   status:"Bound",           producer:"Jane Smith",    agencyId:"1", premium:14200 },
+  { id:"ap2", policyNumber:"POL-A-10042", applicant:"NorthStar Logistics", dba:"NSL",         createdDate:"2026-04-01", effectiveDate:"2026-04-01", lob:"Worker's Comp",     status:"Issued",          producer:"Jane Smith",    agencyId:"1", premium:22000 },
+  { id:"ap3", policyNumber:"POL-A-10039", applicant:"Clearfield Bakery",   dba:"CB Sweets",   createdDate:"2025-06-01", effectiveDate:"2025-06-01", lob:"General Liability", status:"Renewal Created", producer:"Sarah Johnson", agencyId:"1", premium:5500  },
+  { id:"ap4", policyNumber:"POL-A-10022", applicant:"Delta Roofing Co",                       createdDate:"2025-01-15", effectiveDate:"2025-01-15", lob:"Property",          status:"File Closed",     producer:"Mike Chen",     agencyId:"1", premium:8100  },
+  { id:"ap5", policyNumber:"POL-B-20011", applicant:"Great Lakes Freight", dba:"GLF",         createdDate:"2026-02-15", effectiveDate:"2026-02-15", lob:"Worker's Comp",     status:"Bound",           producer:"Maria Chen",    agencyId:"2", premium:31500 },
 ];
 
 /* ─── Agency Notes ───────────────────────────────────────────────────────── */
@@ -559,8 +559,22 @@ const ALL_LOBS = [
   "Inland Marine","Lessor's Risk","Non-Profit","Pollution Liability","Special Events",
   "Truckers GL","Vacant Risks","Boats/Marine","Contractors GL",
 ];
-const QUOTE_STATUSES  = ["All Statuses","Sold/Issued","Pending","Approved","Incomplete","Declined"];
-const POLICY_STATUSES = ["All Statuses","Active","Expired","Upcoming Renewal","Cancelled"];
+// Vocabularies mirror the main Quotes / Policies pages so the STATUS pill
+// + filter list read as one system across surfaces.
+const QUOTE_STATUSES  = [
+  "All Statuses",
+  "Incomplete", "Submitted", "Under Review", "Requested Info",
+  "Declined", "File Closed", "Cancelled",
+  "Renewal Pending", "Renewal Created",
+  "Approved", "Bound",
+  "Paid-Bind Incomplete", "Submission Incomplete",
+  "Issued", "Bind Incomplete",
+];
+const POLICY_STATUSES = [
+  "All Statuses",
+  "File Closed", "Cancelled", "Renewal Created",
+  "Bound", "Paid-Bind Incomplete", "Issued",
+];
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function sortItems<T>(items: T[], key: string | null, dir: "asc" | "desc"): T[] {
@@ -653,6 +667,47 @@ const mockAgencyUsers: AgencyUser[] = [
 /* ─── Agency Detail View ─────────────────────────────────────────────────── */
 type DetailTab = "overview" | "quotes" | "policies" | "users" | "documents" | "notes" | "accounting";
 
+// Shared status pill for the Quotes/Policies tables inside the Agency
+// detail view — same dot + label + soft frame as the main Policies page's
+// STATUS column so both surfaces read as one system.
+// Mirrors the main Quotes / Policies STATUS_DOT palette: teal (complete),
+// razz (in-progress / brand accent), red (terminal negative), gray
+// (neutral/inactive). Covers the full status vocabulary used by
+// mockAgencyQuotes and mockAgencyPolicies.
+const AGENCY_STATUS_DOT: Record<string, string> = {
+  // Policy vocabulary
+  "File Closed":           "#9CA3AF",
+  "Cancelled":             "#EF4444",
+  "Renewal Created":       "#73C9B7",
+  "Bound":                 "#73C9B7",
+  "Paid-Bind Incomplete":  "#A614C3",
+  "Issued":                "#73C9B7",
+  // Quote vocabulary
+  "Incomplete":            "#9CA3AF",
+  "Submitted":             "#A614C3",
+  "Under Review":          "#A614C3",
+  "Requested Info":        "#A614C3",
+  "Declined":              "#EF4444",
+  "Renewal Pending":       "#A614C3",
+  "Approved":              "#73C9B7",
+  "Submission Incomplete": "#9CA3AF",
+  "Bind Incomplete":       "#A614C3",
+};
+const StatusPill = ({ status, isDark }: { status: string; isDark: boolean }) => (
+  <span
+    className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-[3px] rounded-md whitespace-nowrap"
+    style={{
+      fontFamily: FONT,
+      background: isDark ? "rgba(255,255,255,0.04)" : "#F9FAFB",
+      color: isDark ? "#F9FAFB" : "#1F2937",
+      border: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "#F3F4F6"}`,
+    }}
+  >
+    <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: AGENCY_STATUS_DOT[status] || "#9CA3AF" }} />
+    {status}
+  </span>
+);
+
 function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleStar, inactiveUserIds, setInactiveUserIds, statusInactiveUserIds, setStatusInactiveUserIds, removedUserIds, setRemovedUserIds, bookRolled, setBookRolled, allAgencies, initialTab, onNavigateToAgency, viewMode = "internal", itcRecords, setItcRecords }: {
   agency: AgencyDetail;
   isDark: boolean;
@@ -699,7 +754,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
   // Sub-tabs across the top of the Accounting tab. Splitting Statements into
   // Commission vs Account lets users jump straight to the file type they want
   // without a second-level tab switch inside the Statements card.
-  const [accountingView, setAccountingView] = useState<"record" | "comm" | "soa">("record");
+  const [accountingView, setAccountingView] = useState<"comm" | "soa">("comm");
   // Statements view state — mirrors the Documents toolbar language
   // (search, filter by type, sort, select mode, per-item preview).
   const [stmtSearch, setStmtSearch] = useState("");
@@ -809,14 +864,16 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
 
   /* ── quotes / policies state ── */
   const [detailSearch,    setDetailSearch]    = useState("");
-  const [lobFilter,       setLobFilter]       = useState("All LOBs");
-  const [statusFilter,    setStatusFilter]    = useState("All Statuses");
+  const [lobFilter,       setLobFilter]       = useState<Set<string>>(new Set());
+  const [statusFilter,    setStatusFilter]    = useState<Set<string>>(new Set());
   const [applicantFilter, setApplicantFilter] = useState<Set<string>>(new Set());
   const [producerFilter,  setProducerFilter]  = useState<Set<string>>(new Set());
   const [lobOpen,         setLobOpen]         = useState(false);
   const [statusOpen,      setStatusOpen]      = useState(false);
   const [applicantOpen,   setApplicantOpen]   = useState(false);
   const [producerOpen,    setProducerOpen]    = useState(false);
+  const [lobSearch,       setLobSearch]       = useState("");
+  const [statusSearch,    setStatusSearch]    = useState("");
   const [applicantSearch, setApplicantSearch] = useState("");
   const [producerSearch,  setProducerSearch]  = useState("");
   const [qpSortKey,       setQpSortKey]       = useState<string|null>(null);
@@ -838,6 +895,82 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
 
   const closeAllDropdowns = () => { setLobOpen(false); setStatusOpen(false); setApplicantOpen(false); setProducerOpen(false); };
 
+  // Shared multi-select column-header filter — mirrors the Quotes / Policies
+  // page pattern (Search + Select All + per-option checkbox + Reset Filter).
+  // Used for LOB and Status on both the Quotes and Policies tabs so all four
+  // column filters read as one system.
+  const renderMultiFilter = ({
+    label, options, filter, setFilter, search, setSearch, open, setOpen, searchPlaceholder,
+  }: {
+    label: string;
+    options: readonly string[];
+    filter: Set<string>;
+    setFilter: React.Dispatch<React.SetStateAction<Set<string>>>;
+    search: string;
+    setSearch: (v: string) => void;
+    open: boolean;
+    setOpen: React.Dispatch<React.SetStateAction<boolean>>;
+    searchPlaceholder: string;
+  }) => (
+    <div className="relative" onClick={e => e.stopPropagation()}>
+      <button onClick={() => { closeAllDropdowns(); setOpen(o => !o); }}
+        className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider cursor-pointer select-none"
+        style={{ fontFamily: FONT, color: filter.size > 0 ? "#A614C3" : c.muted }}>
+        {label}<span className="inline-flex ml-1"><svg width="7" height="5" viewBox="0 0 7 5" fill="none"><path d="M3.5 5L0.5 0H6.5L3.5 5Z" fill={filter.size > 0 ? "#A614C3" : sub}/></svg></span>
+      </button>
+      {open && (
+        <div className="absolute top-full mt-1 z-30 rounded-xl shadow-lg overflow-hidden min-w-[220px]"
+          style={{ background: c.cardBg, border: `1px solid ${c.border}`, left: 0 }}>
+          <div className="p-2" style={{ borderBottom: `1px solid ${c.border}` }}>
+            <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg"
+              style={{ background: isDark ? "rgba(255,255,255,0.05)" : "#F9FAFB", border: `1px solid ${c.border}` }}>
+              <Search className="w-3.5 h-3.5 flex-shrink-0" style={{ color: c.muted }} />
+              <input value={search} onChange={e => setSearch(e.target.value)} placeholder={searchPlaceholder}
+                className="outline-none text-[12px] flex-1 bg-transparent" style={{ fontFamily: FONT, color: c.text }} />
+            </div>
+          </div>
+          <div className="px-3 py-2" style={{ borderBottom: `1px solid ${c.border}` }}>
+            <button className="flex items-center gap-2 text-[12px] w-full text-left" style={{ fontFamily: FONT, color: c.text }}
+              onClick={() => { setFilter(filter.size === options.length ? new Set() : new Set(options)); }}>
+              <div className="flex items-center justify-center w-4 h-4 rounded flex-shrink-0"
+                style={{ border: `1.5px solid ${c.borderStrong}`, background: c.cardBg }}>
+                {filter.size === options.length && options.length > 0 &&
+                  <svg width="9" height="7" viewBox="0 0 9 7" fill="none"><path d="M1 3.5L3.5 6L8 1" stroke="#A614C3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+              </div>
+              Select All
+            </button>
+          </div>
+          <div className="max-h-[180px] overflow-y-auto py-1">
+            {options.filter(o => !search || o.toLowerCase().includes(search.toLowerCase())).map(opt => (
+              <button key={opt} className="flex items-center gap-2 px-3 py-1.5 text-[12px] w-full text-left transition-colors"
+                style={{ fontFamily: FONT, color: c.text }}
+                onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+                onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                onClick={() => { const s = new Set(filter); s.has(opt) ? s.delete(opt) : s.add(opt); setFilter(s); }}>
+                <div className="flex items-center justify-center w-4 h-4 rounded flex-shrink-0"
+                  style={{ border: `1.5px solid ${c.borderStrong}`, background: c.cardBg }}>
+                  {filter.has(opt) &&
+                    <svg width="9" height="7" viewBox="0 0 9 7" fill="none"><path d="M1 3.5L3.5 6L8 1" stroke="#A614C3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                </div>
+                {opt}
+              </button>
+            ))}
+          </div>
+          <button onClick={() => { setFilter(new Set()); setSearch(""); }}
+            className="w-full flex items-center justify-center gap-2 py-3 text-[12px] font-semibold transition-colors"
+            style={{ fontFamily: FONT, color: "#A614C3", borderTop: `1px solid ${c.border}` }}
+            onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+            onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+            <RefreshCw className="w-3.5 h-3.5" />Reset Filter
+          </button>
+        </div>
+      )}
+    </div>
+  );
+  const LOB_OPTIONS = ALL_LOBS.filter(l => l !== "All LOBs");
+  const QUOTE_STATUS_OPTIONS  = QUOTE_STATUSES.filter(s => s !== "All Statuses");
+  const POLICY_STATUS_OPTIONS = POLICY_STATUSES.filter(s => s !== "All Statuses");
+
   const rawQuotes   = mockAgencyQuotes.filter(q => q.agencyId === agency.id);
   const rawPolicies = mockAgencyPolicies.filter(p => p.agencyId === agency.id);
   const uniqueQApplicants = [...new Set(rawQuotes.map(q => q.applicant))];
@@ -848,8 +981,8 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
   const agencyQuotes = sortItems(
     rawQuotes
       .filter(q => !detailSearch || q.applicant.toLowerCase().includes(detailSearch.toLowerCase()) || q.quoteId.toLowerCase().includes(detailSearch.toLowerCase()))
-      .filter(q => lobFilter === "All LOBs" || q.lob === lobFilter)
-      .filter(q => statusFilter === "All Statuses" || q.status === statusFilter)
+      .filter(q => lobFilter.size === 0 || lobFilter.has(q.lob))
+      .filter(q => statusFilter.size === 0 || statusFilter.has(q.status))
       .filter(q => applicantFilter.size === 0 || applicantFilter.has(q.applicant))
       .filter(q => producerFilter.size === 0 || producerFilter.has(q.producer)),
     qpSortKey, qpSortDir
@@ -857,8 +990,8 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
   const agencyPolicies = sortItems(
     rawPolicies
       .filter(p => !detailSearch || p.applicant.toLowerCase().includes(detailSearch.toLowerCase()) || p.policyNumber.toLowerCase().includes(detailSearch.toLowerCase()))
-      .filter(p => lobFilter === "All LOBs" || p.lob === lobFilter)
-      .filter(p => statusFilter === "All Statuses" || p.status === statusFilter)
+      .filter(p => lobFilter.size === 0 || lobFilter.has(p.lob))
+      .filter(p => statusFilter.size === 0 || statusFilter.has(p.status))
       .filter(p => applicantFilter.size === 0 || applicantFilter.has(p.applicant))
       .filter(p => producerFilter.size === 0 || producerFilter.has(p.producer)),
     qpSortKey, qpSortDir
@@ -1908,7 +2041,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
   );
 
   return (
-    <div className="flex flex-col flex-1 min-h-0" style={{ fontFamily: FONT }}>
+    <div className="flex flex-col flex-1 min-h-0 overflow-y-auto" style={{ fontFamily: FONT, overflowX: "hidden" }}>
       {userToast && (
         <div className="fixed top-[68px] right-6 z-50 flex items-center gap-8"
           style={{ background: isDark ? "#1E2240" : "#fff", border: `1px solid ${c.border}`, borderRadius: 12, padding: "12px 16px", boxShadow: "0 4px 16px rgba(0,0,0,0.10)", minWidth: 360, maxWidth: 460, fontFamily: FONT }}>
@@ -2733,7 +2866,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
           would come from auth (see `clientIsAdmin` in AgencyDetailView); here we simply
           default to admin, so the header renders the h1 alone as it did originally. */}
       <div className="flex flex-col justify-center flex-shrink-0 mb-12"
-        style={{ height: 71, borderBottom: `0.87px solid ${isDark ? "rgba(255,255,255,0.08)" : "#E5E7EB"}`, marginLeft: -48, marginRight: -48, paddingLeft: 28, paddingRight: 28 }}>
+        style={{ height: 71, borderBottom: `0.87px solid ${isDark ? "rgba(255,255,255,0.08)" : "#E5E7EB"}` }}>
         <h1 className="text-[22px] font-normal" style={{ ...font, color: c.text }}>{viewMode === "client" ? "Admin" : "Agencies"}</h1>
       </div>
 
@@ -3054,7 +3187,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
 
         {/* ── Overview tab ── */}
         {detailTab === "overview" && !isEditing && (
-          <div className="flex-1 overflow-y-auto pb-6">
+          <div className="pb-6">
           <div className="rounded-2xl p-8 mb-8" style={{ background: c.cardBg, border: `1px solid ${c.border}` }}>
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-[17px] font-bold" style={{ ...font, color: c.text }}>Agency Information</h3>
@@ -3194,7 +3327,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
         {detailTab === "overview" && isEditing && (
           <>
           {editExpanded && <div className="fixed inset-0 z-40" style={{ background: "rgba(0,0,0,0.35)" }} onClick={() => setEditExpanded(false)} />}
-          <div className={editExpanded ? "fixed inset-y-0 right-0 z-50 flex flex-col shadow-2xl overflow-y-auto" : "flex-1 overflow-y-auto pb-6"}
+          <div className={editExpanded ? "fixed inset-y-0 right-0 z-50 flex flex-col shadow-2xl overflow-y-auto" : "pb-6"}
             style={editExpanded ? { width: "70vw", background: c.cardBg, borderLeft: `1px solid ${c.border}` } : undefined}>
           <div className={editExpanded ? "p-6 mb-6" : "rounded-2xl p-6 mb-6"} style={editExpanded ? { background: c.cardBg } : { background: c.cardBg, border: `1px solid ${c.border}`, maxWidth: 1590 }}>
             {/* Card header */}
@@ -5373,7 +5506,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
           // ── Empty state ──
           if (!record && !itcEditing) {
             return (
-              <div className="flex-1 overflow-y-auto pb-6">
+              <div className="pb-6">
                 <div className="rounded-2xl p-8 mb-8" style={{ background: c.cardBg, border: `1px solid ${c.border}` }}>
                   <h3 className="text-[17px] font-bold mb-6" style={{ ...font, color: c.text }}>ITC Record</h3>
                   <div className="rounded-xl p-10 text-center" style={{ border: `1px dashed ${c.border}` }}>
@@ -5453,7 +5586,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
               );
             };
             return (
-              <div className="flex-1 overflow-y-auto pb-6">
+              <div className="pb-6">
                 <div className="rounded-2xl p-6 mb-6" style={{ background: c.cardBg, border: `1px solid ${c.border}` }}>
                   <div className="flex items-center justify-between mb-6">
                     <h3 className="text-[17px] font-bold" style={{ ...font, color: c.text }}>ITC Record</h3>
@@ -5598,7 +5731,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
             );
             const fullAddr = [record.address, [record.city, record.state].filter(Boolean).join(", "), record.zip].filter(Boolean).join(" · ");
             return (
-              <div className="flex-1 overflow-y-auto pb-6">
+              <div className="pb-6">
                 {/* Sub-tab toolbar — same segmented-control language as
                     the Documents tab. Lets users jump directly to
                     Statements without scrolling past the ITC Record. */}
@@ -5607,7 +5740,6 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                   style={{ borderBottom: `1px solid ${c.border}` }}
                 >
                   {([
-                    { key: "record" as const, label: "ITC Record" },
                     { key: "comm"   as const, label: "Commission Statement" },
                     { key: "soa"    as const, label: "Statement of Account" },
                   ]).map(t => {
@@ -5631,95 +5763,6 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                   })}
                 </div>
 
-                {accountingView === "record" && (
-                <div className="rounded-2xl p-8 mb-8" style={{ background: c.cardBg, border: `1px solid ${c.border}` }}>
-                  <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-[17px] font-bold" style={{ ...font, color: c.text }}>ITC Record</h3>
-                    <button onClick={() => { setItcDraft(record); setItcEditing(true); }}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-colors"
-                      style={{ ...font, border: `1px solid ${isDark ? "rgba(255,255,255,0.10)" : "#E5E7EB"}`, color: c.muted }}
-                      onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
-                      onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-                      <Pencil className="w-3.5 h-3.5" />Edit
-                    </button>
-                  </div>
-
-                  <SectionHeader title="Producer" first />
-                  <div className="grid grid-cols-3 gap-x-12 gap-y-6">
-                    <LabelValue label="Producer Code" value={record.producerCode} />
-                    <LabelValue label="Agent / Broker" value={record.agentOrBroker} />
-                    <div>
-                      <p className="text-[13px] font-semibold mb-2" style={{ ...font, color: c.text }}>Status:</p>
-                      {statusBadge}
-                    </div>
-                    <LabelValue label="Short Name" value={record.shortName || "—"} />
-                    <div className="col-span-2">
-                      <p className="text-[13px] font-semibold mb-1" style={{ ...font, color: c.text }}>Name:</p>
-                      <p className="text-[13px]" style={{ ...font, color: c.muted }}>{record.name}</p>
-                    </div>
-                    <div className="col-span-3">
-                      <p className="text-[13px] font-semibold mb-1" style={{ ...font, color: c.text }}>DBA:</p>
-                      <p className="text-[13px]" style={{ ...font, color: c.muted }}>{record.dba || "—"}</p>
-                    </div>
-                  </div>
-
-                  <SectionHeader title="Contact" />
-                  <div className="grid grid-cols-3 gap-x-12 gap-y-6">
-                    <div className="col-span-3">
-                      <p className="text-[13px] font-semibold mb-1" style={{ ...font, color: c.text }}>Address:</p>
-                      <p className="text-[13px]" style={{ ...font, color: c.muted }}>{fullAddr || "—"}</p>
-                    </div>
-                    <LabelValue label="Telephone" value={record.telephone || "—"} />
-                    <div className="col-span-2">
-                      <p className="text-[13px] font-semibold mb-1" style={{ ...font, color: c.text }}>Email:</p>
-                      <p className="text-[13px]" style={{ ...font, color: c.muted }}>{record.email || "—"}</p>
-                    </div>
-                    <LabelValue label="Accounting Email" value={record.accountingEmail || "—"} />
-                    <LabelValue label="Statement Email" value={record.statementEmail || "—"} />
-                  </div>
-
-                  <SectionHeader title="Appointment & Compliance" />
-                  <div className="grid grid-cols-3 gap-x-12 gap-y-6">
-                    <LabelValue label="Appointment Date" value={record.appointmentDate} />
-                    <LabelValue label="License No" value={record.licenseNo || "—"} />
-                    <LabelValue label="License Expires" value={record.licenseExpires || "—"} />
-                    <LabelValue label="E&O Policy No" value={record.eoPolicyNo || "—"} />
-                    <LabelValue label="E&O Expires" value={record.eoPolicyExpires || "—"} />
-                    <div /> {/* spacer */}
-                    <LabelValue label="Tax ID" value={record.taxId || "—"} />
-                    <LabelValue label="1099 Type" value={record.tax1099Type} />
-                    <LabelValue label="1099 Name" value={record.tax1099Name || "—"} />
-                  </div>
-
-                  <SectionHeader title="Preferences" />
-                  <div className="grid grid-cols-3 gap-x-12 gap-y-6">
-                    <LabelValue label="Email Statements"                    value={<YesNo v={record.emailStatements} />} />
-                    <LabelValue label="Direct Deposits"                     value={<YesNo v={record.directDeposits} />} />
-                    <LabelValue label="Direct Deposits (Commission Only)"   value={<YesNo v={record.directDepositsCommissionOnly} />} />
-                    <LabelValue label="Farmers Agent"                       value={<YesNo v={record.farmersAgent} />} />
-                    <LabelValue label="Smart Choice Agent"                  value={<YesNo v={record.smartChoiceAgent} />} />
-                    <LabelValue label="PIIB Agent"                          value={<YesNo v={record.piibAgent} />} />
-                  </div>
-
-                  <SectionHeader title="Consolidated Billing" />
-                  <div className="grid grid-cols-3 gap-x-12 gap-y-6">
-                    <LabelValue label="Use Consolidated Billing ID"        value={<YesNo v={record.useConsolidatedBillingId} />} />
-                    <LabelValue label="Consolidated Billing ID"            value={record.consolidatedBillingId || "—"} />
-                    <LabelValue label="Is Consolidated Billing Producer"   value={<YesNo v={record.isConsolidatedBillingProducer} />} />
-                  </div>
-
-                  <SectionHeader title="Affiliation" />
-                  <div className="grid grid-cols-3 gap-x-12 gap-y-6">
-                    <LabelValue label="Is Affiliated With"      value={<YesNo v={record.isAffiliatedWith} />} />
-                    <LabelValue label="Affiliated With ID"      value={record.affiliatedWithId || "—"} />
-                    <LabelValue label="Is Affiliation Main"     value={<YesNo v={record.isAffiliationMain} />} />
-                    <div className="col-span-3">
-                      <p className="text-[13px] font-semibold mb-1" style={{ ...font, color: c.text }}>Sub-Producer Name:</p>
-                      <p className="text-[13px]" style={{ ...font, color: c.muted }}>{record.subProducerName || "—"}</p>
-                    </div>
-                  </div>
-                </div>
-                )}
 
                 {/* ── Statements card — 12-month rolling archive.
                     Phase 1 scope: two statements per month (commission +
@@ -5889,7 +5932,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                             {accountingView === "soa" ? "Statement of Account" : "Commission Statement"}
                           </h3>
                           <div className="text-[11.5px] mt-0.5" style={{ ...font, color: c.muted }}>
-                            12-month rolling archive · sourced from ITC WIN J-drive
+                            12-month rolling archive
                           </div>
                         </div>
                         <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full flex-shrink-0"
@@ -5919,7 +5962,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                           {(() => {
                             const gradB: React.CSSProperties = { backgroundImage: btnGrad, backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", fontWeight: 700 };
                             return accountingView === "soa"
-                              ? <>Statements of account post the <b style={gradB}>last day</b> of each month.</>
+                              ? <>Statements of account post the <b style={gradB}>first day</b> of each month.</>
                               : <>Commission statements post around the <b style={gradB}>12th–15th</b> of each month.</>;
                           })()}
                         </span>
@@ -5929,40 +5972,6 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                           inside the select-mode action bar below to keep the header quiet. */}
                       <div className="flex items-center justify-end mb-3 min-w-0">
                         <div className="flex items-center gap-1">
-                          {/* Filter */}
-                          <div className="relative" onClick={e => e.stopPropagation()}>
-                            <button onClick={() => { setStmtFilterOpen(p => !p); setStmtSortOpen(false); }}
-                              className="p-1.5 rounded-md transition-all"
-                              style={{ color: stmtFilterTypes.size > 0 ? "#A855F7" : c.muted, background: stmtFilterTypes.size > 0 ? "rgba(168,85,247,0.10)" : "transparent" }}>
-                              <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M1 3h14v1.5L9.5 10v5l-3-1.5V10L1 4.5V3z"/></svg>
-                            </button>
-                            {stmtFilterOpen && (
-                              <div className="absolute right-0 top-8 z-30 w-56 rounded-xl shadow-xl py-1.5" style={{ background: c.cardBg, border: `1px solid ${c.border}` }}>
-                                <p className="text-[10px] font-semibold uppercase tracking-wide px-3 py-1.5" style={{ fontFamily: FONT, color: c.muted }}>Filter by Type</p>
-                                <button onClick={() => setStmtFilterTypes(new Set())}
-                                  className="w-full text-left px-3 py-1.5 text-[12px] flex items-center justify-between transition-colors"
-                                  style={{ fontFamily: FONT, color: stmtFilterTypes.size === 0 ? "#A614C3" : c.text, background: stmtFilterTypes.size === 0 ? "rgba(168,85,247,0.08)" : "transparent" }}>
-                                  All Types
-                                  {stmtFilterTypes.size === 0 && <svg width="10" height="8" viewBox="0 0 9 7" fill="none"><path d="M1 3.5L3.5 6L8 1" stroke="#A614C3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
-                                </button>
-                                {(["comm","soa"] as const).map(t => {
-                                  const checked = stmtFilterTypes.has(t);
-                                  return (
-                                    <button key={t} onClick={() => toggleFilterType(t)}
-                                      className="w-full text-left px-3 py-1.5 text-[12px] flex items-center gap-2.5 transition-colors"
-                                      style={{ fontFamily: FONT, color: c.text }}
-                                      onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
-                                      onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-                                      <span className="flex items-center justify-center w-4 h-4 rounded flex-shrink-0" style={{ border: `1.5px solid ${c.borderStrong}`, background: c.cardBg }}>
-                                        {checked && <svg width="9" height="7" viewBox="0 0 9 7" fill="none"><path d="M1 3.5L3.5 6L8 1" stroke="#A614C3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
-                                      </span>
-                                      <span>{TYPE_LABEL[t]}</span>
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                            )}
-                          </div>
                           {/* Sort */}
                           <div className="relative" onClick={e => e.stopPropagation()}>
                             <button onClick={() => { setStmtSortOpen(p => !p); setStmtFilterOpen(false); }}
@@ -6195,7 +6204,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                         <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#A614C3", marginTop: 2 }} />
                         <span>
                           Need older statements? The accounting team keeps a full history —
-                          reach out to <a href="mailto:AccountingTeam@btisinc.com" className="font-semibold" style={{ color: "#A614C3" }}>AccountingTeam@btisinc.com</a> with the agency code and the month you need.
+                          reach out to <a href="mailto:Accounting@btisinc.com" className="font-semibold" style={{ color: "#A614C3" }}>Accounting@btisinc.com</a> with the agency code and the month you need.
                         </span>
                       </div>
 
@@ -6320,14 +6329,14 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                 <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none" style={{ color:c.muted }} />
               </div>
               <div className="flex items-center gap-1 ml-1" style={{ borderLeft:`1px solid ${c.border}`, paddingLeft:10 }}>
-                <button title="Reset filters" onClick={() => { setDetailSearch(""); setLobFilter("All LOBs"); setStatusFilter("All Statuses"); setApplicantFilter(new Set()); setProducerFilter(new Set()); setApplicantSearch(""); setProducerSearch(""); setLobOpen(false); setStatusOpen(false); setApplicantOpen(false); setProducerOpen(false); setQpSortKey(null); setQpSortDir("asc"); }}
+                <button title="Reset filters" onClick={() => { setDetailSearch(""); setLobFilter(new Set()); setStatusFilter(new Set()); setApplicantFilter(new Set()); setProducerFilter(new Set()); setLobSearch(""); setStatusSearch(""); setApplicantSearch(""); setProducerSearch(""); setLobOpen(false); setStatusOpen(false); setApplicantOpen(false); setProducerOpen(false); setQpSortKey(null); setQpSortDir("asc"); }}
                   className="p-2 rounded-lg transition-colors" style={{ color:"#A614C3" }} onMouseEnter={e=>(e.currentTarget.style.background=c.hoverBg)} onMouseLeave={e=>(e.currentTarget.style.background="transparent")}><RefreshCw className="w-4 h-4"/></button>
                 <div className="relative" onClick={e=>e.stopPropagation()}><button title="View columns" onClick={()=>setQpViewOpen(o=>!o)} className="p-2 rounded-lg transition-colors" style={{ color:"#A614C3", background: qpViewOpen ? c.hoverBg : "transparent" }} onMouseEnter={e=>(e.currentTarget.style.background=c.hoverBg)} onMouseLeave={e=>(e.currentTarget.style.background = qpViewOpen ? c.hoverBg : "transparent")}><svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="5" height="5" x="2" y="2" rx="1"/><rect width="5" height="5" x="9.5" y="2" rx="1"/><rect width="5" height="5" x="17" y="2" rx="1"/><rect width="5" height="5" x="2" y="9.5" rx="1"/><rect width="5" height="5" x="9.5" y="9.5" rx="1"/><rect width="5" height="5" x="17" y="9.5" rx="1"/><rect width="5" height="5" x="2" y="17" rx="1"/><rect width="5" height="5" x="9.5" y="17" rx="1"/><rect width="5" height="5" x="17" y="17" rx="1"/></svg></button>{qpViewOpen && (<div className="absolute right-0 top-full mt-1 z-30 w-[220px] rounded-xl shadow-xl overflow-hidden" style={{ background: c.cardBg, border: `1px solid ${c.border}` }}><div className="px-4 py-2.5 text-[11px] uppercase tracking-wider font-semibold" style={{ fontFamily: FONT, color: c.muted, borderBottom: `1px solid ${c.border}`, letterSpacing: "0.06em" }}>Show Columns</div><div className="py-1.5 max-h-[280px] overflow-y-auto">{QP_COLUMNS.map(col => { const visible = !qpHiddenCols.has(col.key); return (<label key={col.key} className="flex items-center gap-2.5 px-4 py-2 cursor-pointer transition-colors" onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)} onMouseLeave={e => (e.currentTarget.style.background = "transparent")} onClick={() => setQpHiddenCols(prev => { const s = new Set(prev); s.has(col.key) ? s.delete(col.key) : s.add(col.key); return s; })}><div className="flex items-center justify-center w-4 h-4 rounded flex-shrink-0" style={{ border: `1.5px solid ${c.borderStrong}`, background: c.cardBg }}>{visible && <svg width="9" height="7" viewBox="0 0 9 7" fill="none"><path d="M1 3.5L3.5 6L8 1" stroke="#A614C3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}</div><span className="text-[12px]" style={{ fontFamily: FONT, color: c.text }}>{col.label}</span></label>); })}</div><button onClick={() => setQpHiddenCols(new Set())} className="w-full flex items-center justify-center gap-2 py-3 text-[12px] font-semibold transition-colors" style={{ fontFamily: FONT, color: "#A614C3", borderTop: `1px solid ${c.border}` }} onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)} onMouseLeave={e => (e.currentTarget.style.background = "transparent")}><RefreshCw className="w-3.5 h-3.5" />Show All</button></div>)}</div>
                 <button title="Export" className="p-2 rounded-lg transition-colors" style={{ color:"#A614C3" }} onMouseEnter={e=>(e.currentTarget.style.background=c.hoverBg)} onMouseLeave={e=>(e.currentTarget.style.background="transparent")}><Download className="w-4 h-4"/></button>
               </div>
             </div>
-            <div className="rounded-xl overflow-hidden flex flex-col flex-1 min-h-0" style={{ background:c.cardBg, border:`1px solid ${c.border}` }}>
-              <div className="grid px-5 py-3 gap-4" style={{ gridTemplateColumns:qpGridTemplate, borderBottom:`1px solid ${c.border}`, background:mutedBg }}>
+            <div className="rounded-xl flex flex-col flex-1 min-h-0" style={{ background:c.cardBg, border:`1px solid ${c.border}` }}>
+              <div className="grid px-5 py-3 gap-4 rounded-t-xl" style={{ gridTemplateColumns:qpGridTemplate, borderBottom:`1px solid ${c.border}`, background:mutedBg }}>
                 {/* Created */}
                 {!qpHiddenCols.has("created") && (
                 <button onClick={()=>{if(qpSortKey==="createdDate")setQpSortDir(d=>d==="asc"?"desc":"asc");else{setQpSortKey("createdDate");setQpSortDir("asc");}}} className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider cursor-pointer select-none text-left" style={{fontFamily:FONT,color:c.muted}}>
@@ -6386,43 +6395,17 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                 </button>
                 )}
                 {/* LOB */}
-                {!qpHiddenCols.has("lob") && (
-                <div className="relative">
-                  <button onClick={()=>{closeAllDropdowns();setLobOpen(o=>!o);}} className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider cursor-pointer select-none" style={{fontFamily:FONT,color:lobFilter!=="All LOBs"?"#A614C3":c.muted}}>
-                    LOB<span className="inline-flex ml-1"><svg width="7" height="5" viewBox="0 0 7 5" fill="none"><path d="M3.5 5L0.5 0H6.5L3.5 5Z" fill={lobFilter!=="All LOBs"?"#A614C3":sub}/></svg></span>
-                  </button>
-                  {lobOpen&&(<>
-                    <div className="fixed inset-0 z-10" onClick={()=>setLobOpen(false)}/>
-                    <div className="absolute left-0 top-full mt-1 z-20 rounded-xl shadow-lg overflow-hidden min-w-[200px] max-h-[280px] overflow-y-auto" style={{background:c.cardBg,border:`1px solid ${c.border}`}}>
-                      {ALL_LOBS.map(lob=>(
-                        <button key={lob} onClick={()=>{setLobFilter(lob);setLobOpen(false);}} className="w-full text-left px-3 py-2 text-[12px] transition-colors flex items-center justify-between gap-2" style={{fontFamily:FONT,color:lobFilter===lob?"#A614C3":c.text,fontWeight:lobFilter===lob?600:400,background:lobFilter===lob?"rgba(168,85,247,0.08)":"transparent"}} onMouseEnter={e=>e.currentTarget.style.background=lobFilter===lob?"rgba(168,85,247,0.12)":c.hoverBg} onMouseLeave={e=>e.currentTarget.style.background=lobFilter===lob?"rgba(168,85,247,0.08)":"transparent"}>
-                          <span>{lob}</span>
-                          {lobFilter===lob && <svg width="11" height="9" viewBox="0 0 9 7" fill="none" className="flex-shrink-0"><path d="M1 3.5L3.5 6L8 1" stroke="#A614C3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
-                        </button>
-                      ))}
-                    </div>
-                  </>)}
-                </div>
-                )}
+                {!qpHiddenCols.has("lob") && renderMultiFilter({
+                  label: "LOB", options: LOB_OPTIONS, filter: lobFilter, setFilter: setLobFilter,
+                  search: lobSearch, setSearch: setLobSearch, open: lobOpen, setOpen: setLobOpen,
+                  searchPlaceholder: "Search LOB",
+                })}
                 {/* Status */}
-                {!qpHiddenCols.has("status") && (
-                <div className="relative">
-                  <button onClick={()=>{closeAllDropdowns();setStatusOpen(o=>!o);}} className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider cursor-pointer select-none" style={{fontFamily:FONT,color:statusFilter!=="All Statuses"?"#A614C3":c.muted}}>
-                    Status<span className="inline-flex ml-1"><svg width="7" height="5" viewBox="0 0 7 5" fill="none"><path d="M3.5 5L0.5 0H6.5L3.5 5Z" fill={statusFilter!=="All Statuses"?"#A614C3":sub}/></svg></span>
-                  </button>
-                  {statusOpen&&(<>
-                    <div className="fixed inset-0 z-10" onClick={()=>setStatusOpen(false)}/>
-                    <div className="absolute left-0 top-full mt-1 z-20 rounded-xl shadow-lg overflow-hidden min-w-[170px]" style={{background:c.cardBg,border:`1px solid ${c.border}`}}>
-                      {POLICY_STATUSES.map(status=>(
-                        <button key={status} onClick={()=>{setStatusFilter(status);setStatusOpen(false);}} className="w-full text-left px-3 py-2 text-[12px] transition-colors flex items-center justify-between gap-2" style={{fontFamily:FONT,color:statusFilter===status?"#A614C3":c.text,fontWeight:statusFilter===status?600:400,background:statusFilter===status?"rgba(168,85,247,0.08)":"transparent"}} onMouseEnter={e=>e.currentTarget.style.background=statusFilter===status?"rgba(168,85,247,0.12)":c.hoverBg} onMouseLeave={e=>e.currentTarget.style.background=statusFilter===status?"rgba(168,85,247,0.08)":"transparent"}>
-                          <span>{status}</span>
-                          {statusFilter===status && <svg width="11" height="9" viewBox="0 0 9 7" fill="none" className="flex-shrink-0"><path d="M1 3.5L3.5 6L8 1" stroke="#A614C3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
-                        </button>
-                      ))}
-                    </div>
-                  </>)}
-                </div>
-                )}
+                {!qpHiddenCols.has("status") && renderMultiFilter({
+                  label: "Status", options: POLICY_STATUS_OPTIONS, filter: statusFilter, setFilter: setStatusFilter,
+                  search: statusSearch, setSearch: setStatusSearch, open: statusOpen, setOpen: setStatusOpen,
+                  searchPlaceholder: "Search Status",
+                })}
                 {/* Producer */}
                 {!qpHiddenCols.has("producer") && (
                 <div className="relative">
@@ -6472,7 +6455,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                       {!qpHiddenCols.has("dba")          && <div className="text-[12px]" style={{ fontFamily:FONT, color:c.text }}>{p.dba||"—"}</div>}
                       {!qpHiddenCols.has("effective")    && <div className="text-[12px]" style={{ fontFamily:FONT, color:c.text }}>{new Date(p.effectiveDate).toLocaleDateString()}</div>}
                       {!qpHiddenCols.has("lob")          && <div className="text-[12px]" style={{ fontFamily:FONT, color:c.text }}>{p.lob}</div>}
-                      {!qpHiddenCols.has("status")       && <div className="text-[12px]" style={{ fontFamily:FONT, color:c.text }}>{p.status}</div>}
+                      {!qpHiddenCols.has("status")       && <div><StatusPill status={p.status} isDark={isDark} /></div>}
                       {!qpHiddenCols.has("producer")     && <div className="text-[12px]" style={{ fontFamily:FONT, color:c.text }}>{p.producer}</div>}
                     </div>
                   );
@@ -6505,14 +6488,14 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                 <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none" style={{ color:c.muted }} />
               </div>
               <div className="flex items-center gap-1 ml-1" style={{ borderLeft:`1px solid ${c.border}`, paddingLeft:10 }}>
-                <button title="Reset filters" onClick={() => { setDetailSearch(""); setLobFilter("All LOBs"); setStatusFilter("All Statuses"); setApplicantFilter(new Set()); setProducerFilter(new Set()); setApplicantSearch(""); setProducerSearch(""); setLobOpen(false); setStatusOpen(false); setApplicantOpen(false); setProducerOpen(false); setQpSortKey(null); setQpSortDir("asc"); }}
+                <button title="Reset filters" onClick={() => { setDetailSearch(""); setLobFilter(new Set()); setStatusFilter(new Set()); setApplicantFilter(new Set()); setProducerFilter(new Set()); setLobSearch(""); setStatusSearch(""); setApplicantSearch(""); setProducerSearch(""); setLobOpen(false); setStatusOpen(false); setApplicantOpen(false); setProducerOpen(false); setQpSortKey(null); setQpSortDir("asc"); }}
                   className="p-2 rounded-lg transition-colors" style={{ color:"#A614C3" }} onMouseEnter={e=>(e.currentTarget.style.background=c.hoverBg)} onMouseLeave={e=>(e.currentTarget.style.background="transparent")}><RefreshCw className="w-4 h-4"/></button>
                 <div className="relative" onClick={e=>e.stopPropagation()}><button title="View columns" onClick={()=>setQpViewOpen(o=>!o)} className="p-2 rounded-lg transition-colors" style={{ color:"#A614C3", background: qpViewOpen ? c.hoverBg : "transparent" }} onMouseEnter={e=>(e.currentTarget.style.background=c.hoverBg)} onMouseLeave={e=>(e.currentTarget.style.background = qpViewOpen ? c.hoverBg : "transparent")}><svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="5" height="5" x="2" y="2" rx="1"/><rect width="5" height="5" x="9.5" y="2" rx="1"/><rect width="5" height="5" x="17" y="2" rx="1"/><rect width="5" height="5" x="2" y="9.5" rx="1"/><rect width="5" height="5" x="9.5" y="9.5" rx="1"/><rect width="5" height="5" x="17" y="9.5" rx="1"/><rect width="5" height="5" x="2" y="17" rx="1"/><rect width="5" height="5" x="9.5" y="17" rx="1"/><rect width="5" height="5" x="17" y="17" rx="1"/></svg></button>{qpViewOpen && (<div className="absolute right-0 top-full mt-1 z-30 w-[220px] rounded-xl shadow-xl overflow-hidden" style={{ background: c.cardBg, border: `1px solid ${c.border}` }}><div className="px-4 py-2.5 text-[11px] uppercase tracking-wider font-semibold" style={{ fontFamily: FONT, color: c.muted, borderBottom: `1px solid ${c.border}`, letterSpacing: "0.06em" }}>Show Columns</div><div className="py-1.5 max-h-[280px] overflow-y-auto">{QP_COLUMNS.map(col => { const visible = !qpHiddenCols.has(col.key); return (<label key={col.key} className="flex items-center gap-2.5 px-4 py-2 cursor-pointer transition-colors" onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)} onMouseLeave={e => (e.currentTarget.style.background = "transparent")} onClick={() => setQpHiddenCols(prev => { const s = new Set(prev); s.has(col.key) ? s.delete(col.key) : s.add(col.key); return s; })}><div className="flex items-center justify-center w-4 h-4 rounded flex-shrink-0" style={{ border: `1.5px solid ${c.borderStrong}`, background: c.cardBg }}>{visible && <svg width="9" height="7" viewBox="0 0 9 7" fill="none"><path d="M1 3.5L3.5 6L8 1" stroke="#A614C3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}</div><span className="text-[12px]" style={{ fontFamily: FONT, color: c.text }}>{col.label}</span></label>); })}</div><button onClick={() => setQpHiddenCols(new Set())} className="w-full flex items-center justify-center gap-2 py-3 text-[12px] font-semibold transition-colors" style={{ fontFamily: FONT, color: "#A614C3", borderTop: `1px solid ${c.border}` }} onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)} onMouseLeave={e => (e.currentTarget.style.background = "transparent")}><RefreshCw className="w-3.5 h-3.5" />Show All</button></div>)}</div>
                 <button title="Export" className="p-2 rounded-lg transition-colors" style={{ color:"#A614C3" }} onMouseEnter={e=>(e.currentTarget.style.background=c.hoverBg)} onMouseLeave={e=>(e.currentTarget.style.background="transparent")}><Download className="w-4 h-4"/></button>
               </div>
             </div>
-            <div className="rounded-xl overflow-hidden flex flex-col flex-1 min-h-0" style={{ background:c.cardBg, border:`1px solid ${c.border}` }}>
-              <div className="grid px-5 py-3 gap-4" style={{ gridTemplateColumns:qpGridTemplate, borderBottom:`1px solid ${c.border}`, background:mutedBg }}>
+            <div className="rounded-xl flex flex-col flex-1 min-h-0" style={{ background:c.cardBg, border:`1px solid ${c.border}` }}>
+              <div className="grid px-5 py-3 gap-4 rounded-t-xl" style={{ gridTemplateColumns:qpGridTemplate, borderBottom:`1px solid ${c.border}`, background:mutedBg }}>
                 {/* Created */}
                 {!qpHiddenCols.has("created") && (
                 <button onClick={()=>{if(qpSortKey==="createdDate")setQpSortDir(d=>d==="asc"?"desc":"asc");else{setQpSortKey("createdDate");setQpSortDir("asc");}}} className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider cursor-pointer select-none text-left" style={{fontFamily:FONT,color:c.muted}}>
@@ -6571,43 +6554,17 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                 </button>
                 )}
                 {/* LOB */}
-                {!qpHiddenCols.has("lob") && (
-                <div className="relative">
-                  <button onClick={()=>{closeAllDropdowns();setLobOpen(o=>!o);}} className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider cursor-pointer select-none" style={{fontFamily:FONT,color:lobFilter!=="All LOBs"?"#A614C3":c.muted}}>
-                    LOB<span className="inline-flex ml-1"><svg width="7" height="5" viewBox="0 0 7 5" fill="none"><path d="M3.5 5L0.5 0H6.5L3.5 5Z" fill={lobFilter!=="All LOBs"?"#A614C3":sub}/></svg></span>
-                  </button>
-                  {lobOpen&&(<>
-                    <div className="fixed inset-0 z-10" onClick={()=>setLobOpen(false)}/>
-                    <div className="absolute left-0 top-full mt-1 z-20 rounded-xl shadow-lg overflow-hidden min-w-[200px] max-h-[280px] overflow-y-auto" style={{background:c.cardBg,border:`1px solid ${c.border}`}}>
-                      {ALL_LOBS.map(lob=>(
-                        <button key={lob} onClick={()=>{setLobFilter(lob);setLobOpen(false);}} className="w-full text-left px-3 py-2 text-[12px] transition-colors flex items-center justify-between gap-2" style={{fontFamily:FONT,color:lobFilter===lob?"#A614C3":c.text,fontWeight:lobFilter===lob?600:400,background:lobFilter===lob?"rgba(168,85,247,0.08)":"transparent"}} onMouseEnter={e=>e.currentTarget.style.background=lobFilter===lob?"rgba(168,85,247,0.12)":c.hoverBg} onMouseLeave={e=>e.currentTarget.style.background=lobFilter===lob?"rgba(168,85,247,0.08)":"transparent"}>
-                          <span>{lob}</span>
-                          {lobFilter===lob && <svg width="11" height="9" viewBox="0 0 9 7" fill="none" className="flex-shrink-0"><path d="M1 3.5L3.5 6L8 1" stroke="#A614C3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
-                        </button>
-                      ))}
-                    </div>
-                  </>)}
-                </div>
-                )}
+                {!qpHiddenCols.has("lob") && renderMultiFilter({
+                  label: "LOB", options: LOB_OPTIONS, filter: lobFilter, setFilter: setLobFilter,
+                  search: lobSearch, setSearch: setLobSearch, open: lobOpen, setOpen: setLobOpen,
+                  searchPlaceholder: "Search LOB",
+                })}
                 {/* Status */}
-                {!qpHiddenCols.has("status") && (
-                <div className="relative">
-                  <button onClick={()=>{closeAllDropdowns();setStatusOpen(o=>!o);}} className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider cursor-pointer select-none" style={{fontFamily:FONT,color:statusFilter!=="All Statuses"?"#A614C3":c.muted}}>
-                    Status<span className="inline-flex ml-1"><svg width="7" height="5" viewBox="0 0 7 5" fill="none"><path d="M3.5 5L0.5 0H6.5L3.5 5Z" fill={statusFilter!=="All Statuses"?"#A614C3":sub}/></svg></span>
-                  </button>
-                  {statusOpen&&(<>
-                    <div className="fixed inset-0 z-10" onClick={()=>setStatusOpen(false)}/>
-                    <div className="absolute left-0 top-full mt-1 z-20 rounded-xl shadow-lg overflow-hidden min-w-[170px]" style={{background:c.cardBg,border:`1px solid ${c.border}`}}>
-                      {QUOTE_STATUSES.map(status=>(
-                        <button key={status} onClick={()=>{setStatusFilter(status);setStatusOpen(false);}} className="w-full text-left px-3 py-2 text-[12px] transition-colors flex items-center justify-between gap-2" style={{fontFamily:FONT,color:statusFilter===status?"#A614C3":c.text,fontWeight:statusFilter===status?600:400,background:statusFilter===status?"rgba(168,85,247,0.08)":"transparent"}} onMouseEnter={e=>e.currentTarget.style.background=statusFilter===status?"rgba(168,85,247,0.12)":c.hoverBg} onMouseLeave={e=>e.currentTarget.style.background=statusFilter===status?"rgba(168,85,247,0.08)":"transparent"}>
-                          <span>{status}</span>
-                          {statusFilter===status && <svg width="11" height="9" viewBox="0 0 9 7" fill="none" className="flex-shrink-0"><path d="M1 3.5L3.5 6L8 1" stroke="#A614C3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
-                        </button>
-                      ))}
-                    </div>
-                  </>)}
-                </div>
-                )}
+                {!qpHiddenCols.has("status") && renderMultiFilter({
+                  label: "Status", options: QUOTE_STATUS_OPTIONS, filter: statusFilter, setFilter: setStatusFilter,
+                  search: statusSearch, setSearch: setStatusSearch, open: statusOpen, setOpen: setStatusOpen,
+                  searchPlaceholder: "Search Status",
+                })}
                 {/* Producer */}
                 {!qpHiddenCols.has("producer") && (
                 <div className="relative">
@@ -6657,7 +6614,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                       {!qpHiddenCols.has("dba")          && <div className="text-[12px]" style={{ fontFamily:FONT, color:c.text }}>{q.dba||"—"}</div>}
                       {!qpHiddenCols.has("effective")    && <div className="text-[12px]" style={{ fontFamily:FONT, color:c.text }}>{q.effectiveDate?new Date(q.effectiveDate).toLocaleDateString():"—"}</div>}
                       {!qpHiddenCols.has("lob")          && <div className="text-[12px]" style={{ fontFamily:FONT, color:c.text }}>{q.lob}</div>}
-                      {!qpHiddenCols.has("status")       && <div className="text-[12px]" style={{ fontFamily:FONT, color:c.text }}>{q.status}</div>}
+                      {!qpHiddenCols.has("status")       && <div><StatusPill status={q.status} isDark={isDark} /></div>}
                       {!qpHiddenCols.has("producer")     && <div className="text-[12px]" style={{ fontFamily:FONT, color:c.text }}>{q.producer}</div>}
                     </div>
                   );

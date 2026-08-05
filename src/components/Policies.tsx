@@ -44,36 +44,31 @@ const mockPolicies: PolicyRow[] = [
 ];
 
 const ALL_LOBS = ["All LOBs","General Liability","Worker's Comp","Vacant Risks","Business Owners","Professional Liability","Excess","Bonds","Commercial Auto","Property","Cyber Liability","Builder's Risk","Equipment Floater"];
-// 15-status vocabulary — matches the reference deck exactly.
+// Trimmed to the statuses actually surfaced on the Policies page.
 const POLICY_STATUSES = [
   "All Statuses",
-  "Incomplete", "Submitted", "Under Review", "Requested Info",
-  "Declined", "File Closed", "Cancelled",
-  "Renewal Pending", "Renewal Created",
-  "Approved", "Bound",
-  "Paid-Bind Incomplete", "Submission Incomplete",
-  "Issued", "Bind Incomplete",
+  "File Closed", "Cancelled", "Renewal Created",
+  "Bound", "Paid-Bind Incomplete", "Issued",
 ];
 
-// Status palette: each status has its own distinct hue so the dot is meaningful
-// at a glance. Brand teal + magenta still anchor "done" and "urgent action";
-// the other slots use semantic colors (amber/red/blue/orange/emerald/gray).
+// Simplified 4-hue palette — teal (complete), razz (in-progress / brand
+// accent), red (terminal negative), gray (neutral/inactive).
 const STATUS_DOT: Record<string, string> = {
   "Incomplete":            "#9CA3AF", // gray — missing data
-  "Submitted":             "#3B82F6", // blue — sent, awaiting review
-  "Under Review":          "#8B5CF6", // violet — active review
-  "Requested Info":        "#0EA5E9", // sky — info requested from insured
+  "Submitted":             "#A614C3", // razz — in flight
+  "Under Review":          "#A614C3", // razz — active review
+  "Requested Info":        "#A614C3", // razz — info requested
   "Declined":              "#EF4444", // red — terminal failure
-  "File Closed":           "#64748B", // slate — closed file
+  "File Closed":           "#9CA3AF", // gray — closed / inactive
   "Cancelled":             "#EF4444", // red — cancelled
-  "Renewal Pending":       "#F59E0B", // amber — awaiting renewal
-  "Renewal Created":       "#73C9B7", // emerald — renewal ready
-  "Approved":              "#73C9B7", // emerald — success/affirmative
+  "Renewal Pending":       "#A614C3", // razz — awaiting renewal
+  "Renewal Created":       "#73C9B7", // teal — renewal ready
+  "Approved":              "#73C9B7", // teal — success
   "Bound":                 "#73C9B7", // brand teal — bound
-  "Paid-Bind Incomplete":  "#F59E0B", // amber — paid but pending bind
-  "Submission Incomplete": "#9CA3AF",
+  "Paid-Bind Incomplete":  "#A614C3", // razz — awaiting bind finalization
+  "Submission Incomplete": "#9CA3AF", // gray — inactive
   "Issued":                "#73C9B7", // brand teal — issued
-  "Bind Incomplete":       "#9CA3AF",
+  "Bind Incomplete":       "#A614C3", // razz — awaiting bind finalization
 };
 
 // Used by the detail view's heading accent — same palette as the dots.

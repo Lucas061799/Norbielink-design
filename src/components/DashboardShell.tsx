@@ -59,7 +59,7 @@ export default function DashboardShell({ children, pageTitle }: DashboardShellPr
       case "Endorsements · Design Option 2":
         return <Endorsements key="endorsements-opt2" isDark={darkMode} layout="2col" skipSearch />;
       case "Endorsements · Design Option 3":
-        return <EndorsementBoard isDark={darkMode} />;
+        return <EndorsementBoard isDark={darkMode} onBack={() => setActivePage("Endorsements")} />;
       case "Pricing":
         return <Pricing isDark={darkMode} />;
       default:

@@ -177,9 +177,10 @@ function findMeta(key: EndorsementKey) {
 
 interface Props {
   isDark: boolean;
+  onBack?: () => void;
 }
 
-export default function EndorsementBoard({ isDark }: Props) {
+export default function EndorsementBoard({ isDark, onBack }: Props) {
   const c = {
     text: isDark ? "#F9FAFB" : "#1F2937",
     muted: isDark ? "#8B8FA8" : "#6B7280",
@@ -282,6 +283,7 @@ export default function EndorsementBoard({ isDark }: Props) {
       >
         <button
           type="button"
+          onClick={onBack}
           className="inline-flex items-center gap-1.5 transition-opacity hover:opacity-70"
           style={{ fontFamily: FONT, fontSize: 12, fontWeight: 500, color: c.muted, background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
         >

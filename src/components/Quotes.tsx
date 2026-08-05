@@ -55,24 +55,25 @@ const QUOTE_STATUSES = [
   "Issued", "Bind Incomplete",
 ];
 
-// Status palette: brand teal + magenta anchor bound/urgent, others use
-// semantic hues (amber/red/blue/orange/emerald/gray).
+// Simplified 4-hue palette so the status column reads calmly:
+// teal = complete/positive · razz = active/in-progress (brand accent) ·
+// red = terminal negative · gray = neutral/inactive.
 const STATUS_DOT: Record<string, string> = {
   "Incomplete":            "#9CA3AF", // gray — missing data
-  "Submitted":             "#3B82F6", // blue — sent, awaiting review
-  "Under Review":          "#8B5CF6", // violet — active review
-  "Requested Info":        "#0EA5E9", // sky — info requested from insured
+  "Submitted":             "#A614C3", // razz — in flight
+  "Under Review":          "#A614C3", // razz — active review
+  "Requested Info":        "#A614C3", // razz — info requested
   "Declined":              "#EF4444", // red — terminal failure
-  "File Closed":           "#64748B", // slate — closed file
+  "File Closed":           "#9CA3AF", // gray — closed / inactive
   "Cancelled":             "#EF4444", // red — cancelled
-  "Renewal Pending":       "#F59E0B", // amber — awaiting renewal
-  "Renewal Created":       "#73C9B7", // emerald — renewal ready
-  "Approved":              "#73C9B7", // emerald — success/affirmative
+  "Renewal Pending":       "#A614C3", // razz — awaiting renewal
+  "Renewal Created":       "#73C9B7", // teal — renewal ready
+  "Approved":              "#73C9B7", // teal — success
   "Bound":                 "#73C9B7", // brand teal — bound
-  "Paid-Bind Incomplete":  "#F59E0B", // amber — paid but pending bind
-  "Submission Incomplete": "#9CA3AF",
+  "Paid-Bind Incomplete":  "#A614C3", // razz — awaiting bind finalization
+  "Submission Incomplete": "#9CA3AF", // gray — inactive
   "Issued":                "#73C9B7", // brand teal — issued
-  "Bind Incomplete":       "#9CA3AF",
+  "Bind Incomplete":       "#A614C3", // razz — awaiting bind finalization
 };
 
 // Used by the detail view's heading accent — same palette as the dots.
