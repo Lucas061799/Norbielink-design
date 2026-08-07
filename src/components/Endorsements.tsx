@@ -280,7 +280,7 @@ export default function Endorsements({ isDark, layout = "3col", skipSearch = fal
             {[
               { icon: Search,        title: "1. Find your policy",   body: "Search by policy number, submission ID, or insured name — we'll pull it up instantly." },
               { icon: ClipboardList, title: "2. Tell us what changed", body: "Add coverage, update limits, swap a vehicle — just describe the change and attach docs." },
-              { icon: Send,          title: "3. We route it",         body: "Your request lands with our team the moment you hit submit." },
+              { icon: Send,          title: "3. We route it",         body: "Once you submit, our team reviews your request and routes it to the right carrier team." },
             ].map(step => {
               const Icon = step.icon;
               return (
