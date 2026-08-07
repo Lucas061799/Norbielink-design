@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { Fragment, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Check, ChevronDown, ChevronRight, Download, FileEdit, HelpCircle, Layers, Plus, Send, Shield, X } from "lucide-react";
 import { AddressAutocomplete } from "./AddressAutocomplete";
 import { DatePicker } from "./DatePicker";
@@ -64,108 +64,200 @@ const NAV: { label: string; items: { key: EndorsementKey; label: string }[] }[] 
 
 type FieldType = "date" | "text" | "select" | "textarea" | "file";
 type Field = { label: string; type: FieldType; placeholder?: string; options?: string[]; span?: 1 | 2; optional?: boolean };
+
+// All 50 states + DC — reused by every card that has a State dropdown.
+const US_STATES = [
+  "AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA",
+  "KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ",
+  "NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT",
+  "VA","WA","WV","WI","WY","DC",
+];
+
+// Entity Type dropdown — matches the Excel spec's list (12+ options, plus Other).
+const ENTITY_TYPES = [
+  "Association","Common Ownership","Corporation","Government Entity","Individual",
+  "Joint Employers","Joint Venture","Labor Union","Limited Liability Company",
+  "Limited Partnership","Partnership","Sole Proprietorship","Trust","Other",
+];
 // Types with their own required supporting field baked in — everyone else
 // falls back to the shared "Notes & documents" block at the bottom of the request.
 // Empty for now — every endorsement type also gets the shared bottom section
 // so users always have a place to attach general context / files.
 const SKIP_UNIVERSAL_SUPPORTING = new Set<EndorsementKey>();
-const CARD_META: Record<EndorsementKey, { blurb: string; fields: Field[] }> = {
-  contact:      { blurb: "Update the insured or agency contact on file.",  fields: [
+const CARD_META: Record<EndorsementKey, { blurb: string; footNote?: string; fields: Field[] }> = {
+  contact:      { blurb: "Are you updating the insured or agency contact information?",
+                  footNote: "At least one contact info field must be completed in order to submit.",
+                  fields: [
                     { label: "Effective date", type: "date", span: 1 },
-                    { label: "Contact type",   type: "select", options: ["Owner", "Officer", "Agent", "Employee"], span: 1 },
-                    { label: "Full name",      type: "text", placeholder: "First Last", span: 2 },
-                    { label: "Phone",          type: "text", placeholder: "(555) 123-4567", span: 1 },
-                    { label: "Email",          type: "text", placeholder: "name@example.com", span: 1 },
+                    { label: "Contact",        type: "select", options: ["Agent", "Insured"], span: 1 },
+                    { label: "First Name",     type: "text", placeholder: "Jane", span: 1 },
+                    { label: "Last Name",      type: "text", placeholder: "Doe",  span: 1 },
+                    { label: "Phone Number",   type: "text", placeholder: "(555) 123-4567", span: 1 },
+                    { label: "Email Address",  type: "text", placeholder: "name@example.com", span: 1 },
                   ] },
-  namedinsured: { blurb: "Amend the legal name or DBA of the entity.",     fields: [
+  namedinsured: { blurb: "Are you amending the Legal Name or DBA of the entity? If changing the entity or ownership structure, use the Entity endorsement instead.",
+                  footNote: "At least one of New Legal Name or New DBA must be completed in order to submit.",
+                  fields: [
                     { label: "Effective date",     type: "date", span: 1 },
-                    { label: "Current legal name", type: "text", placeholder: "e.g. Byrne Insurance Group", span: 2 },
-                    { label: "New legal name",     type: "text", placeholder: "e.g. Byrne Insurance Solutions", span: 2 },
-                    { label: "Additional comment (please clearly explain the changes)", type: "textarea", placeholder: "Reason for the name change, any related restructuring…", span: 2 },
+                    { label: "Current Legal Name", type: "text", placeholder: "e.g. Byrne Insurance Group", span: 1 },
+                    { label: "Current DBA",        type: "text", placeholder: "e.g. Byrne Insurance", span: 1, optional: true },
+                    { label: "New Legal Name",     type: "text", placeholder: "e.g. Byrne Insurance Solutions", span: 1, optional: true },
+                    { label: "New DBA",            type: "text", placeholder: "e.g. Byrne Solutions", span: 1, optional: true },
+                    { label: "Reason for the change (please clearly explain what is changing)", type: "textarea", placeholder: "Reason for the name change, any related restructuring…", span: 2 },
                   ] },
   mailing:      { blurb: "Change the mailing address on the policy.",      fields: [
                     { label: "Effective date", type: "date", span: 2 },
                     { label: "Street",         type: "text", placeholder: "123 Main St", span: 2 },
                     { label: "City",           type: "text", placeholder: "Des Moines", span: 1 },
-                    { label: "State",          type: "text", placeholder: "IA", span: 1 },
+                    { label: "State",          type: "select", options: US_STATES, span: 1 },
                     { label: "ZIP",            type: "text", placeholder: "50314", span: 1 },
                   ] },
-  effdate:      { blurb: "Adjust the effective or expiration date.",       fields: [
-                    { label: "Current effective date", type: "date", span: 1 },
-                    { label: "New effective date",     type: "date", span: 1 },
+  effdate:      { blurb: "Change the requested policy effective date.",    fields: [
+                    { label: "Requested Policy Effective Date", type: "date", span: 1 },
+                    { label: "Reason for effective date change", type: "textarea", placeholder: "Explain why the effective date needs to change…", span: 2 },
                   ] },
-  classcode:    { blurb: "Add, edit, or remove class codes and payroll.",  fields: [
+  classcode:    { blurb: "Add, remove, or edit class codes and payroll for a location. Use + Add line for multiple changes in one request.",
+                  fields: [
                     { label: "Effective date", type: "date", span: 1 },
-                    { label: "Action",         type: "select", options: ["Add", "Edit", "Remove"], span: 1 },
-                    { label: "Class code",     type: "text", placeholder: "e.g. 5190", span: 1 },
-                    { label: "Payroll",        type: "text", placeholder: "e.g. 50,000", span: 1 },
+                    { label: "Reason for class code / payroll changes (for additions, include duties & operations for the class code)",
+                      type: "textarea", placeholder: "Describe duties, operations, or the reason for the change…", span: 2 },
+                    { label: "Location address the changes apply to", type: "text", placeholder: "123 Main St", span: 2 },
+                    { label: "City",           type: "text", placeholder: "Des Moines", span: 1 },
+                    { label: "State",          type: "select", options: US_STATES, span: 1 },
+                    { label: "Zip",            type: "text", placeholder: "50314", span: 1 },
                   ] },
-  limits:       { blurb: "Adjust coverage limits on the policy.",          fields: [
+  limits:       { blurb: "Change the Employers Liability limits on the policy. Effective date must be the policy inception date.",
+                  fields: [
                     { label: "Effective date", type: "date", span: 1 },
-                    { label: "Coverage part",  type: "select", options: ["Each Accident", "Disease – Policy Limit", "Disease – Each Employee"], span: 1 },
-                    { label: "New limit",      type: "text", placeholder: "e.g. 1,000,000", span: 2 },
+                    { label: "Employers Liability Limits", type: "select",
+                      options: ["$100,000 / $500,000 / $100,000", "$500,000 / $500,000 / $500,000", "$1,000,000 / $1,000,000 / $1,000,000"],
+                      span: 1 },
                   ] },
-  waiver:       { blurb: "Add a Waiver of Subrogation for a project.",     fields: [
-                    { label: "Effective date",     type: "date", span: 1 },
-                    { label: "Certificate holder", type: "text", placeholder: "Name on certificate", span: 2 },
-                    { label: "Project",            type: "text", placeholder: "Project name", span: 2 },
-                    { label: "Address",            type: "text", placeholder: "Project address", span: 2 },
+  waiver:       { blurb: "Add a Waiver of Subrogation. For Specific waivers, fill in the holder / jobsite / class-code details below; for Blanket waivers, leave those fields blank.",
+                  fields: [
+                    { label: "Effective date",       type: "date", span: 1 },
+                    { label: "Waiver of Subrogation", type: "select", options: ["Blanket", "Specific"], span: 1 },
+                    { label: "Waiver Holder Name",   type: "text", placeholder: "Name on certificate", span: 2, optional: true },
+                    { label: "Holder Address",       type: "text", placeholder: "Street", span: 2, optional: true },
+                    { label: "Holder City",          type: "text", placeholder: "City", span: 1, optional: true },
+                    { label: "Holder State",         type: "select", options: US_STATES, span: 1, optional: true },
+                    { label: "Holder Zip",           type: "text", placeholder: "ZIP", span: 1, optional: true },
+                    { label: "Jobsite Address",      type: "text", placeholder: "Street", span: 2, optional: true },
+                    { label: "Jobsite City",         type: "text", placeholder: "City", span: 1, optional: true },
+                    { label: "Jobsite State",        type: "select", options: US_STATES, span: 1, optional: true },
+                    { label: "Jobsite Zip",          type: "text", placeholder: "ZIP", span: 1, optional: true },
+                    { label: "Class Code",           type: "text", placeholder: "e.g. 5190", span: 1, optional: true },
+                    { label: "Payroll",              type: "text", placeholder: "e.g. 50,000", span: 1, optional: true },
+                    { label: "Employees at Jobsite", type: "text", placeholder: "e.g. 3", span: 1, optional: true },
+                    { label: "Description of Work",  type: "textarea", placeholder: "Describe the work performed at this jobsite…", span: 2, optional: true },
                   ] },
-  officer:      { blurb: "Include or exclude an officer from coverage.",   fields: [
+  officer:      { blurb: "Include or exclude an officer from coverage. Ownership % and eligibility rules vary by state.",
+                  fields: [
                     { label: "Effective date", type: "date", span: 1 },
-                    { label: "Action",         type: "select", options: ["Include", "Exclude"], span: 1 },
-                    { label: "Officer name",   type: "text", placeholder: "First Last", span: 1 },
+                    { label: "First Name",     type: "text", placeholder: "Jane", span: 1 },
+                    { label: "Last Name",      type: "text", placeholder: "Doe",  span: 1 },
                     { label: "Title",          type: "text", placeholder: "e.g. President", span: 1 },
+                    { label: "Included / Excluded", type: "select", options: ["Included", "Excluded"], span: 1 },
                   ] },
   mcp65:        { blurb: "File an MCP 65 form for California DMV.",        fields: [
-                    { label: "Effective date", type: "date", span: 1 },
-                    { label: "MC number",      type: "text", placeholder: "e.g. MC123456", span: 1 },
-                    { label: "Filing type",    type: "select", options: ["Add", "Cancel"], span: 2 },
-                  ] },
-  puc:          { blurb: "File PUC Filing for California PUC.",            fields: [
-                    { label: "Effective date", type: "date", span: 1 },
-                    { label: "Carrier PUC",    type: "text", placeholder: "PUC ID", span: 1 },
-                    { label: "Filing type",    type: "select", options: ["Add", "Cancel"], span: 2 },
-                  ] },
-  thirdpartynoc:{ blurb: "Third Party Notice of Cancellation.",            fields: [
-                    { label: "Effective date", type: "date", span: 1 },
-                    { label: "Party name",     type: "text", placeholder: "Third-party name", span: 2 },
-                    { label: "Address",        type: "text", placeholder: "Full mailing address", span: 2 },
-                  ] },
-  altemp:       { blurb: "Add or remove an Alternate Employer.",           fields: [
-                    { label: "Effective date", type: "date", span: 1 },
-                    { label: "Alt employer",   type: "text", placeholder: "Legal name", span: 2 },
-                    { label: "FEIN",           type: "text", placeholder: "12-3456789", span: 1 },
-                  ] },
-  fein:         { blurb: "Update the FEIN on the policy.",                 fields: [
-                    { label: "Effective date", type: "date", span: 1 },
-                    { label: "New FEIN",       type: "text", placeholder: "12-3456789", span: 1 },
-                  ] },
-  xmod:         { blurb: "Apply or update the experience mod.",            fields: [
-                    { label: "Effective date", type: "date", span: 1 },
-                    { label: "State",          type: "text", placeholder: "CA", span: 1 },
-                    { label: "New mod factor", type: "text", placeholder: "e.g. 0.95", span: 2 },
-                    { label: "Upload Ex-Mod worksheet", type: "file", span: 2 },
-                  ] },
-  location:     { blurb: "Add or remove a location on the policy.",        fields: [
                     { label: "Effective date",  type: "date", span: 1 },
-                    { label: "Action",          type: "select", options: ["Add", "Remove"], span: 1 },
-                    { label: "Address",         type: "text", placeholder: "Full address", span: 2 },
-                    { label: "Classification",  type: "text", placeholder: "e.g. office", span: 2 },
+                    { label: "MCP 65 Number",   type: "text", placeholder: "e.g. MC123456", span: 1 },
                   ] },
-  entity:       { blurb: "Change the legal entity structure.",             fields: [
+  puc:          { blurb: "File a PUC Filing for the California Public Utilities Commission.",
+                  fields: [
+                    { label: "Effective date",     type: "date", span: 1 },
+                    { label: "PUC Filing Number",  type: "text", placeholder: "PUC ID", span: 1 },
+                  ] },
+  thirdpartynoc:{ blurb: "Third Party Notice of Cancellation — carrier will notify the named party if the policy is cancelled.",
+                  fields: [
+                    { label: "Effective date",     type: "date", span: 1 },
+                    { label: "Third Party Name",   type: "text", placeholder: "e.g. City of Sacramento", span: 2 },
+                    { label: "Address",            type: "text", placeholder: "Street", span: 2 },
+                    { label: "City",               type: "text", placeholder: "City", span: 1 },
+                    { label: "State",              type: "select", options: US_STATES, span: 1 },
+                    { label: "Zip",                type: "text", placeholder: "ZIP", span: 1 },
+                  ] },
+  altemp:       { blurb: "Add an Alternate Employer endorsement. State determines the correct form number.",
+                  fields: [
+                    { label: "Effective date",         type: "date", span: 1 },
+                    { label: "State",                  type: "select", options: US_STATES, span: 1 },
+                    { label: "Form Number",            type: "text", placeholder: "e.g. WC 00 03 01 A", span: 2 },
+                    { label: "Name of Alternate Employer", type: "text", placeholder: "Legal name", span: 2 },
+                    { label: "Alternate Employer FEIN", type: "text", placeholder: "12-3456789", span: 1 },
+                  ] },
+  fein:         { blurb: "Add or update the FEIN on the policy.",          fields: [
                     { label: "Effective date", type: "date", span: 1 },
-                    { label: "Current entity", type: "select", options: ["Sole Prop", "LLC", "Corporation", "Partnership"], span: 1 },
-                    { label: "New entity",     type: "select", options: ["Sole Prop", "LLC", "Corporation", "Partnership"], span: 2 },
+                    { label: "FEIN",           type: "text", placeholder: "12-3456789", span: 1 },
+                    { label: "Legal Name",     type: "text", placeholder: "Entity legal name", span: 2 },
+                    { label: "DBA",            type: "text", placeholder: "Doing-business-as name", span: 2, optional: true },
+                  ] },
+  xmod:         { blurb: "Apply or update the experience mod on the policy.",
+                  fields: [
+                    { label: "Ex-Mod Effective Date", type: "date", span: 1 },
+                    { label: "Ex-Mod Factor",         type: "text", placeholder: "e.g. 0.95", span: 1 },
+                    { label: "Legal Name",            type: "text", placeholder: "Entity legal name", span: 2 },
+                    { label: "DBA",                   type: "text", placeholder: "Doing-business-as name", span: 2, optional: true },
+                    { label: "FEIN",                  type: "text", placeholder: "12-3456789", span: 1 },
+                    { label: "Rating State(s)",       type: "text", placeholder: "e.g. CA, NV", span: 1 },
+                    { label: "Upload Ex-Mod Worksheet", type: "file", span: 2 },
+                  ] },
+  location:     { blurb: "Add, edit, or remove a location on the policy. If also changing entity or ownership structure, use the Entity endorsement.",
+                  fields: [
+                    { label: "Effective date",          type: "date", span: 1 },
+                    { label: "Add/Edit/Remove Location", type: "select", options: ["Add", "Edit", "Remove"], span: 1 },
+                    { label: "Address",                 type: "text", placeholder: "Street", span: 2 },
+                    { label: "City",                    type: "text", placeholder: "City", span: 1 },
+                    { label: "State",                   type: "select", options: US_STATES, span: 1 },
+                    { label: "Zip",                     type: "text", placeholder: "ZIP", span: 1 },
+                    { label: "Legal Name at this location", type: "text", placeholder: "Entity legal name", span: 2 },
+                    { label: "DBA",                     type: "text", placeholder: "Doing-business-as name", span: 2, optional: true },
+                    { label: "Operations performed at this location", type: "textarea", placeholder: "Describe operations…", span: 2 },
+                    { label: "Class Code",              type: "text", placeholder: "e.g. 5190", span: 1 },
+                    { label: "Payroll",                 type: "text", placeholder: "e.g. 50,000", span: 1 },
+                    { label: "Full Time Employees",     type: "text", placeholder: "e.g. 5", span: 1 },
+                    { label: "Part Time Employees",     type: "text", placeholder: "e.g. 2", span: 1 },
+                  ] },
+  entity:       { blurb: "Add, edit, or remove an entity on the policy — including ownership, entity type, and location exposure.",
+                  fields: [
+                    { label: "Effective date",          type: "date", span: 1 },
+                    { label: "Add/Edit/Remove Entity",  type: "select", options: ["Add New Entity", "Edit Entity", "Remove Entity"], span: 1 },
+                    { label: "Entity Type",             type: "select", options: ENTITY_TYPES, span: 1 },
+                    { label: "Other Entity Type (if Other selected)", type: "text", placeholder: "Describe entity type", span: 1, optional: true },
+                    { label: "Legal Name",              type: "text", placeholder: "Entity legal name", span: 2 },
+                    { label: "DBA",                     type: "text", placeholder: "Doing-business-as name", span: 2, optional: true },
+                    { label: "FEIN",                    type: "text", placeholder: "12-3456789", span: 1 },
+                    { label: "Owner First Name",        type: "text", placeholder: "Jane", span: 1 },
+                    { label: "Owner Last Name",         type: "text", placeholder: "Doe",  span: 1 },
+                    { label: "Owner Title",             type: "text", placeholder: "e.g. President", span: 1 },
+                    { label: "Ownership %",             type: "text", placeholder: "e.g. 100", span: 1 },
+                    { label: "Included / Excluded",     type: "select", options: ["Included", "Excluded"], span: 1 },
+                    { label: "Entity Location — Address", type: "text", placeholder: "Street", span: 2 },
+                    { label: "City",                    type: "text", placeholder: "City", span: 1 },
+                    { label: "State",                   type: "select", options: US_STATES, span: 1 },
+                    { label: "Zip",                     type: "text", placeholder: "ZIP", span: 1 },
+                    { label: "Operations performed at this location", type: "textarea", placeholder: "Describe operations…", span: 2 },
+                    { label: "Class Code",              type: "text", placeholder: "e.g. 5190", span: 1 },
+                    { label: "Payroll",                 type: "text", placeholder: "e.g. 50,000", span: 1 },
+                    { label: "Full Time Employees",     type: "text", placeholder: "e.g. 5", span: 1 },
+                    { label: "Part Time Employees",     type: "text", placeholder: "e.g. 2", span: 1 },
                   ] },
   reinstate:    { blurb: "Request reinstatement of a cancelled policy.",   fields: [
-                    { label: "Effective date", type: "date", span: 1 },
-                    { label: "Reason",         type: "textarea", placeholder: "Why should this policy be reinstated?", span: 2 },
-                    { label: "Upload Acord 37 No Loss Statement", type: "file", span: 2 },
+                    { label: "Effective date",        type: "date", span: 1 },
+                    { label: "Reinstatement Request", type: "text", placeholder: "Reason for reinstatement", span: 2 },
+                    { label: "Upload Acord 37 No Loss Statement", type: "file", span: 2, optional: true },
                   ] },
-  cancel:       { blurb: "Cancel the policy on or after a date.",          fields: [
-                    { label: "Cancellation date", type: "date", span: 1 },
-                    { label: "Reason",            type: "textarea", placeholder: "Reason for cancellation", span: 2 },
+  cancel:       { blurb: "Cancel the policy on or after a specific date.", fields: [
+                    { label: "Effective date",      type: "date", span: 1 },
+                    { label: "Cancellation Reason", type: "select",
+                      options: [
+                        "Coverage placed elsewhere",
+                        "Ownership Change / Business Sold",
+                        "Completed Operations - No Employees",
+                        "Retiring / Out of Business",
+                        "Rewritten",
+                        "Other",
+                      ],
+                      span: 1 },
                     { label: "Upload Acord 25 LPR / Replacement Coverage Document", type: "file", span: 2 },
                   ] },
   other:        { blurb: "Anything else — free-form request.",             fields: [
@@ -216,6 +308,12 @@ export default function EndorsementBoard({ isDark, onBack }: Props) {
   // Single universal supporting block for the whole request (matches Option 1).
   const [notes, setNotes] = useState("");
   const [fileAttached, setFileAttached] = useState<string[]>([]);
+  // Class Code / Payroll repeatable rows — each row picks an action
+  // (Add / Edit / Remove) and captures its own code + payroll + FT/PT.
+  // Remove greys out the numeric cells; only the class code is required.
+  type CcRow = { action: "Add" | "Edit" | "Remove"; code: string; payroll: string; ft: string; pt: string };
+  const emptyCcRow = (): CcRow => ({ action: "Add", code: "", payroll: "", ft: "", pt: "" });
+  const [ccRows, setCcRows] = useState<CcRow[]>([emptyCcRow(), emptyCcRow()]);
   // Collapsible section headers in the left rail — all open by default.
   const [openSections, setOpenSections] = useState<Set<string>>(new Set(["request", "policy", "help"]));
   // Preview-before-submit + top-right confirmation toast + submitted-state
@@ -232,9 +330,18 @@ export default function EndorsementBoard({ isDark, onBack }: Props) {
   // Only required (non-optional) fields count toward the progress gate; the
   // universal comment/upload appended for non-SKIP types is optional and
   // never blocks submit.
-  const doneCount = (k: EndorsementKey) =>
-    CARD_META[k].fields.reduce((n, f, i) => n + (!f.optional && (values[k]?.[i] ?? "").trim() ? 1 : 0), 0);
-  const requiredCount = (k: EndorsementKey) => CARD_META[k].fields.filter(f => !f.optional).length;
+  // Class Code / Payroll has a repeatable-row grid on top of the flat
+  // fields; count it as one extra required item satisfied by any row that
+  // has a class code entered.
+  const ccHasValidRow = () => ccRows.some(r => r.code.trim().length > 0);
+  const doneCount = (k: EndorsementKey) => {
+    const base = CARD_META[k].fields.reduce((n, f, i) => n + (!f.optional && (values[k]?.[i] ?? "").trim() ? 1 : 0), 0);
+    return k === "classcode" ? base + (ccHasValidRow() ? 1 : 0) : base;
+  };
+  const requiredCount = (k: EndorsementKey) => {
+    const base = CARD_META[k].fields.filter(f => !f.optional).length;
+    return k === "classcode" ? base + 1 : base;
+  };
   const totalRequired = orderedSelected.reduce((sum, k) => sum + requiredCount(k), 0);
   const totalDone     = orderedSelected.reduce((sum, k) => sum + doneCount(k), 0);
   const submitReady   = orderedSelected.length > 0 && totalRequired === totalDone;
@@ -732,10 +839,10 @@ export default function EndorsementBoard({ isDark, onBack }: Props) {
                   >
                     <div className="flex items-center gap-3 px-6 pt-5 pb-3">
                       <div className="flex-1 min-w-0">
-                        <div className="text-[10.5px] font-bold uppercase tracking-wider mb-1" style={{ fontFamily: FONT, color: c.muted, letterSpacing: "0.08em" }}>
-                          {meta.group}
-                        </div>
                         <h2 className="text-[16px] font-semibold" style={{ fontFamily: FONT, color: c.text }}>{meta.label}</h2>
+                        {cm.blurb && (
+                          <p className="text-[12px] mt-1" style={{ fontFamily: FONT, color: c.muted, lineHeight: 1.5 }}>{cm.blurb}</p>
+                        )}
                       </div>
                       {isDone && (
                         <span
@@ -772,8 +879,97 @@ export default function EndorsementBoard({ isDark, onBack }: Props) {
                             outline: "none",
                             width: "100%",
                           };
+                          const showCcGrid = k === "classcode" && i === 1;
                           return (
-                            <div key={i} className="flex flex-col gap-1.5" style={{ gridColumn: `span ${f.span ?? 2}` }}>
+                            <Fragment key={i}>
+                              {showCcGrid && (
+                                <div className="flex flex-col gap-2" style={{ gridColumn: "span 2" }}>
+                                  <div className="text-[11px] font-bold uppercase tracking-wider" style={{ fontFamily: FONT, color: c.muted, letterSpacing: "0.05em" }}>
+                                    Class code changes
+                                  </div>
+                                  <p className="text-[12px]" style={{ fontFamily: FONT, color: c.muted, margin: 0 }}>
+                                    Choose an action per line. On <b>Remove</b>, payroll and employee counts grey out — only the class code is needed.
+                                  </p>
+                                  <div style={{ border: `1px solid ${c.border}`, borderRadius: 10, marginTop: 4 }}>
+                                    <div style={{ display: "grid", gridTemplateColumns: "130px 1.6fr 1fr .6fr .6fr 40px", background: c.helperBg, borderTopLeftRadius: 10, borderTopRightRadius: 10 }}>
+                                      {["Action","Class code","Payroll","FT","PT",""].map((h, hi) => (
+                                        <div key={hi} style={{ padding: "8px 10px", borderBottom: `1px solid ${c.border}`, fontFamily: FONT, fontSize: 10.5, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", color: c.muted }}>{h}</div>
+                                      ))}
+                                    </div>
+                                    {ccRows.map((row, ridx) => {
+                                      const isRemove = row.action === "Remove";
+                                      const isLast = ridx === ccRows.length - 1;
+                                      const cellStyle: React.CSSProperties = {
+                                        padding: 0,
+                                        borderBottom: isLast ? "none" : `1px solid ${c.softDivider}`,
+                                        borderRight: `1px solid ${c.softDivider}`,
+                                        display: "flex", alignItems: "stretch", minHeight: 44,
+                                      };
+                                      const rowInputStyle: React.CSSProperties = {
+                                        fontFamily: FONT, fontSize: 13, color: c.text,
+                                        background: "transparent", border: "none", padding: "10px 12px",
+                                        width: "100%", outline: "none",
+                                      };
+                                      const patch = (p: Partial<CcRow>) => setCcRows(rs => rs.map((r, j) => j === ridx ? { ...r, ...p } : r));
+                                      return (
+                                        <div key={ridx} style={{ display: "grid", gridTemplateColumns: "130px 1.6fr 1fr .6fr .6fr 40px", position: "relative" }}>
+                                          <div style={{ ...cellStyle, display: "block" }}>
+                                            <StyledSelect
+                                              value={row.action}
+                                              onChange={v => { const a = v as CcRow["action"]; patch({ action: a, ...(a === "Remove" ? { payroll: "", ft: "", pt: "" } : {}) }); }}
+                                              options={["Add", "Edit", "Remove"]}
+                                              labelFor={v => v}
+                                              triggerStyle={{ ...rowInputStyle, padding: "10px 16px", background: "transparent", border: "none" }}
+                                              c={{ text: c.text, muted: c.muted, border: c.border, cardBg: c.cardBg, hoverBg: c.hoverBg, razz: c.razz, razzTintBg: c.razzTintBg }}
+                                              font={{ fontFamily: FONT }}
+                                            />
+                                          </div>
+                                          <div style={cellStyle}>
+                                            <input value={row.code} onChange={e => patch({ code: e.target.value })} placeholder="e.g. 5190" style={rowInputStyle} />
+                                          </div>
+                                          <div style={cellStyle}>
+                                            <input value={row.payroll} onChange={e => patch({ payroll: e.target.value })} placeholder="50,000" disabled={isRemove} style={{ ...rowInputStyle, opacity: isRemove ? 0.35 : 1, cursor: isRemove ? "not-allowed" : "text" }} />
+                                          </div>
+                                          <div style={cellStyle}>
+                                            <input value={row.ft} onChange={e => patch({ ft: e.target.value })} placeholder="0" disabled={isRemove} style={{ ...rowInputStyle, opacity: isRemove ? 0.35 : 1, cursor: isRemove ? "not-allowed" : "text" }} />
+                                          </div>
+                                          <div style={cellStyle}>
+                                            <input value={row.pt} onChange={e => patch({ pt: e.target.value })} placeholder="0" disabled={isRemove} style={{ ...rowInputStyle, opacity: isRemove ? 0.35 : 1, cursor: isRemove ? "not-allowed" : "text" }} />
+                                          </div>
+                                          <div style={{ ...cellStyle, borderRight: "none", justifyContent: "center" }}>
+                                            <button
+                                              type="button"
+                                              onClick={() => setCcRows(rs => rs.length > 1 ? rs.filter((_, j) => j !== ridx) : rs)}
+                                              title="Remove line"
+                                              style={{ background: "transparent", border: "none", color: c.muted, cursor: "pointer", padding: 4, display: "flex", alignItems: "center", justifyContent: "center" }}
+                                              onMouseEnter={e => (e.currentTarget.style.color = "#EF4444")}
+                                              onMouseLeave={e => (e.currentTarget.style.color = c.muted)}
+                                            >
+                                              <X className="w-3.5 h-3.5" strokeWidth={2} />
+                                            </button>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => setCcRows(rs => [...rs, emptyCcRow()])}
+                                    style={{
+                                      width: "100%",
+                                      fontFamily: FONT, fontSize: 12.5, fontWeight: 600,
+                                      color: c.razz, background: "transparent",
+                                      border: `1px dashed ${c.border}`, borderRadius: 8,
+                                      padding: "10px 14px", cursor: "pointer", marginTop: 4,
+                                    }}
+                                    onMouseEnter={e => { e.currentTarget.style.background = c.razzTintBg; e.currentTarget.style.borderColor = c.razz; }}
+                                    onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = c.border; }}
+                                  >
+                                    + Add line
+                                  </button>
+                                </div>
+                              )}
+                            <div className="flex flex-col gap-1.5" style={{ gridColumn: `span ${f.span ?? 2}` }}>
                               <label className="text-[11.5px] font-semibold flex items-center gap-1" style={{ fontFamily: FONT, color: c.text }}>
                                 {f.label}
                                 {f.optional ? (
@@ -929,9 +1125,13 @@ export default function EndorsementBoard({ isDark, onBack }: Props) {
                                 })()
                               )}
                             </div>
+                            </Fragment>
                           );
                         })}
                       </div>
+                      {cm.footNote && (
+                        <p className="text-[11.5px] mt-3" style={{ fontFamily: FONT, color: c.muted, lineHeight: 1.5 }}>{cm.footNote}</p>
+                      )}
                     </div>
                   </section>
                 );
@@ -947,12 +1147,9 @@ export default function EndorsementBoard({ isDark, onBack }: Props) {
                   style={{ background: c.cardBg, border: `1px solid ${c.border}`, boxShadow: isDark ? "none" : "0 1px 2px rgba(15,23,42,0.04)" }}
                 >
                   <div className="px-6 pt-5 pb-3">
-                    <div className="text-[10.5px] font-bold uppercase tracking-wider mb-1" style={{ fontFamily: FONT, color: c.muted, letterSpacing: "0.08em" }}>
-                      Supporting detail
-                    </div>
-                    <h2 className="text-[16px] font-semibold" style={{ fontFamily: FONT, color: c.text }}>Notes &amp; documents</h2>
+                    <h2 className="text-[16px] font-semibold" style={{ fontFamily: FONT, color: c.text }}>Supporting materials</h2>
                     <p className="text-[12px] mt-1" style={{ fontFamily: FONT, color: c.muted }}>
-                      Optional context that applies to the whole request — the underwriter sees it alongside every change above.
+                      Optional notes and documents that apply to the whole request — the underwriter sees them alongside every change above.
                     </p>
                   </div>
                   <div className="px-6 pb-5 flex flex-col gap-4">

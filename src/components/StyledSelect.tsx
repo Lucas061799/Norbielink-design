@@ -48,15 +48,19 @@ export function StyledSelect<T extends string>({
         className="w-full flex items-center justify-between gap-2"
         style={{
           ...triggerStyle,
-          // Keep the caller's border by default; only override to razz when open.
-          border: open ? `1px solid ${c.razz}` : (triggerStyle.border ?? `1px solid ${c.border}`),
+          // Caller wins: if triggerStyle.border/background were explicitly set
+          // (e.g. "none"/"transparent" in a table cell), we don't override them.
+          // Otherwise fall back to the razz-when-open frame.
+          border: triggerStyle.border !== undefined
+            ? triggerStyle.border
+            : (open ? `1px solid ${c.razz}` : `1px solid ${c.border}`),
           textAlign: "left",
           cursor: "pointer",
           // Trigger uses its own chevron child instead of the caller's bg image,
           // so pull the right padding back to a normal value — no need to leave
           // 32px of empty space for a chevron that isn't there.
           backgroundImage: "none",
-          backgroundColor: c.cardBg,
+          backgroundColor: (triggerStyle.background as string | undefined) ?? triggerStyle.backgroundColor ?? c.cardBg,
           paddingRight: 12,
           // Match sibling <input> vertical rhythm so the trigger height doesn't
           // creep above/below neighbouring text inputs and DatePickers.
