@@ -693,7 +693,10 @@ export default function EndorsementBoard({ isDark, onBack }: Props) {
                   ))}
                 </div>
               </div>
-              <div className="flex items-center justify-between px-6 py-3" style={{ borderTop: `1px solid ${c.border}` }}>
+              {/* Inset divider — sits between the picker grid and the
+                  action row without touching the card's rounded edges. */}
+              <div className="mx-6" style={{ height: 1, background: c.border }} />
+              <div className="flex items-center justify-between px-6 py-3">
                 <span className="text-[12px]" style={{ color: c.muted }}>{addPicks.size} selected</span>
                 <button
                   type="button"
@@ -1162,7 +1165,10 @@ export default function EndorsementBoard({ isDark, onBack }: Props) {
                 ))}
               </div>
             </div>
-            <div className="flex items-center justify-between px-6 py-3" style={{ borderTop: `1px solid ${c.border}` }}>
+            {/* Inset divider — matches the empty-state picker so both
+                surfaces read the same way. */}
+            <div className="mx-6" style={{ height: 1, background: c.border }} />
+            <div className="flex items-center justify-between px-6 py-3">
               <span className="text-[12px]" style={{ color: c.muted }}>{addPicks.size} selected</span>
               <div className="flex items-center gap-2">
                 <button
