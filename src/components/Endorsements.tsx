@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { Search, ChevronDown, X, Send, ClipboardList, Clock, CheckCircle2, Check } from "lucide-react";
-import EndorsementIntake from "./EndorsementIntake";
 import EndorsementBoard from "./EndorsementBoard";
 
 const FONT = "var(--font-montserrat), Montserrat, sans-serif";
@@ -173,25 +172,6 @@ export default function Endorsements({ isDark, layout = "3col", skipSearch = fal
 
       {view === "form" && intakePolicy && (
         <EndorsementBoard isDark={isDark} onBack={handleBack} />
-      )}
-      {/* Legacy EndorsementIntake kept behind an unused prop for reference —
-          the current intake is EndorsementBoard rendered above. */}
-      {false && intakePolicy && (
-        <EndorsementIntake
-          selectedPolicy={{
-            policyNumber: intakePolicy.policyNumber,
-            applicant:    intakePolicy.applicant,
-            submissionId: intakePolicy.submissionId,
-            effective:    intakePolicy.effective,
-            lob:          intakePolicy.lob,
-            dba:          intakePolicy.dba,
-            status:       intakePolicy.status,
-          }}
-          onBack={handleBack}
-          onSubmit={handleSubmit}
-          isDark={isDark}
-          layout={layout}
-        />
       )}
 
       {view !== "form" && (

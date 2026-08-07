@@ -878,7 +878,7 @@ export default function EndorsementBoard({ isDark, onBack }: Props) {
                                           // City / State / ZIP fields in the
                                           // same card when the user picks a
                                           // suggestion.
-                                          const streetVal = addr.street || addr.formatted || val;
+                                          const streetVal = addr.street || val;
                                           const findIdx = (rx: RegExp) => cm.fields.findIndex(x => rx.test(x.label));
                                           const cityIdx  = findIdx(/^city$/i);
                                           const stateIdx = findIdx(/^state$/i);
