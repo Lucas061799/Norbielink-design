@@ -880,6 +880,14 @@ export default function EndorsementBoard({ isDark, onBack }: Props) {
                             width: "100%",
                           };
                           const showCcGrid = k === "classcode" && i === 1;
+                          // Compact the classcode Location block onto 2 rows:
+                          // row 1 is Address (full width), row 2 packs City +
+                          // State + Zip into a nested 3-col grid inside a
+                          // span-2 cell. Suppress the individual City/State/Zip
+                          // renders (indices 3–5) since they're rendered inside
+                          // the composite block appended to Address (i === 2).
+                          if (k === "classcode" && (i === 3 || i === 4 || i === 5)) return null;
+                          const showCcAddressExtras = k === "classcode" && i === 2;
                           return (
                             <Fragment key={i}>
                               {showCcGrid && (
@@ -1125,6 +1133,50 @@ export default function EndorsementBoard({ isDark, onBack }: Props) {
                                 })()
                               )}
                             </div>
+                            {showCcAddressExtras && (
+                              <div style={{ gridColumn: "span 2", display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: 16 }}>
+                                {[3, 4, 5].map(subI => {
+                                  const subF = cm.fields[subI];
+                                  const subVal = values[k]?.[subI] ?? "";
+                                  const subInputStyle: React.CSSProperties = {
+                                    fontFamily: FONT, fontSize: 13, color: c.text,
+                                    background: c.cardBg, border: `1px solid ${c.border}`,
+                                    borderRadius: 8, padding: "9px 12px", outline: "none", width: "100%",
+                                  };
+                                  return (
+                                    <div key={subI} className="flex flex-col gap-1.5">
+                                      <label className="text-[11.5px] font-semibold flex items-center gap-1" style={{ fontFamily: FONT, color: c.text }}>
+                                        {subF.label}
+                                        {subF.optional ? (
+                                          <span className="text-[10.5px] font-medium" style={{ color: c.muted }}>optional</span>
+                                        ) : (
+                                          <span style={{ color: c.razz }}>*</span>
+                                        )}
+                                      </label>
+                                      {subF.type === "select" ? (
+                                        <StyledSelect
+                                          value={subVal}
+                                          onChange={v => setValue(k, subI, v)}
+                                          options={subF.options ?? []}
+                                          labelFor={v => v || "Select…"}
+                                          triggerStyle={subInputStyle}
+                                          c={{ text: c.text, muted: c.muted, border: c.border, cardBg: c.cardBg, hoverBg: c.hoverBg, razz: c.razz, razzTintBg: c.razzTintBg }}
+                                          font={{ fontFamily: FONT }}
+                                        />
+                                      ) : (
+                                        <input
+                                          type="text"
+                                          value={subVal}
+                                          onChange={e => setValue(k, subI, e.target.value)}
+                                          placeholder={subF.placeholder}
+                                          style={subInputStyle}
+                                        />
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
                             </Fragment>
                           );
                         })}
