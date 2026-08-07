@@ -160,14 +160,6 @@ export default function Sidenav({ isDark = false, onToggleDark, activeItem = "Ma
 
   const darkMode = isDark;
 
-  // Endorsements has three design-variant sub-items so the team can
-  // explore alternate intake designs side-by-side. Clicking the parent
-  // toggles the sub-list instead of navigating anywhere itself.
-  const ENDORSEMENT_CHILDREN = [
-    { label: "Design Option 1" },
-    { label: "Design Option 2" },
-    { label: "Design Option 3" },
-  ];
   const navItems: { label: string; icon: React.ReactNode; badge?: string; hasChevron?: boolean; children?: { label: string }[] }[] = [
     { label: "Marketplace",       icon: <LayoutGrid className="w-[18px] h-[18px]" /> },
     { label: "Appetite Assistant", icon: <Sparkles  className="w-[16px] h-[16px]" /> },
@@ -177,7 +169,7 @@ export default function Sidenav({ isDark = false, onToggleDark, activeItem = "Ma
     { label: "ProSuite",          icon: <Briefcase  className="w-[18px] h-[18px]" />, badge: "PRO", hasChevron: true },
     { label: "Make a Payment",    icon: <CreditCard className="w-[18px] h-[18px]" /> },
     { label: "Payment Info",      icon: <BookOpen   className="w-[18px] h-[18px]" />, hasChevron: true },
-    { label: "Endorsements",      icon: <FileEdit   className="w-[18px] h-[18px]" />, hasChevron: true, children: ENDORSEMENT_CHILDREN },
+    { label: "Endorsements",      icon: <FileEdit   className="w-[18px] h-[18px]" /> },
     { label: "Tools & Resources", icon: <Wrench     className="w-[18px] h-[18px]" />, hasChevron: true },
     { label: "Support",           icon: <HelpCircle className="w-[18px] h-[18px]" /> },
     { label: "Admin",             icon: <UserCog    className="w-[18px] h-[18px]" /> },
@@ -186,10 +178,8 @@ export default function Sidenav({ isDark = false, onToggleDark, activeItem = "Ma
     { label: "Pricing",           icon: <Rocket     className="w-[18px] h-[18px]" /> },
   ];
 
-  // Which parent nav is currently showing its children. Auto-open when a
-  // child is the active page so navigating in from a link keeps the tree open.
-  const endorsementChildActive = ENDORSEMENT_CHILDREN.some(ch => activeItem === `Endorsements · ${ch.label}`);
-  const [expandedNav, setExpandedNav] = useState<string | null>(endorsementChildActive ? "Endorsements" : null);
+  // Which parent nav is currently showing its children.
+  const [expandedNav, setExpandedNav] = useState<string | null>(null);
 
   return (
     <aside

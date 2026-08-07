@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Search, ChevronDown, X, Send, ClipboardList, Clock, CheckCircle2, Check } from "lucide-react";
 import EndorsementIntake from "./EndorsementIntake";
+import EndorsementBoard from "./EndorsementBoard";
 
 const FONT = "var(--font-montserrat), Montserrat, sans-serif";
 
@@ -161,13 +162,21 @@ export default function Endorsements({ isDark, layout = "3col", skipSearch = fal
 
   return (
     <div className="flex flex-col flex-1 min-h-0" style={{ fontFamily: FONT }} onClick={closeAll}>
-      {/* Section title */}
-      <div className="flex flex-col justify-center flex-shrink-0 mb-12"
-        style={{ height: 71, borderBottom: `0.87px solid ${isDark ? "rgba(255,255,255,0.08)" : "#E5E7EB"}`, marginLeft: -48, marginRight: -48, paddingLeft: 28, paddingRight: 28 }}>
-        <h1 className="text-[22px] font-normal" style={{ fontFamily: FONT, color: c.text }}>Endorsements</h1>
-      </div>
+      {/* Section title — hidden in form view so the intake's own top bar
+          reads as the page header without redundancy. */}
+      {view !== "form" && (
+        <div className="flex flex-col justify-center flex-shrink-0 mb-12"
+          style={{ height: 71, borderBottom: `0.87px solid ${isDark ? "rgba(255,255,255,0.08)" : "#E5E7EB"}`, marginLeft: -48, marginRight: -48, paddingLeft: 28, paddingRight: 28 }}>
+          <h1 className="text-[22px] font-normal" style={{ fontFamily: FONT, color: c.text }}>Endorsements</h1>
+        </div>
+      )}
 
       {view === "form" && intakePolicy && (
+        <EndorsementBoard isDark={isDark} onBack={handleBack} />
+      )}
+      {/* Legacy EndorsementIntake kept behind an unused prop for reference —
+          the current intake is EndorsementBoard rendered above. */}
+      {false && intakePolicy && (
         <EndorsementIntake
           selectedPolicy={{
             policyNumber: intakePolicy.policyNumber,

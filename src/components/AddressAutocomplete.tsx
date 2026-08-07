@@ -97,7 +97,7 @@ export function AddressAutocomplete({
 
   const search = (q: string) => {
     if (timeoutRef.current !== null) window.clearTimeout(timeoutRef.current);
-    if (q.trim().length < 3) {
+    if (q.trim().length < 2) {
       setSuggestions([]); setOpen(false); setLoading(false);
       return;
     }
@@ -174,7 +174,9 @@ export function AddressAutocomplete({
               onMouseEnter={() => setActive(idx)}
               style={{
                 padding: "9px 12px", fontSize: 12, cursor: "pointer", lineHeight: 1.4,
-                background: idx === active ? "rgba(116,195,183,0.15)" : "transparent",
+                background: idx === active ? "rgba(166,20,195,0.08)" : "transparent",
+                color: idx === active ? "#A614C3" : dropdownText,
+                fontWeight: idx === active ? 600 : 400,
                 borderBottom: idx < suggestions.length - 1 ? `1px solid ${dropdownBorder}` : "none",
               }}
             >

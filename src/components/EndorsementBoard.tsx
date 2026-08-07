@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { ArrowLeft, Check, ChevronDown, ChevronRight, FileEdit, HelpCircle, Layers, Plus, Send, Shield, X } from "lucide-react";
+import { ArrowLeft, Check, ChevronDown, ChevronRight, Download, FileEdit, HelpCircle, Layers, Plus, Send, Shield, X } from "lucide-react";
+import { AddressAutocomplete } from "./AddressAutocomplete";
 import { DatePicker } from "./DatePicker";
 import { StyledSelect } from "./StyledSelect";
 
@@ -65,13 +66,15 @@ type FieldType = "date" | "text" | "select" | "textarea" | "file";
 type Field = { label: string; type: FieldType; placeholder?: string; options?: string[]; span?: 1 | 2; optional?: boolean };
 // Types with their own required supporting field baked in — everyone else
 // falls back to the shared "Notes & documents" block at the bottom of the request.
-const SKIP_UNIVERSAL_SUPPORTING = new Set<EndorsementKey>(["reinstate", "cancel", "xmod", "namedinsured"]);
+// Empty for now — every endorsement type also gets the shared bottom section
+// so users always have a place to attach general context / files.
+const SKIP_UNIVERSAL_SUPPORTING = new Set<EndorsementKey>();
 const CARD_META: Record<EndorsementKey, { blurb: string; fields: Field[] }> = {
   contact:      { blurb: "Update the insured or agency contact on file.",  fields: [
                     { label: "Effective date", type: "date", span: 1 },
                     { label: "Contact type",   type: "select", options: ["Owner", "Officer", "Agent", "Employee"], span: 1 },
                     { label: "Full name",      type: "text", placeholder: "First Last", span: 2 },
-                    { label: "Phone",          type: "text", placeholder: "555-123-4567", span: 1 },
+                    { label: "Phone",          type: "text", placeholder: "(555) 123-4567", span: 1 },
                     { label: "Email",          type: "text", placeholder: "name@example.com", span: 1 },
                   ] },
   namedinsured: { blurb: "Amend the legal name or DBA of the entity.",     fields: [
@@ -199,8 +202,8 @@ export default function EndorsementBoard({ isDark, onBack }: Props) {
   };
   const razzGrad = "linear-gradient(90deg,#5C2ED4 0%,#A614C3 65%)";
 
-  const [selected, setSelected] = useState<Set<EndorsementKey>>(new Set(["contact", "effdate"]));
-  const [activeKey, setActiveKey] = useState<EndorsementKey>("contact");
+  const [selected, setSelected] = useState<Set<EndorsementKey>>(new Set());
+  const [activeKey, setActiveKey] = useState<EndorsementKey | null>(null);
   // Refs to each section card so sidebar clicks can smooth-scroll to them.
   const sectionRefs = useRef<Partial<Record<EndorsementKey, HTMLElement | null>>>({});
   const jumpToSection = (k: EndorsementKey) => {
@@ -212,12 +215,14 @@ export default function EndorsementBoard({ isDark, onBack }: Props) {
   const [addPicks, setAddPicks] = useState<Set<EndorsementKey>>(new Set());
   // Single universal supporting block for the whole request (matches Option 1).
   const [notes, setNotes] = useState("");
-  const [fileAttached, setFileAttached] = useState<string | null>(null);
+  const [fileAttached, setFileAttached] = useState<string[]>([]);
   // Collapsible section headers in the left rail — all open by default.
   const [openSections, setOpenSections] = useState<Set<string>>(new Set(["request", "policy", "help"]));
-  const CARRIERS = ["AmTrust", "Clearspring", "CNA"] as const;
-  const [carrier, setCarrier] = useState<(typeof CARRIERS)[number]>("AmTrust");
-  const [carrierOpen, setCarrierOpen] = useState(false);
+  // Preview-before-submit + top-right confirmation toast + submitted-state
+  // (post-send view replaces the intake with a read-only summary).
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [toastOpen, setToastOpen] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
 
   const orderedSelected = useMemo(() => {
     const order = NAV.flatMap(g => g.items.map(it => it.key));
@@ -233,6 +238,72 @@ export default function EndorsementBoard({ isDark, onBack }: Props) {
   const totalRequired = orderedSelected.reduce((sum, k) => sum + requiredCount(k), 0);
   const totalDone     = orderedSelected.reduce((sum, k) => sum + doneCount(k), 0);
   const submitReady   = orderedSelected.length > 0 && totalRequired === totalDone;
+
+  // Opens a printable HTML window with the Norbielink logo + full request
+  // recap and triggers the browser print dialog so the user saves as PDF.
+  // Shared across the hero circular icon, the bottom Download button, and
+  // any future entry points.
+  const downloadCopy = () => {
+    const esc = (s: string) => s.replace(/[&<>"']/g, m => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+    }[m] as string));
+    const groups = orderedSelected.map(k => {
+      const meta = findMeta(k);
+      const cm = CARD_META[k];
+      const rows = cm.fields.map((f, i) => `
+        <tr>
+          <td class="lbl">${esc(f.label)}${f.optional ? ' <span class="opt">(optional)</span>' : ''}</td>
+          <td class="val">${esc((values[k]?.[i] ?? "").trim() || "—")}</td>
+        </tr>`).join("");
+      return `
+        <section class="card">
+          <div class="eyebrow">${esc(meta.group)}</div>
+          <h2>${esc(meta.label)}</h2>
+          <table>${rows}</table>
+        </section>`;
+    }).join("");
+    const win = window.open("", "_blank", "noopener,noreferrer,width=900,height=1100");
+    if (!win) return;
+    win.document.write(`<!doctype html>
+<html><head><meta charset="utf-8"><title>Endorsement request · Byrne Insurance Group</title>
+<style>
+  @page { margin: 20mm; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #1F2937; margin: 0; padding: 24px 32px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  header { display: flex; align-items: center; justify-content: space-between; padding-bottom: 16px; border-bottom: 1px solid #E5E7EB; }
+  header img { height: 34px; }
+  header .stamp { font-size: 11px; color: #6B7280; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; }
+  h1 { font-size: 22px; margin: 24px 0 4px; }
+  .policy { color: #A614C3; font-weight: 600; font-size: 13px; letter-spacing: 0.01em; }
+  .card { border: 1px solid #E5E7EB; border-radius: 12px; padding: 16px 20px; margin: 16px 0; page-break-inside: avoid; }
+  .eyebrow { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #6B7280; margin-bottom: 4px; }
+  h2 { font-size: 16px; margin: 0 0 12px; }
+  table { width: 100%; border-collapse: collapse; }
+  td { padding: 6px 0; font-size: 13px; vertical-align: top; border-bottom: 1px dashed #F3F4F6; }
+  td:last-child { padding-left: 12px; }
+  tr:last-child td { border-bottom: none; }
+  .lbl { color: #6B7280; width: 42%; }
+  .opt { color: #9CA3AF; font-size: 11px; }
+  .val { color: #1F2937; word-break: break-word; }
+  footer { margin-top: 32px; padding-top: 12px; border-top: 1px solid #E5E7EB; font-size: 11px; color: #9CA3AF; text-align: center; }
+</style></head><body>
+  <header>
+    <img src="${window.location.origin}/norbielink-logo.svg" alt="Norbielink" />
+    <span class="stamp">Endorsement request</span>
+  </header>
+  <h1>Byrne Insurance Group</h1>
+  <div class="policy">7038911131 · VIC00003362</div>
+  ${groups}
+  <footer>Generated by Norbielink · ${new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</footer>
+  <script>
+    const img = document.querySelector("header img");
+    const trigger = () => { window.focus(); window.print(); };
+    if (img && !img.complete) { img.addEventListener("load", trigger); img.addEventListener("error", trigger); }
+    else { trigger(); }
+  </script>
+</body></html>`);
+    win.document.close();
+  };
 
   const setValue = (k: EndorsementKey, i: number, v: string) => {
     setValues(prev => ({ ...prev, [k]: { ...(prev[k] ?? {}), [i]: v } }));
@@ -299,7 +370,150 @@ export default function EndorsementBoard({ isDark, onBack }: Props) {
         </span>
       </div>
 
+      {/* Post-submit view — mirrors the intake's 3-column shell so the
+          transition from editing → submitted feels like the same page.
+          LEFT: policy + committed-changes list (all checked). CENTER:
+          success card + per-change recap. RIGHT: confirmation + actions. */}
+      {submitted && (
+        <div className="flex flex-1 min-h-0">
+          {/* LEFT rail — mirrors the intake sidebar, everything green now. */}
+          <aside className="flex-shrink-0 overflow-y-auto"
+            style={{ width: 220, background: c.railBg, borderRight: `1px solid ${c.border}`, padding: "24px 10px 16px" }}>
+            <div className="px-2 pb-3 mb-3" style={{ borderBottom: `1px solid ${c.border}` }}>
+              <div className="text-[13.5px] font-semibold leading-tight truncate" style={{ fontFamily: FONT, color: c.text, letterSpacing: "-0.01em" }}>
+                Byrne Insurance Group
+              </div>
+              <div className="text-[12px] mt-1.5 leading-tight" style={{ fontFamily: FONT, color: c.razz, fontWeight: 500 }}>
+                7038911131 · VIC00003362
+              </div>
+            </div>
+            <div className="px-2 mb-3">
+              <span className="text-[10.5px] font-bold uppercase tracking-wider" style={{ fontFamily: FONT, color: c.muted, letterSpacing: "0.08em" }}>Submitted changes</span>
+            </div>
+            <div className="flex flex-col px-2">
+              {orderedSelected.map(k => {
+                const meta = findMeta(k);
+                return (
+                  <div key={k} className="flex items-center gap-2 py-2" style={{
+                    fontFamily: FONT, fontSize: 12.5, fontWeight: 500, color: c.text,
+                  }}>
+                    <Check className="w-3 h-3 flex-shrink-0" strokeWidth={3} style={{ color: "#73C9B7" }} />
+                    <span className="flex-1 truncate">{meta.label}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </aside>
+
+          {/* CENTER — success hero + recap cards. Right panel actions were
+              hoisted into this hero so the layout is a single column instead
+              of a lonely side-panel. */}
+          <main className="flex-1 min-w-0 overflow-y-auto" style={{ padding: "24px 28px" }}>
+            <div className="flex flex-col gap-4">
+              {(() => {
+                return (
+                  <div className="rounded-2xl px-6 py-5 flex items-start gap-3"
+                    style={{ background: c.cardBg, border: `1px solid ${c.border}`, boxShadow: isDark ? "none" : "0 1px 2px rgba(15,23,42,0.04)" }}>
+                    <span className="flex-shrink-0 flex items-center justify-center rounded-full" style={{ width: 36, height: 36, background: "rgba(115,201,183,0.18)" }}>
+                      <Check className="w-4 h-4" strokeWidth={3} style={{ color: "#0F7A63" }} />
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-[16px] font-bold" style={{ fontFamily: FONT, color: c.text }}>Request submitted</h3>
+                      <p className="text-[12.5px] mt-1" style={{ fontFamily: FONT, color: c.muted, lineHeight: 1.5 }}>
+                        A copy has been emailed to your inbox. The carrier team will follow up if anything else is needed.
+                      </p>
+                    </div>
+                    {/* Quick circular download shortcut — same action as the
+                        Download button after the recap; sits in the top-right
+                        of the hero so users can grab a copy without scrolling. */}
+                    <button
+                      type="button"
+                      onClick={downloadCopy}
+                      title="Download a copy"
+                      aria-label="Download a copy"
+                      className="flex-shrink-0 inline-flex items-center justify-center rounded-full transition-colors"
+                      style={{
+                        width: 28, height: 28,
+                        background: "transparent",
+                        border: `1px solid ${c.border}`,
+                        color: c.muted,
+                        cursor: "pointer",
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.background = c.hoverBg; e.currentTarget.style.color = c.razz; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = c.muted; }}
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                );
+              })()}
+
+              {orderedSelected.map(k => {
+                const meta = findMeta(k);
+                const cm = CARD_META[k];
+                return (
+                  <section key={k} className="rounded-2xl"
+                    style={{ background: c.cardBg, border: `1px solid ${c.border}`, boxShadow: isDark ? "none" : "0 1px 2px rgba(15,23,42,0.04)" }}>
+                    <div className="flex items-center gap-3 px-6 pt-5 pb-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[10.5px] font-bold uppercase tracking-wider mb-1" style={{ fontFamily: FONT, color: c.muted, letterSpacing: "0.08em" }}>{meta.group}</div>
+                        <h2 className="text-[16px] font-semibold" style={{ fontFamily: FONT, color: c.text }}>{meta.label}</h2>
+                      </div>
+                    </div>
+                    <div className="px-6 pb-5">
+                      <div className="flex flex-col gap-1.5">
+                        {cm.fields.map((f, i) => {
+                          const v = (values[k]?.[i] ?? "").trim();
+                          return (
+                            <div key={f.label} className="flex items-start gap-3 text-[13px]" style={{ fontFamily: FONT, color: c.text }}>
+                              <span className="w-[42%] flex-shrink-0" style={{ color: c.muted }}>
+                                {f.label}{f.optional && <span style={{ color: c.sub }}> (optional)</span>}
+                              </span>
+                              <span className="flex-1 min-w-0" style={{ color: v ? c.text : c.sub, wordBreak: "break-word" }}>{v || "—"}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </section>
+                );
+              })}
+
+              {/* Bottom action row — full-size buttons after the recap so
+                  they sit at the visual "end" of the submitted request.
+                  Split left/right so Download reads as secondary and
+                  Back to Endorsements is the primary end-of-flow action. */}
+              <div className="flex items-center justify-between gap-2 flex-wrap mt-2">
+                <button
+                  type="button"
+                  onClick={downloadCopy}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-[13px] font-semibold transition-colors"
+                  style={{ fontFamily: FONT, color: c.text, background: c.cardBg, border: `1px solid ${c.border}`, cursor: "pointer" }}
+                  onMouseEnter={e => { e.currentTarget.style.background = c.hoverBg; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = c.cardBg; }}
+                >
+                  <Download className="w-3.5 h-3.5" />Download a copy
+                </button>
+                {onBack && (
+                  <button
+                    type="button"
+                    onClick={onBack}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-[13px] font-semibold transition-all"
+                    style={{ fontFamily: FONT, color: "#fff", background: razzGrad, border: "none", cursor: "pointer" }}
+                    onMouseEnter={e => (e.currentTarget.style.filter = "brightness(1.08)")}
+                    onMouseLeave={e => (e.currentTarget.style.filter = "none")}
+                  >
+                    Back to Endorsements
+                  </button>
+                )}
+              </div>
+            </div>
+          </main>
+        </div>
+      )}
+
       {/* Three-column layout: LEFT tree · CENTER cards · RIGHT submit panel */}
+      {!submitted && (
       <div className="flex flex-1 min-h-0">
         {/* ── LEFT: nested navigator, softer gray bg, no borders on rows */}
         <aside
@@ -412,28 +626,91 @@ export default function EndorsementBoard({ isDark, onBack }: Props) {
         {/* ── CENTER: content cards */}
         <main className="flex-1 min-w-0 overflow-y-auto" style={{ padding: "24px 28px" }}>
           {orderedSelected.length === 0 ? (
-            <div
-              className="text-center rounded-2xl"
-              style={{ background: c.cardBg, border: `1px solid ${c.border}`, fontFamily: FONT, padding: "72px 32px" }}
-            >
-              <div
-                className="mx-auto flex items-center justify-center rounded-2xl mb-3"
-                style={{ width: 48, height: 48, background: c.razzTintBg, border: "1px solid rgba(168,85,247,0.25)" }}
-              >
-                <Plus className="w-6 h-6" style={{ color: c.razz }} />
+            /* Empty-state picker — the change catalog is rendered inline as
+                "page 0" so users pick their changes immediately on landing
+                instead of hitting a callout + separate popup. Same picker
+                UI as the Add-change modal; commits via the same flow. */
+            <div className="rounded-2xl flex flex-col"
+              style={{ background: c.cardBg, border: `1px solid ${c.border}`, fontFamily: FONT }}>
+              <div className="px-7 pt-6 pb-4">
+                <h3 className="text-[16px] font-bold mb-0.5" style={{ color: c.text }}>What Are We Changing On This Policy?</h3>
+                <p className="text-[12.5px]" style={{ color: c.muted }}>Pick one or more — each becomes a card in the center.</p>
               </div>
-              <div className="text-[15px] font-semibold mb-1" style={{ color: c.text }}>What&apos;s changing on this policy?</div>
-              <div className="text-[12.5px] mb-4" style={{ color: c.muted, lineHeight: 1.5 }}>
-                Each change becomes a card on this page. The whole request submits together.
+              <div className="px-7 pb-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-6 items-start">
+                  {[
+                    [NAV[0]],
+                    [NAV[1]],
+                    [NAV[2], NAV[3], NAV[4]],
+                  ].map((groups, colIdx) => (
+                    <div key={colIdx} className="flex flex-col gap-6">
+                      {groups.map(g => (
+                        <div key={g.label}>
+                          <div className="pb-2 mb-2" style={{ fontFamily: FONT, fontSize: 12.5, fontWeight: 700, color: c.text, borderBottom: `1px solid ${c.softDivider}` }}>
+                            {g.label}
+                          </div>
+                          <div className="flex flex-col gap-0.5">
+                            {g.items.map(it => {
+                              const picked = addPicks.has(it.key);
+                              return (
+                                <button
+                                  key={it.key}
+                                  type="button"
+                                  onClick={() => togglePick(it.key)}
+                                  className="w-full flex items-center gap-2.5 rounded-md transition-colors"
+                                  style={{
+                                    fontFamily: FONT, textAlign: "left",
+                                    background: "transparent",
+                                    color: c.text,
+                                    padding: "7px 8px",
+                                    border: "none",
+                                    fontSize: 13,
+                                    fontWeight: picked ? 600 : 500,
+                                    cursor: "pointer",
+                                  }}
+                                  onMouseEnter={e => { e.currentTarget.style.background = c.hoverBg; }}
+                                  onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
+                                >
+                                  <span
+                                    className="flex-shrink-0 flex items-center justify-center rounded"
+                                    style={{
+                                      width: 17, height: 17,
+                                      border: picked ? "none" : `1.5px solid ${c.border}`,
+                                      background: picked ? razzGrad : "transparent",
+                                      transition: "background 120ms",
+                                    }}
+                                  >
+                                    {picked && <Check className="w-2.5 h-2.5 text-white" strokeWidth={3.5} />}
+                                  </span>
+                                  <span className="flex-1 min-w-0 truncate">{it.label}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
               </div>
-              <button
-                type="button"
-                onClick={openAdd}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[12.5px] font-semibold text-white"
-                style={{ background: razzGrad, fontFamily: FONT, border: "none", cursor: "pointer" }}
-              >
-                <Plus className="w-3.5 h-3.5" />Add change
-              </button>
+              <div className="flex items-center justify-between px-6 py-3" style={{ borderTop: `1px solid ${c.border}` }}>
+                <span className="text-[12px]" style={{ color: c.muted }}>{addPicks.size} selected</span>
+                <button
+                  type="button"
+                  disabled={addPicks.size === 0}
+                  onClick={commitAdd}
+                  className="px-3.5 py-1.5 rounded-md text-[12px] font-semibold transition-all"
+                  style={addPicks.size === 0 ? {
+                    color: c.muted, background: c.helperBg, border: `1px solid ${c.border}`, cursor: "not-allowed",
+                  } : {
+                    color: "#fff", background: razzGrad, border: "none", cursor: "pointer",
+                  }}
+                  onMouseEnter={e => { if (addPicks.size > 0) e.currentTarget.style.filter = "brightness(1.08)"; }}
+                  onMouseLeave={e => (e.currentTarget.style.filter = "none")}
+                >
+                  Add to request
+                </button>
+              </div>
             </div>
           ) : (
             <div className="flex flex-col gap-4">
@@ -504,9 +781,10 @@ export default function EndorsementBoard({ isDark, onBack }: Props) {
                               </label>
                               {f.type === "select" ? (
                                 <StyledSelect<string>
-                                  value={val || (f.placeholder ?? "")}
-                                  onChange={v => setValue(k, i, v === (f.placeholder ?? "") ? "" : v)}
-                                  options={[(f.placeholder ?? "Select…"), ...(f.options ?? [])]}
+                                  value={val}
+                                  onChange={v => setValue(k, i, v)}
+                                  options={f.options ?? []}
+                                  labelFor={v => v || "Select…"}
                                   triggerStyle={inputStyle}
                                   c={{ text: c.text, muted: c.muted, border: c.border, cardBg: c.cardBg, hoverBg: c.hoverBg, razz: c.razz, razzTintBg: c.razzTintBg }}
                                   font={{ fontFamily: FONT }}
@@ -529,54 +807,123 @@ export default function EndorsementBoard({ isDark, onBack }: Props) {
                                   font={{ fontFamily: FONT }}
                                 />
                               ) : f.type === "file" ? (
-                                <label
-                                  className="flex items-center justify-center gap-2 rounded-lg cursor-pointer transition-colors"
-                                  style={{
-                                    fontFamily: FONT,
-                                    fontSize: 12.5,
-                                    color: val ? c.text : c.muted,
-                                    background: val ? c.helperBg : "transparent",
-                                    border: `1.5px dashed ${val ? c.border : c.border}`,
-                                    padding: "16px 12px",
-                                  }}
-                                  onMouseEnter={e => { if (!val) { e.currentTarget.style.borderColor = c.razz; e.currentTarget.style.background = c.razzTintBg; } }}
-                                  onMouseLeave={e => { if (!val) { e.currentTarget.style.borderColor = c.border; e.currentTarget.style.background = "transparent"; } }}
-                                >
-                                  <input
-                                    type="file"
-                                    className="hidden"
-                                    onChange={e => setValue(k, i, e.target.files?.[0]?.name ?? "")}
-                                  />
-                                  {val ? (
-                                    <>
-                                      <Check className="w-3.5 h-3.5" style={{ color: "#0F7A63" }} strokeWidth={3} />
-                                      <span className="font-semibold truncate">{val}</span>
-                                      <button
-                                        type="button"
-                                        onClick={e => { e.preventDefault(); setValue(k, i, ""); }}
-                                        className="ml-1 text-[11px] font-medium transition-opacity hover:opacity-70"
-                                        style={{ color: c.muted, background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
+                                (() => {
+                                  // Multi-file support — filenames joined by \n
+                                  // in the underlying string state so the rest
+                                  // of the form model (single string per field)
+                                  // stays unchanged. Split for display / remove.
+                                  const files = val ? val.split("\n").filter(Boolean) : [];
+                                  return (
+                                    <div className="flex flex-col gap-1.5">
+                                      {files.length > 0 && files.map((name, idx) => (
+                                        <div key={`${name}-${idx}`}
+                                          className="flex items-center gap-2 rounded-lg px-3 py-2"
+                                          style={{ fontFamily: FONT, fontSize: 12.5, color: c.text, background: c.helperBg, border: `1px solid ${c.border}` }}>
+                                          <Check className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#0F7A63" }} strokeWidth={3} />
+                                          <span className="font-medium truncate flex-1">{name}</span>
+                                          <button
+                                            type="button"
+                                            onClick={e => { e.preventDefault(); const next = files.filter((_, j) => j !== idx); setValue(k, i, next.join("\n")); }}
+                                            className="text-[11px] font-medium transition-opacity hover:opacity-70 flex-shrink-0"
+                                            style={{ color: c.muted, background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
+                                          >
+                                            Remove
+                                          </button>
+                                        </div>
+                                      ))}
+                                      <label
+                                        className="flex items-center justify-center gap-2 rounded-lg cursor-pointer transition-colors"
+                                        style={{
+                                          fontFamily: FONT,
+                                          fontSize: 12.5,
+                                          color: c.muted,
+                                          background: "transparent",
+                                          border: `1.5px dashed ${c.border}`,
+                                          padding: "16px 12px",
+                                        }}
+                                        onMouseEnter={e => { e.currentTarget.style.borderColor = c.razz; e.currentTarget.style.background = c.razzTintBg; }}
+                                        onMouseLeave={e => { e.currentTarget.style.borderColor = c.border; e.currentTarget.style.background = "transparent"; }}
                                       >
-                                        Replace
-                                      </button>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                        <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
-                                      </svg>
-                                      <span>Drag &amp; drop or click to upload</span>
-                                    </>
-                                  )}
-                                </label>
+                                        <input
+                                          type="file"
+                                          multiple
+                                          className="hidden"
+                                          onChange={e => {
+                                            const picked = Array.from(e.target.files ?? []).map(f => f.name);
+                                            if (picked.length) setValue(k, i, [...files, ...picked].join("\n"));
+                                            e.currentTarget.value = "";
+                                          }}
+                                        />
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                          <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
+                                        </svg>
+                                        <span>{files.length > 0 ? "Add another file" : "Drag & drop or click to upload"}</span>
+                                      </label>
+                                    </div>
+                                  );
+                                })()
                               ) : (
-                                <input
-                                  type="text"
-                                  value={val}
-                                  onChange={e => setValue(k, i, e.target.value)}
-                                  placeholder={f.placeholder}
-                                  style={inputStyle}
-                                />
+                                (() => {
+                                  // Address-shaped fields get the shared
+                                  // AddressAutocomplete so users can search
+                                  // instead of typing free-form.
+                                  const isAddress = /address|street/i.test(f.label);
+                                  if (isAddress) {
+                                    return (
+                                      <AddressAutocomplete
+                                        value={val}
+                                        onChange={v => setValue(k, i, v)}
+                                        onSelect={addr => {
+                                          // Batch-fill street + neighbouring
+                                          // City / State / ZIP fields in the
+                                          // same card when the user picks a
+                                          // suggestion.
+                                          const streetVal = addr.street || addr.formatted || val;
+                                          const findIdx = (rx: RegExp) => cm.fields.findIndex(x => rx.test(x.label));
+                                          const cityIdx  = findIdx(/^city$/i);
+                                          const stateIdx = findIdx(/^state$/i);
+                                          const zipIdx   = findIdx(/^zip|postal/i);
+                                          setValues(prev => {
+                                            const bucket = { ...(prev[k] ?? {}) };
+                                            bucket[i] = streetVal;
+                                            if (cityIdx  >= 0 && addr.city)  bucket[cityIdx]  = addr.city;
+                                            if (stateIdx >= 0 && addr.state) bucket[stateIdx] = addr.state;
+                                            if (zipIdx   >= 0 && addr.zip)   bucket[zipIdx]   = addr.zip;
+                                            return { ...prev, [k]: bucket };
+                                          });
+                                        }}
+                                        placeholder={f.placeholder}
+                                        inputStyle={inputStyle}
+                                      />
+                                    );
+                                  }
+                                  // Auto-format on every keystroke for phone
+                                  // fields — reshape digits into (XXX) XXX-XXXX
+                                  // so the field always reads correctly, no
+                                  // matter what the user pastes.
+                                  const isPhone = /phone/i.test(f.label) || (f.placeholder && /\(\d{3}\)/.test(f.placeholder));
+                                  return (
+                                    <input
+                                      type="text"
+                                      value={val}
+                                      onChange={e => {
+                                        if (!isPhone) { setValue(k, i, e.target.value); return; }
+                                        // Drop a leading "1" country code so we always
+                                        // format the 10-digit US number.
+                                        let d = e.target.value.replace(/\D/g, "").slice(0, 11);
+                                        if (d.length === 11 && d.startsWith("1")) d = d.slice(1);
+                                        d = d.slice(0, 10);
+                                        let formatted = d;
+                                        if (d.length > 6)      formatted = `(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}`;
+                                        else if (d.length > 3) formatted = `(${d.slice(0,3)}) ${d.slice(3)}`;
+                                        else if (d.length > 0) formatted = `(${d}`;
+                                        setValue(k, i, formatted);
+                                      }}
+                                      placeholder={f.placeholder}
+                                      style={inputStyle}
+                                    />
+                                  );
+                                })()
                               )}
                             </div>
                           );
@@ -631,46 +978,59 @@ export default function EndorsementBoard({ isDark, onBack }: Props) {
                       <p className="text-[11.5px]" style={{ fontFamily: FONT, color: c.muted, marginBottom: 4 }}>
                         Attach any forms, letters, or documentation that are required for processing.
                       </p>
+                      {/* Multi-file upload — each attached file gets its
+                          own row with a remove control; the dashed picker
+                          stays under the list so users can add more. */}
+                      {fileAttached.length > 0 && (
+                        <div className="flex flex-col gap-1.5 mb-1">
+                          {fileAttached.map((name, idx) => (
+                            <div key={`${name}-${idx}`}
+                              className="flex items-center gap-2 rounded-lg px-3 py-2"
+                              style={{ fontFamily: FONT, fontSize: 12.5, color: c.text, background: c.helperBg, border: `1px solid ${c.border}` }}>
+                              <Check className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#0F7A63" }} strokeWidth={3} />
+                              <span className="font-medium truncate flex-1">{name}</span>
+                              <button
+                                type="button"
+                                onClick={() => setFileAttached(prev => prev.filter((_, i) => i !== idx))}
+                                className="text-[11px] font-medium transition-opacity hover:opacity-70 flex-shrink-0"
+                                style={{ color: c.muted, background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                       <label
                         className="flex items-center justify-center gap-2 rounded-lg cursor-pointer transition-colors"
                         style={{
                           fontFamily: FONT,
                           fontSize: 13,
                           fontWeight: 500,
-                          color: fileAttached ? c.text : c.muted,
-                          background: fileAttached ? c.helperBg : "transparent",
+                          color: c.muted,
+                          background: "transparent",
                           border: `1.5px dashed ${c.border}`,
                           padding: "18px 12px",
                         }}
-                        onMouseEnter={e => { if (!fileAttached) { e.currentTarget.style.borderColor = c.razz; e.currentTarget.style.background = c.razzTintBg; } }}
-                        onMouseLeave={e => { if (!fileAttached) { e.currentTarget.style.borderColor = c.border; e.currentTarget.style.background = "transparent"; } }}
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = c.razz; e.currentTarget.style.background = c.razzTintBg; }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = c.border; e.currentTarget.style.background = "transparent"; }}
                       >
                         <input
                           type="file"
+                          multiple
                           className="hidden"
-                          onChange={e => setFileAttached(e.target.files?.[0]?.name ?? null)}
+                          onChange={e => {
+                            const picked = Array.from(e.target.files ?? []).map(f => f.name);
+                            if (picked.length) setFileAttached(prev => [...prev, ...picked]);
+                            // Reset the input so the same file can be re-picked
+                            // after removing (browsers ignore identical picks).
+                            e.currentTarget.value = "";
+                          }}
                         />
-                        {fileAttached ? (
-                          <>
-                            <Check className="w-3.5 h-3.5" style={{ color: "#0F7A63" }} strokeWidth={3} />
-                            <span className="font-semibold truncate">{fileAttached}</span>
-                            <button
-                              type="button"
-                              onClick={e => { e.preventDefault(); setFileAttached(null); }}
-                              className="ml-1 text-[11px] font-medium transition-opacity hover:opacity-70"
-                              style={{ color: c.muted, background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
-                            >
-                              Replace
-                            </button>
-                          </>
-                        ) : (
-                          <>
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={c.razz} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
-                            </svg>
-                            <span style={{ color: c.text }}>Drag &amp; Drop or browse</span>
-                          </>
-                        )}
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={c.razz} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
+                        </svg>
+                        <span style={{ color: c.text }}>{fileAttached.length > 0 ? "Add another file" : "Drag & Drop or browse"}</span>
                       </label>
                       <p className="text-[11px] mt-1" style={{ fontFamily: FONT, color: c.muted }}>
                         Accepted file formats: PDF, JPG, PNG, DOC, DOCX. Max. file size: 10MB
@@ -684,107 +1044,21 @@ export default function EndorsementBoard({ isDark, onBack }: Props) {
                 type="button"
                 onClick={openAdd}
                 className="w-full inline-flex items-center justify-center gap-1.5 py-3 rounded-2xl text-[12.5px] font-semibold transition-colors"
-                style={{ fontFamily: FONT, color: c.razz, background: "transparent", border: `1px dashed ${c.border}`, cursor: "pointer" }}
+                style={{ fontFamily: FONT, color: c.razz, background: "transparent", border: `1px dashed #D1D5DB`, cursor: "pointer" }}
                 onMouseEnter={e => { e.currentTarget.style.background = c.razzTintBg; e.currentTarget.style.borderColor = c.razz; }}
-                onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = c.border; }}
+                onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = "#D1D5DB"; }}
               >
                 <Plus className="w-3.5 h-3.5" />Add another change
               </button>
-            </div>
-          )}
-        </main>
 
-        {/* ── RIGHT: hero submit panel (like the 2FA card in the reference) */}
-        <aside
-          className="flex-shrink-0 overflow-y-auto"
-          style={{ width: 260, background: c.railBg, borderLeft: `1px solid ${c.border}`, padding: "16px 14px" }}
-        >
-          <div
-            className="rounded-2xl"
-            style={{ background: c.cardBg, border: `1px solid ${c.border}`, boxShadow: isDark ? "none" : "0 1px 2px rgba(15,23,42,0.04)" }}
-          >
-            <div className="px-5 pt-5 pb-4">
-              <h3 className="text-[14px] font-semibold" style={{ fontFamily: FONT, color: c.text }}>Ready to send?</h3>
-            </div>
-            {/* Meta rows */}
-            <div className="px-5 pb-4 flex flex-col gap-3">
-              <div className="flex items-center justify-between">
-                <span className="text-[11.5px] font-semibold" style={{ fontFamily: FONT, color: c.muted }}>Progress</span>
-                <span className="text-[11.5px] font-semibold" style={{ fontFamily: FONT, color: submitReady ? "#0F7A63" : c.razz }}>
-                  {totalDone} / {totalRequired}
-                </span>
-              </div>
-              <div className="h-1 rounded-full overflow-hidden" style={{ background: c.softDivider }}>
-                <div style={{ width: `${totalRequired === 0 ? 0 : (totalDone / totalRequired) * 100}%`, height: "100%", background: submitReady ? "#73C9B7" : razzGrad, transition: "width 300ms ease" }} />
-              </div>
-              <div className="flex flex-col gap-1.5 mt-1">
-                <label className="text-[11.5px] font-semibold" style={{ fontFamily: FONT, color: c.muted }}>Route to</label>
-                <div className="relative" onClick={e => e.stopPropagation()}>
-                  <button
-                    type="button"
-                    onClick={() => setCarrierOpen(o => !o)}
-                    className="w-full flex items-center justify-between transition-colors"
-                    style={{
-                      fontFamily: FONT,
-                      fontSize: 12.5,
-                      fontWeight: 600,
-                      color: c.text,
-                      background: c.cardBg,
-                      border: `1px solid ${carrierOpen ? c.razz : c.border}`,
-                      borderRadius: 8,
-                      padding: "8px 10px",
-                      cursor: "pointer",
-                      textAlign: "left",
-                    }}
-                  >
-                    <span>{carrier}</span>
-                    <ChevronDown className="w-3.5 h-3.5 transition-transform" style={{ color: c.muted, transform: carrierOpen ? "rotate(180deg)" : "rotate(0deg)" }} />
-                  </button>
-                  {carrierOpen && (
-                    <>
-                      <div className="fixed inset-0 z-30" onClick={() => setCarrierOpen(false)} />
-                      <div
-                        className="absolute left-0 right-0 top-full mt-1 z-40 rounded-lg overflow-hidden"
-                        style={{ background: c.cardBg, border: `1px solid ${c.border}`, boxShadow: "0 8px 24px rgba(15,23,42,0.10)" }}
-                      >
-                        {CARRIERS.map(name => {
-                          const active = name === carrier;
-                          return (
-                            <button
-                              key={name}
-                              type="button"
-                              onClick={() => { setCarrier(name); setCarrierOpen(false); }}
-                              className="w-full flex items-center justify-between transition-colors"
-                              style={{
-                                fontFamily: FONT,
-                                fontSize: 12.5,
-                                fontWeight: active ? 600 : 500,
-                                color: active ? c.razz : c.text,
-                                background: active ? c.razzTintBg : "transparent",
-                                border: "none",
-                                padding: "8px 10px",
-                                textAlign: "left",
-                                cursor: "pointer",
-                              }}
-                              onMouseEnter={e => { if (!active) e.currentTarget.style.background = c.hoverBg; }}
-                              onMouseLeave={e => { if (!active) e.currentTarget.style.background = "transparent"; }}
-                            >
-                              <span>{name}</span>
-                              {active && <Check className="w-3 h-3" strokeWidth={3} />}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-            <div className="px-5 py-4 flex flex-col gap-2" style={{ borderTop: `1px solid ${c.softDivider}` }}>
+              {/* Preview & submit — lives at the bottom of the form so users
+                  scroll down to the action instead of hunting for a right
+                  panel that isn't there anymore. */}
               <button
                 type="button"
                 disabled={!submitReady}
-                className="w-full inline-flex items-center justify-center gap-1.5 py-2 rounded-lg text-[12.5px] font-semibold transition-all"
+                onClick={() => setPreviewOpen(true)}
+                className="w-full inline-flex items-center justify-center gap-1.5 py-3 rounded-xl text-[13px] font-semibold transition-all"
                 style={submitReady ? {
                   fontFamily: FONT, color: "#fff", background: razzGrad, border: "none", cursor: "pointer", boxShadow: "0 4px 14px rgba(166,20,195,0.25)",
                 } : {
@@ -794,12 +1068,15 @@ export default function EndorsementBoard({ isDark, onBack }: Props) {
                 onMouseLeave={e => { e.currentTarget.style.filter = "none"; }}
               >
                 <Send className="w-3.5 h-3.5" />
-                {submitReady ? "Submit request" : `${totalRequired - totalDone} fields left`}
+                {submitReady
+                  ? "Preview & submit"
+                  : `${totalRequired - totalDone} ${totalRequired - totalDone === 1 ? "field" : "fields"} left`}
               </button>
             </div>
-          </div>
-        </aside>
+          )}
+        </main>
       </div>
+      )}
 
       {/* Add-change modal */}
       {addOpen && (
@@ -914,6 +1191,151 @@ export default function EndorsementBoard({ isDark, onBack }: Props) {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ── Preview-before-submit modal ─────────────────────────────────
+          Summarises every selected change + filled value in one scroll,
+          offers a Download (copy of the request) button and a Send
+          Now action that closes the modal + fires the top-right toast. */}
+      {previewOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-6"
+          style={{ background: "rgba(0,0,0,0.45)" }}
+          onClick={() => setPreviewOpen(false)}
+        >
+          <div
+            className="rounded-2xl flex flex-col"
+            style={{ background: c.cardBg, border: `1px solid ${c.border}`, width: "min(720px, 94vw)", maxHeight: "82vh", boxShadow: "0 20px 50px rgba(0,0,0,0.20)", fontFamily: FONT }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-6 pt-5 pb-4">
+              <div>
+                <h3 className="text-[16px] font-bold mb-0.5" style={{ color: c.text }}>Preview request</h3>
+                <p className="text-[12.5px]" style={{ color: c.muted }}>Review everything before it goes to the carrier.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreviewOpen(false)}
+                className="p-1.5 rounded-md transition-colors"
+                style={{ color: c.muted, background: "transparent", border: "none", cursor: "pointer" }}
+                onMouseEnter={e => { e.currentTarget.style.background = c.hoverBg; }}
+                onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="px-6 pb-5 overflow-y-auto">
+              {/* Policy header — echoes the sidebar identity block. */}
+              <div className="rounded-xl px-4 py-3 mb-4" style={{ background: c.railBg, border: `1px solid ${c.border}` }}>
+                <div className="text-[10.5px] font-bold uppercase tracking-wider mb-1" style={{ color: c.muted, letterSpacing: "0.08em" }}>Policy</div>
+                <div className="text-[13.5px] font-semibold" style={{ color: c.text }}>Byrne Insurance Group</div>
+                <div className="text-[12px] mt-0.5" style={{ color: c.razz, fontWeight: 500 }}>7038911131 · VIC00003362</div>
+              </div>
+
+              {/* Per-change summary — label + supporting field values. */}
+              <div className="flex flex-col gap-3">
+                {orderedSelected.map(k => {
+                  const meta = findMeta(k);
+                  const cm = CARD_META[k];
+                  const rows = cm.fields
+                    .map((f, i) => ({ label: f.label, value: (values[k]?.[i] ?? "").trim(), optional: !!f.optional }));
+                  return (
+                    <div key={k} className="rounded-xl px-4 py-3" style={{ background: c.cardBg, border: `1px solid ${c.border}` }}>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="text-[10.5px] font-bold uppercase tracking-wider" style={{ color: c.muted, letterSpacing: "0.08em" }}>{meta.group}</div>
+                        <button
+                          type="button"
+                          onClick={() => { setPreviewOpen(false); setTimeout(() => jumpToSection(k), 60); }}
+                          title="Edit this change"
+                          className="inline-flex items-center gap-1 text-[11px] font-semibold transition-opacity hover:opacity-70"
+                          style={{ color: c.razz, background: "transparent", border: "none", padding: 0, cursor: "pointer" }}
+                        >
+                          <FileEdit className="w-3 h-3" />Edit
+                        </button>
+                      </div>
+                      <div className="text-[14px] font-semibold mb-2" style={{ color: c.text }}>{meta.label}</div>
+                      <div className="flex flex-col gap-1.5">
+                        {rows.map(r => (
+                          <div key={r.label} className="flex items-start gap-3 text-[12.5px]" style={{ color: c.text }}>
+                            <span className="w-[42%] flex-shrink-0" style={{ color: c.muted }}>
+                              {r.label}{r.optional && <span style={{ color: c.sub }}> (optional)</span>}
+                            </span>
+                            <span className="flex-1 min-w-0" style={{ color: r.value ? c.text : c.sub, wordBreak: "break-word" }}>
+                              {r.value || "—"}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between gap-2 px-6 py-3" style={{ borderTop: `1px solid ${c.border}` }}>
+              <button
+                type="button"
+                onClick={() => setPreviewOpen(false)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-md text-[12px] font-semibold transition-colors"
+                style={{ color: c.text, background: c.cardBg, border: `1px solid ${c.border}`, cursor: "pointer" }}
+                onMouseEnter={e => { e.currentTarget.style.background = c.hoverBg; }}
+                onMouseLeave={e => { e.currentTarget.style.background = c.cardBg; }}
+              >
+                Back to editing
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPreviewOpen(false);
+                  setSubmitted(true);
+                  setToastOpen(true);
+                  window.setTimeout(() => setToastOpen(false), 6000);
+                }}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-md text-[12px] font-semibold transition-all"
+                style={{ color: "#fff", background: razzGrad, border: "none", cursor: "pointer" }}
+                onMouseEnter={e => (e.currentTarget.style.filter = "brightness(1.08)")}
+                onMouseLeave={e => (e.currentTarget.style.filter = "none")}
+              >
+                <Send className="w-3.5 h-3.5" />Send now
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Success toast — top-right, auto-hides after 4.5s. ─────────── */}
+      {toastOpen && (
+        <div
+          className="fixed z-[60] flex items-start gap-3 rounded-xl"
+          style={{
+            top: 24, right: 24,
+            width: 360,
+            padding: "12px 14px",
+            background: c.cardBg,
+            border: `1px solid ${c.border}`,
+            boxShadow: "0 12px 32px rgba(15,23,42,0.14)",
+            fontFamily: FONT,
+          }}
+        >
+          <span className="flex-shrink-0 flex items-center justify-center rounded-full" style={{ width: 24, height: 24, background: "rgba(115,201,183,0.18)" }}>
+            <Check className="w-3.5 h-3.5" strokeWidth={3} style={{ color: "#0F7A63" }} />
+          </span>
+          <div className="flex-1 min-w-0">
+            <div className="text-[13px] font-semibold" style={{ color: c.text }}>Request submitted</div>
+            <div className="text-[12px] mt-0.5" style={{ color: c.muted, lineHeight: 1.5 }}>
+              A copy has been emailed to your inbox.
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setToastOpen(false)}
+            className="p-1 rounded-md flex-shrink-0"
+            style={{ color: c.muted, background: "transparent", border: "none", cursor: "pointer" }}
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
         </div>
       )}
     </div>

@@ -8,7 +8,6 @@ import Agencies from "@/components/Agencies";
 import Quotes from "@/components/Quotes";
 import Policies from "@/components/Policies";
 import Endorsements from "@/components/Endorsements";
-import EndorsementBoard from "@/components/EndorsementBoard";
 import Marketplace from "@/components/Marketplace";
 import Website from "@/components/Website";
 import Pricing from "@/components/Pricing";
@@ -53,13 +52,7 @@ export default function DashboardShell({ children, pageTitle }: DashboardShellPr
       case "Policies":
         return <Policies isDark={darkMode} />;
       case "Endorsements":
-        return <Endorsements key="endorsements-3col" isDark={darkMode} layout="3col" />;
-      case "Endorsements · Design Option 1":
-        return <Endorsements key="endorsements-opt1" isDark={darkMode} layout="3col" skipSearch />;
-      case "Endorsements · Design Option 2":
-        return <Endorsements key="endorsements-opt2" isDark={darkMode} layout="2col" skipSearch />;
-      case "Endorsements · Design Option 3":
-        return <EndorsementBoard isDark={darkMode} onBack={() => setActivePage("Endorsements")} />;
+        return <Endorsements isDark={darkMode} />;
       case "Pricing":
         return <Pricing isDark={darkMode} />;
       default:
@@ -86,7 +79,7 @@ export default function DashboardShell({ children, pageTitle }: DashboardShellPr
         <TopBar isDark={darkMode} activePage={activePage} />
         <main
           className="flex-1 overflow-hidden transition-colors duration-300 px-12"
-          style={(() => { const fullHeightPages = ["Clients", "Agencies", "Admin", "Quotes", "Policies", "Endorsements", "Endorsements · Design Option 1", "Endorsements · Design Option 2", "Endorsements · Design Option 3"]; const isFullHeight = fullHeightPages.includes(activePage); return { background: darkMode ? "#0F1120" : "#ffffff", paddingTop: isFullHeight ? 0 : 24, paddingBottom: isFullHeight ? 48 : 24, display: isFullHeight ? "flex" : "block", flexDirection: "column" as const, overflowY: isFullHeight ? "hidden" : "auto", height: isFullHeight ? "100%" : "auto" }; })()}
+          style={(() => { const fullHeightPages = ["Clients", "Agencies", "Admin", "Quotes", "Policies", "Endorsements"]; const isFullHeight = fullHeightPages.includes(activePage); return { background: darkMode ? "#0F1120" : "#ffffff", paddingTop: isFullHeight ? 0 : 24, paddingBottom: isFullHeight ? 48 : 24, display: isFullHeight ? "flex" : "block", flexDirection: "column" as const, overflowY: isFullHeight ? "hidden" : "auto", height: isFullHeight ? "100%" : "auto" }; })()}
         >
           {renderPage()}
         </main>
