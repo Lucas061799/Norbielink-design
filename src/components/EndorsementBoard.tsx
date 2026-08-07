@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Check, ChevronDown, ChevronRight, Download, FileEdit, HelpCircle, Layers, Plus, Send, Shield, X } from "lucide-react";
+import { ArrowLeft, Check, ChevronDown, ChevronRight, FileEdit, HelpCircle, Layers, Plus, Printer, Send, Shield, X } from "lucide-react";
 import { AddressAutocomplete } from "./AddressAutocomplete";
 import { DatePicker } from "./DatePicker";
 import { StyledSelect } from "./StyledSelect";
@@ -212,10 +212,6 @@ const CARD_META: Record<EndorsementKey, { blurb: string; footNote?: string; fiel
                     { label: "Legal Name at this location", type: "text", placeholder: "Entity legal name", span: 2 },
                     { label: "DBA",                     type: "text", placeholder: "Doing-business-as name", span: 2, optional: true },
                     { label: "Operations performed at this location", type: "textarea", placeholder: "Describe operations…", span: 2 },
-                    { label: "Class Code",              type: "text", placeholder: "e.g. 5190", span: 1 },
-                    { label: "Payroll",                 type: "text", placeholder: "e.g. 50,000", span: 1 },
-                    { label: "Full Time Employees",     type: "text", placeholder: "e.g. 5", span: 1 },
-                    { label: "Part Time Employees",     type: "text", placeholder: "e.g. 2", span: 1 },
                   ] },
   entity:       { blurb: "Add, edit, or remove an entity on the policy — including ownership, entity type, and location exposure.",
                   fields: [
@@ -225,21 +221,12 @@ const CARD_META: Record<EndorsementKey, { blurb: string; footNote?: string; fiel
                     { label: "Other Entity Type (if Other selected)", type: "text", placeholder: "Describe entity type", span: 1, optional: true },
                     { label: "Legal Name",              type: "text", placeholder: "Entity legal name", span: 2 },
                     { label: "DBA",                     type: "text", placeholder: "Doing-business-as name", span: 2, optional: true },
-                    { label: "FEIN",                    type: "text", placeholder: "12-3456789", span: 1 },
-                    { label: "Owner First Name",        type: "text", placeholder: "Jane", span: 1 },
-                    { label: "Owner Last Name",         type: "text", placeholder: "Doe",  span: 1 },
-                    { label: "Owner Title",             type: "text", placeholder: "e.g. President", span: 1 },
-                    { label: "Ownership %",             type: "text", placeholder: "e.g. 100", span: 1 },
-                    { label: "Included / Excluded",     type: "select", options: ["Included", "Excluded"], span: 1 },
+                    { label: "FEIN",                    type: "text", placeholder: "12-3456789", span: 2 },
                     { label: "Entity Location — Address", type: "text", placeholder: "Street", span: 2 },
                     { label: "City",                    type: "text", placeholder: "City", span: 1 },
                     { label: "State",                   type: "select", options: US_STATES, span: 1 },
                     { label: "Zip",                     type: "text", placeholder: "ZIP", span: 1 },
                     { label: "Operations performed at this location", type: "textarea", placeholder: "Describe operations…", span: 2 },
-                    { label: "Class Code",              type: "text", placeholder: "e.g. 5190", span: 1 },
-                    { label: "Payroll",                 type: "text", placeholder: "e.g. 50,000", span: 1 },
-                    { label: "Full Time Employees",     type: "text", placeholder: "e.g. 5", span: 1 },
-                    { label: "Part Time Employees",     type: "text", placeholder: "e.g. 2", span: 1 },
                   ] },
   reinstate:    { blurb: "Request reinstatement of a cancelled policy.",   fields: [
                     { label: "Effective date",        type: "date", span: 1 },
@@ -273,9 +260,13 @@ function findMeta(key: EndorsementKey) {
 interface Props {
   isDark: boolean;
   onBack?: () => void;
+  // Set true when opening the board to review an already-submitted request
+  // (e.g. from the "View Existing" chooser on the Endorsements landing) so it
+  // opens straight in the submitted-recap view instead of the fresh intake.
+  initialSubmitted?: boolean;
 }
 
-export default function EndorsementBoard({ isDark, onBack }: Props) {
+export default function EndorsementBoard({ isDark, onBack, initialSubmitted = false }: Props) {
   const c = {
     text: isDark ? "#F9FAFB" : "#1F2937",
     muted: isDark ? "#8B8FA8" : "#6B7280",
@@ -294,15 +285,60 @@ export default function EndorsementBoard({ isDark, onBack }: Props) {
   };
   const razzGrad = "linear-gradient(90deg,#5C2ED4 0%,#A614C3 65%)";
 
-  const [selected, setSelected] = useState<Set<EndorsementKey>>(new Set());
-  const [activeKey, setActiveKey] = useState<EndorsementKey | null>(null);
+  // When opening for a review of an existing request, seed a plausible sample
+  // batch (Contact Info + Mailing Address + Officer + Class Code) so the recap
+  // reads as a real multi-change submission. A real backend hook-up would
+  // replace this with the actual submission's data.
+  const [selected, setSelected] = useState<Set<EndorsementKey>>(
+    initialSubmitted
+      ? new Set<EndorsementKey>(["contact", "mailing", "officer", "classcode"])
+      : new Set<EndorsementKey>()
+  );
+  const [activeKey, setActiveKey] = useState<EndorsementKey | null>(
+    initialSubmitted ? "contact" : null
+  );
   // Refs to each section card so sidebar clicks can smooth-scroll to them.
   const sectionRefs = useRef<Partial<Record<EndorsementKey, HTMLElement | null>>>({});
   const jumpToSection = (k: EndorsementKey) => {
     setActiveKey(k);
     sectionRefs.current[k]?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
-  const [values, setValues] = useState<Record<string, Record<number, string>>>({});
+  const [values, setValues] = useState<Record<string, Record<number, string>>>(
+    initialSubmitted
+      ? {
+          contact: {
+            0: "08/07/2026",         // Effective date
+            1: "Insured",            // Contact
+            2: "Sean",               // First Name
+            3: "Byrne",              // Last Name
+            4: "(916) 772-9200",     // Phone Number
+            5: "sbyrne@btisinc.com", // Email Address
+          },
+          mailing: {
+            0: "08/07/2026",         // Effective date
+            1: "587 Test St.",       // Street
+            2: "Sacramento",         // City
+            3: "CA",                 // State
+            4: "95814",              // ZIP
+          },
+          officer: {
+            0: "08/07/2026",         // Effective date
+            1: "Jordan",             // First Name
+            2: "Reeves",             // Last Name
+            3: "President",          // Title
+            4: "Excluded",           // Included / Excluded
+          },
+          classcode: {
+            0: "08/07/2026",         // Effective date
+            1: "Adding a new low-wage electrical worker; office role removed after Q2 restructuring.", // Reason
+            2: "587 Test St.",       // Location address
+            3: "Sacramento",         // City
+            4: "CA",                 // State
+            5: "95814",              // Zip
+          },
+        }
+      : {}
+  );
   const [addOpen, setAddOpen] = useState(false);
   const [addPicks, setAddPicks] = useState<Set<EndorsementKey>>(new Set());
   // Single universal supporting block for the whole request (matches Option 1).
@@ -311,16 +347,36 @@ export default function EndorsementBoard({ isDark, onBack }: Props) {
   // Class Code / Payroll repeatable rows — each row picks an action
   // (Add / Edit / Remove) and captures its own code + payroll + FT/PT.
   // Remove greys out the numeric cells; only the class code is required.
-  type CcRow = { action: "Add" | "Edit" | "Remove"; code: string; payroll: string; ft: string; pt: string };
-  const emptyCcRow = (): CcRow => ({ action: "Add", code: "", payroll: "", ft: "", pt: "" });
-  const [ccRows, setCcRows] = useState<CcRow[]>([emptyCcRow(), emptyCcRow()]);
+  // Excel spec (Class Code-Payroll sheet): Action dropdown is
+  // "(Add Class Code) (Remove Class Code) (Edit Payroll)" — payroll & FT/PT
+  // grey out when Remove Class Code is picked.
+  type CcAction = "Add Class Code" | "Remove Class Code" | "Edit Payroll";
+  type CcRow = { action: CcAction; code: string; payroll: string; ft: string; pt: string };
+  const emptyCcRow = (): CcRow => ({ action: "Add Class Code", code: "", payroll: "", ft: "", pt: "" });
+  // Per-card class-code grid state. classcode / location / entity all use the
+  // same repeat-row shape but each maintains its own rows so edits stay scoped.
+  type CcCard = "classcode" | "location" | "entity";
+  const [ccRowsByCard, setCcRowsByCard] = useState<Record<CcCard, CcRow[]>>({
+    classcode: [emptyCcRow(), emptyCcRow()],
+    location:  [emptyCcRow(), emptyCcRow()],
+    entity:    [emptyCcRow(), emptyCcRow()],
+  });
+  const getCcRows = (card: CcCard) => ccRowsByCard[card];
+  const setCcRowsForCard = (card: CcCard, updater: (rs: CcRow[]) => CcRow[]) =>
+    setCcRowsByCard(prev => ({ ...prev, [card]: updater(prev[card]) }));
+
+  // Entity Ownership grid — repeatable rows per Excel spec's Ownership
+  // Information section (First / Last / Title / Ownership % / Incl-Excl).
+  type OwnerRow = { first: string; last: string; title: string; pct: string; status: "Included" | "Excluded" };
+  const emptyOwnerRow = (): OwnerRow => ({ first: "", last: "", title: "", pct: "", status: "Included" });
+  const [entityOwners, setEntityOwners] = useState<OwnerRow[]>([emptyOwnerRow()]);
   // Collapsible section headers in the left rail — all open by default.
   const [openSections, setOpenSections] = useState<Set<string>>(new Set(["request", "policy", "help"]));
   // Preview-before-submit + top-right confirmation toast + submitted-state
   // (post-send view replaces the intake with a read-only summary).
   const [previewOpen, setPreviewOpen] = useState(false);
   const [toastOpen, setToastOpen] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
+  const [submitted, setSubmitted] = useState(initialSubmitted);
 
   const orderedSelected = useMemo(() => {
     const order = NAV.flatMap(g => g.items.map(it => it.key));
@@ -333,14 +389,22 @@ export default function EndorsementBoard({ isDark, onBack }: Props) {
   // Class Code / Payroll has a repeatable-row grid on top of the flat
   // fields; count it as one extra required item satisfied by any row that
   // has a class code entered.
-  const ccHasValidRow = () => ccRows.some(r => r.code.trim().length > 0);
+  const isCcCard = (k: EndorsementKey): k is CcCard => k === "classcode" || k === "location" || k === "entity";
+  const ccHasValidRow = (card: CcCard) => getCcRows(card).some(r => r.code.trim().length > 0);
+  const entityHasValidOwner = () => entityOwners.some(o => o.first.trim().length > 0);
   const doneCount = (k: EndorsementKey) => {
     const base = CARD_META[k].fields.reduce((n, f, i) => n + (!f.optional && (values[k]?.[i] ?? "").trim() ? 1 : 0), 0);
-    return k === "classcode" ? base + (ccHasValidRow() ? 1 : 0) : base;
+    let extra = 0;
+    if (isCcCard(k) && ccHasValidRow(k)) extra += 1;
+    if (k === "entity" && entityHasValidOwner()) extra += 1;
+    return base + extra;
   };
   const requiredCount = (k: EndorsementKey) => {
     const base = CARD_META[k].fields.filter(f => !f.optional).length;
-    return k === "classcode" ? base + 1 : base;
+    let extra = 0;
+    if (isCcCard(k)) extra += 1;         // class-code grid
+    if (k === "entity") extra += 1;      // ownership grid
+    return base + extra;
   };
   const totalRequired = orderedSelected.reduce((sum, k) => sum + requiredCount(k), 0);
   const totalDone     = orderedSelected.reduce((sum, k) => sum + doneCount(k), 0);
@@ -440,6 +504,199 @@ export default function EndorsementBoard({ isDark, onBack }: Props) {
     setAddPicks(prev => { const s = new Set(prev); s.has(k) ? s.delete(k) : s.add(k); return s; });
   };
 
+  // Renders the repeatable Action / Class Code / Payroll / FT / PT grid used
+  // by classcode, location, and entity cards. Each caller shares the shape but
+  // maintains its own rows via ccRowsByCard so edits stay scoped.
+  // Entity Ownership grid — repeatable rows for the Ownership Information
+  // block on the Entity endorsement (Excel spec). First / Last / Title /
+  // Ownership % / Included-Excluded, with + Add owner and per-row remove.
+  const renderOwnerGrid = () => {
+    const cols = "1.1fr 1.1fr 1.1fr 140px 130px 40px";
+    return (
+      <div className="flex flex-col gap-2" style={{ gridColumn: "span 2" }}>
+        <p className="text-[12px]" style={{ fontFamily: FONT, color: c.text, margin: 0, fontWeight: 500 }}>
+          Ownership Information <span style={{ color: c.muted, fontWeight: 400 }}>(if adding excluded owners, please attach a signed waiver form)</span>
+        </p>
+        <div style={{ border: `1px solid ${c.border}`, borderRadius: 10, marginTop: 4 }}>
+          <div style={{ display: "grid", gridTemplateColumns: cols, background: c.helperBg, borderTopLeftRadius: 10, borderTopRightRadius: 10 }}>
+            {["First name","Last name","Title","Ownership %","Status",""].map((h, hi) => (
+              <div key={hi} style={{ padding: "8px 12px", borderBottom: `1px solid ${c.border}`, fontFamily: FONT, fontSize: 10.5, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", color: c.muted }}>{h}</div>
+            ))}
+          </div>
+          {entityOwners.map((row, ridx) => {
+            const isLast = ridx === entityOwners.length - 1;
+            const cellStyle: React.CSSProperties = {
+              padding: 0,
+              borderBottom: isLast ? "none" : `1px solid ${c.softDivider}`,
+              borderRight: `1px solid ${c.softDivider}`,
+              display: "flex", alignItems: "stretch", minHeight: 44,
+            };
+            const rowInputStyle: React.CSSProperties = {
+              fontFamily: FONT, fontSize: 13, color: c.text,
+              background: "transparent", border: "none", padding: "10px 12px",
+              width: "100%", outline: "none",
+            };
+            const patch = (p: Partial<OwnerRow>) => setEntityOwners(rs => rs.map((r, j) => j === ridx ? { ...r, ...p } : r));
+            return (
+              <div key={ridx} style={{ display: "grid", gridTemplateColumns: cols, position: "relative" }}>
+                <div style={cellStyle}>
+                  <input value={row.first} onChange={e => patch({ first: e.target.value })} placeholder="Jane" style={rowInputStyle} />
+                </div>
+                <div style={cellStyle}>
+                  <input value={row.last} onChange={e => patch({ last: e.target.value })} placeholder="Doe" style={rowInputStyle} />
+                </div>
+                <div style={cellStyle}>
+                  <input value={row.title} onChange={e => patch({ title: e.target.value })} placeholder="e.g. President" style={rowInputStyle} />
+                </div>
+                <div style={cellStyle}>
+                  <input value={row.pct} onChange={e => patch({ pct: e.target.value })} placeholder="e.g. 100" inputMode="numeric" style={rowInputStyle} />
+                </div>
+                <div style={{ ...cellStyle, display: "block" }}>
+                  <StyledSelect
+                    value={row.status}
+                    onChange={v => patch({ status: v as OwnerRow["status"] })}
+                    options={["Included", "Excluded"]}
+                    labelFor={v => v}
+                    triggerStyle={{ ...rowInputStyle, padding: "10px 16px", background: "transparent", border: "none" }}
+                    c={{ text: c.text, muted: c.muted, border: c.border, cardBg: c.cardBg, hoverBg: c.hoverBg, razz: c.razz, razzTintBg: c.razzTintBg }}
+                    font={{ fontFamily: FONT }}
+                  />
+                </div>
+                <div style={{ ...cellStyle, borderRight: "none", justifyContent: "center" }}>
+                  <button
+                    type="button"
+                    onClick={() => setEntityOwners(rs => rs.length > 1 ? rs.filter((_, j) => j !== ridx) : rs)}
+                    title="Remove owner"
+                    style={{ background: "transparent", border: "none", color: c.muted, cursor: "pointer", padding: 4, display: "flex", alignItems: "center", justifyContent: "center" }}
+                    onMouseEnter={e => (e.currentTarget.style.color = "#EF4444")}
+                    onMouseLeave={e => (e.currentTarget.style.color = c.muted)}
+                  >
+                    <X className="w-3.5 h-3.5" strokeWidth={2} />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <button
+          type="button"
+          onClick={() => setEntityOwners(rs => [...rs, emptyOwnerRow()])}
+          style={{
+            width: "100%",
+            fontFamily: FONT, fontSize: 12.5, fontWeight: 600,
+            color: c.razz, background: "transparent",
+            border: `1px dashed ${c.border}`, borderRadius: 8,
+            padding: "10px 14px", cursor: "pointer", marginTop: 4,
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = c.razzTintBg; e.currentTarget.style.borderColor = c.razz; }}
+          onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = c.border; }}
+        >
+          + Add owner
+        </button>
+      </div>
+    );
+  };
+
+  const renderCcGrid = (card: CcCard) => {
+    const rows = getCcRows(card);
+    // Section headers come straight from the Excel spec ("Please provide
+    // exposure for this new location only.", etc.). Class Code / Payroll
+    // itself has no header in the spec — it goes directly from the reason
+    // field into the grid.
+    const CC_HEADERS: Record<CcCard, string | null> = {
+      classcode: null,
+      location:  "Please provide exposure for this location.",
+      entity:    "Please provide exposure for this entity.",
+    };
+    const header = CC_HEADERS[card];
+    return (
+      <div className="flex flex-col gap-2" style={{ gridColumn: "span 2" }}>
+        {header && (
+          <p className="text-[12px]" style={{ fontFamily: FONT, color: c.text, margin: 0, fontWeight: 500 }}>
+            {header}
+          </p>
+        )}
+        <div style={{ border: `1px solid ${c.border}`, borderRadius: 10, marginTop: 4 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "180px 1.4fr 1fr .6fr .6fr 40px", background: c.helperBg, borderTopLeftRadius: 10, borderTopRightRadius: 10 }}>
+            {["Action","Class code","Payroll","FT","PT",""].map((h, hi) => (
+              <div key={hi} style={{ padding: "8px 12px", borderBottom: `1px solid ${c.border}`, fontFamily: FONT, fontSize: 10.5, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", color: c.muted }}>{h}</div>
+            ))}
+          </div>
+          {rows.map((row, ridx) => {
+            const isRemove = row.action === "Remove Class Code";
+            const isLast = ridx === rows.length - 1;
+            const cellStyle: React.CSSProperties = {
+              padding: 0,
+              borderBottom: isLast ? "none" : `1px solid ${c.softDivider}`,
+              borderRight: `1px solid ${c.softDivider}`,
+              display: "flex", alignItems: "stretch", minHeight: 44,
+            };
+            const rowInputStyle: React.CSSProperties = {
+              fontFamily: FONT, fontSize: 13, color: c.text,
+              background: "transparent", border: "none", padding: "10px 12px",
+              width: "100%", outline: "none",
+            };
+            const patch = (p: Partial<CcRow>) => setCcRowsForCard(card, rs => rs.map((r, j) => j === ridx ? { ...r, ...p } : r));
+            return (
+              <div key={ridx} style={{ display: "grid", gridTemplateColumns: "180px 1.4fr 1fr .6fr .6fr 40px", position: "relative" }}>
+                <div style={{ ...cellStyle, display: "block" }}>
+                  <StyledSelect
+                    value={row.action}
+                    onChange={v => { const a = v as CcRow["action"]; patch({ action: a, ...(a === "Remove Class Code" ? { payroll: "", ft: "", pt: "" } : {}) }); }}
+                    options={["Add Class Code", "Remove Class Code", "Edit Payroll"]}
+                    labelFor={v => v}
+                    triggerStyle={{ ...rowInputStyle, padding: "10px 16px", background: "transparent", border: "none" }}
+                    c={{ text: c.text, muted: c.muted, border: c.border, cardBg: c.cardBg, hoverBg: c.hoverBg, razz: c.razz, razzTintBg: c.razzTintBg }}
+                    font={{ fontFamily: FONT }}
+                  />
+                </div>
+                <div style={cellStyle}>
+                  <input value={row.code} onChange={e => patch({ code: e.target.value })} placeholder="e.g. 5190" style={rowInputStyle} />
+                </div>
+                <div style={cellStyle}>
+                  <input value={row.payroll} onChange={e => patch({ payroll: e.target.value })} placeholder="50,000" disabled={isRemove} style={{ ...rowInputStyle, opacity: isRemove ? 0.35 : 1, cursor: isRemove ? "not-allowed" : "text" }} />
+                </div>
+                <div style={cellStyle}>
+                  <input value={row.ft} onChange={e => patch({ ft: e.target.value })} placeholder="0" disabled={isRemove} style={{ ...rowInputStyle, opacity: isRemove ? 0.35 : 1, cursor: isRemove ? "not-allowed" : "text" }} />
+                </div>
+                <div style={cellStyle}>
+                  <input value={row.pt} onChange={e => patch({ pt: e.target.value })} placeholder="0" disabled={isRemove} style={{ ...rowInputStyle, opacity: isRemove ? 0.35 : 1, cursor: isRemove ? "not-allowed" : "text" }} />
+                </div>
+                <div style={{ ...cellStyle, borderRight: "none", justifyContent: "center" }}>
+                  <button
+                    type="button"
+                    onClick={() => setCcRowsForCard(card, rs => rs.length > 1 ? rs.filter((_, j) => j !== ridx) : rs)}
+                    title="Remove line"
+                    style={{ background: "transparent", border: "none", color: c.muted, cursor: "pointer", padding: 4, display: "flex", alignItems: "center", justifyContent: "center" }}
+                    onMouseEnter={e => (e.currentTarget.style.color = "#EF4444")}
+                    onMouseLeave={e => (e.currentTarget.style.color = c.muted)}
+                  >
+                    <X className="w-3.5 h-3.5" strokeWidth={2} />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <button
+          type="button"
+          onClick={() => setCcRowsForCard(card, rs => [...rs, emptyCcRow()])}
+          style={{
+            width: "100%",
+            fontFamily: FONT, fontSize: 12.5, fontWeight: 600,
+            color: c.razz, background: "transparent",
+            border: `1px dashed ${c.border}`, borderRadius: 8,
+            padding: "10px 14px", cursor: "pointer", marginTop: 4,
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = c.razzTintBg; e.currentTarget.style.borderColor = c.razz; }}
+          onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = c.border; }}
+        >
+          + Add line
+        </button>
+      </div>
+    );
+  };
+
   return (
     <div
       className="flex flex-col flex-1 min-h-0 overflow-hidden"
@@ -485,7 +742,7 @@ export default function EndorsementBoard({ isDark, onBack }: Props) {
         <div className="flex flex-1 min-h-0">
           {/* LEFT rail — mirrors the intake sidebar, everything green now. */}
           <aside className="flex-shrink-0 overflow-y-auto"
-            style={{ width: 220, background: c.railBg, borderRight: `1px solid ${c.border}`, padding: "24px 10px 16px" }}>
+            style={{ width: 220, background: c.pageBg, borderRight: `1px solid ${c.border}`, padding: "24px 10px 16px" }}>
             <div className="px-2 pb-3 mb-3" style={{ borderBottom: `1px solid ${c.border}` }}>
               <div className="text-[13.5px] font-semibold leading-tight truncate" style={{ fontFamily: FONT, color: c.text, letterSpacing: "-0.01em" }}>
                 Byrne Insurance Group
@@ -521,13 +778,17 @@ export default function EndorsementBoard({ isDark, onBack }: Props) {
                 return (
                   <div className="rounded-2xl px-6 py-5 flex items-start gap-3"
                     style={{ background: c.cardBg, border: `1px solid ${c.border}`, boxShadow: isDark ? "none" : "0 1px 2px rgba(15,23,42,0.04)" }}>
-                    <span className="flex-shrink-0 flex items-center justify-center rounded-full" style={{ width: 36, height: 36, background: "rgba(115,201,183,0.18)" }}>
-                      <Check className="w-4 h-4" strokeWidth={3} style={{ color: "#0F7A63" }} />
+                    <span className="flex-shrink-0 flex items-center justify-center rounded-full" style={{ width: 36, height: 36, background: isDark ? "rgba(115,201,183,0.22)" : "rgba(115,201,183,0.18)" }}>
+                      <Check className="w-4 h-4" strokeWidth={3} style={{ color: isDark ? "#73C9B7" : "#0F7A63" }} />
                     </span>
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-[16px] font-bold" style={{ fontFamily: FONT, color: c.text }}>Request submitted</h3>
+                      <h3 className="text-[16px] font-bold" style={{ fontFamily: FONT, color: c.text }}>
+                        {initialSubmitted ? "Submitted request" : "Request submitted"}
+                      </h3>
                       <p className="text-[12.5px] mt-1" style={{ fontFamily: FONT, color: c.muted, lineHeight: 1.5 }}>
-                        A copy has been emailed to your inbox. The carrier team will follow up if anything else is needed.
+                        {initialSubmitted
+                          ? "Submitted Jul 24, 2026. Print a copy for your records or start a new request below."
+                          : "A copy has been emailed to your inbox. Our team will follow up if anything else is needed."}
                       </p>
                     </div>
                     {/* Quick circular download shortcut — same action as the
@@ -536,8 +797,8 @@ export default function EndorsementBoard({ isDark, onBack }: Props) {
                     <button
                       type="button"
                       onClick={downloadCopy}
-                      title="Download a copy"
-                      aria-label="Download a copy"
+                      title="Print"
+                      aria-label="Print"
                       className="flex-shrink-0 inline-flex items-center justify-center rounded-full transition-colors"
                       style={{
                         width: 28, height: 28,
@@ -549,7 +810,7 @@ export default function EndorsementBoard({ isDark, onBack }: Props) {
                       onMouseEnter={e => { e.currentTarget.style.background = c.hoverBg; e.currentTarget.style.color = c.razz; }}
                       onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = c.muted; }}
                     >
-                      <Download className="w-3.5 h-3.5" />
+                      <Printer className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 );
@@ -599,7 +860,7 @@ export default function EndorsementBoard({ isDark, onBack }: Props) {
                   onMouseEnter={e => { e.currentTarget.style.background = c.hoverBg; }}
                   onMouseLeave={e => { e.currentTarget.style.background = c.cardBg; }}
                 >
-                  <Download className="w-3.5 h-3.5" />Download a copy
+                  <Printer className="w-3.5 h-3.5" />Print
                 </button>
                 {onBack && (
                   <button
@@ -610,7 +871,7 @@ export default function EndorsementBoard({ isDark, onBack }: Props) {
                     onMouseEnter={e => (e.currentTarget.style.filter = "brightness(1.08)")}
                     onMouseLeave={e => (e.currentTarget.style.filter = "none")}
                   >
-                    Back to Endorsements
+                    Submit a new Request
                   </button>
                 )}
               </div>
@@ -625,7 +886,7 @@ export default function EndorsementBoard({ isDark, onBack }: Props) {
         {/* ── LEFT: nested navigator, softer gray bg, no borders on rows */}
         <aside
           className="flex-shrink-0 overflow-y-auto"
-          style={{ width: 220, background: c.railBg, borderRight: `1px solid ${c.border}`, padding: "24px 10px 16px" }}
+          style={{ width: 220, background: c.pageBg, borderRight: `1px solid ${c.border}`, padding: "24px 10px 16px" }}
         >
           {/* Policy identity — top-aligned with the first center card's
               outer border (both sit at aside/main padding-top = 24px). */}
@@ -711,20 +972,20 @@ export default function EndorsementBoard({ isDark, onBack }: Props) {
               style={{
                 fontFamily: FONT,
                 fontSize: 12.5,
-                fontWeight: 500,
+                fontWeight: 600,
                 color: c.razz,
-                background: "transparent",
-                border: "1px solid transparent",
+                background: c.razzTintBg,
+                border: `1px dashed ${c.razz}`,
                 padding: "8px 10px",
                 borderRadius: 8,
                 cursor: "pointer",
-                marginTop: 4,
+                marginTop: 8,
               }}
-              onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
-              onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+              onMouseEnter={e => { e.currentTarget.style.background = razzGrad; e.currentTarget.style.color = "#ffffff"; e.currentTarget.style.borderColor = "transparent"; }}
+              onMouseLeave={e => { e.currentTarget.style.background = c.razzTintBg; e.currentTarget.style.color = c.razz; e.currentTarget.style.borderColor = c.razz; }}
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>Add change</span>
+              <span>Add more Changes</span>
             </button>
           </div>
 
@@ -892,7 +1153,7 @@ export default function EndorsementBoard({ isDark, onBack }: Props) {
                             waiver:        [5, 9], // Holder block + Jobsite block
                             thirdpartynoc: [2],
                             location:      [2],
-                            entity:        [12],
+                            entity:        [7],
                           };
                           const addrIdxs = ADDR_BLOCKS[k] ?? [];
                           if (addrIdxs.some(a => i === a + 1 || i === a + 2 || i === a + 3)) return null;
@@ -900,93 +1161,8 @@ export default function EndorsementBoard({ isDark, onBack }: Props) {
                           const showCcAddressExtras = currentAddrIdx !== undefined;
                           return (
                             <Fragment key={i}>
-                              {showCcGrid && (
-                                <div className="flex flex-col gap-2" style={{ gridColumn: "span 2" }}>
-                                  <div className="text-[11px] font-bold uppercase tracking-wider" style={{ fontFamily: FONT, color: c.muted, letterSpacing: "0.05em" }}>
-                                    Class code changes
-                                  </div>
-                                  <p className="text-[12px]" style={{ fontFamily: FONT, color: c.muted, margin: 0 }}>
-                                    Choose an action per line. On <b>Remove</b>, payroll and employee counts grey out — only the class code is needed.
-                                  </p>
-                                  <div style={{ border: `1px solid ${c.border}`, borderRadius: 10, marginTop: 4 }}>
-                                    <div style={{ display: "grid", gridTemplateColumns: "130px 1.6fr 1fr .6fr .6fr 40px", background: c.helperBg, borderTopLeftRadius: 10, borderTopRightRadius: 10 }}>
-                                      {["Action","Class code","Payroll","FT","PT",""].map((h, hi) => (
-                                        <div key={hi} style={{ padding: "8px 10px", borderBottom: `1px solid ${c.border}`, fontFamily: FONT, fontSize: 10.5, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", color: c.muted }}>{h}</div>
-                                      ))}
-                                    </div>
-                                    {ccRows.map((row, ridx) => {
-                                      const isRemove = row.action === "Remove";
-                                      const isLast = ridx === ccRows.length - 1;
-                                      const cellStyle: React.CSSProperties = {
-                                        padding: 0,
-                                        borderBottom: isLast ? "none" : `1px solid ${c.softDivider}`,
-                                        borderRight: `1px solid ${c.softDivider}`,
-                                        display: "flex", alignItems: "stretch", minHeight: 44,
-                                      };
-                                      const rowInputStyle: React.CSSProperties = {
-                                        fontFamily: FONT, fontSize: 13, color: c.text,
-                                        background: "transparent", border: "none", padding: "10px 12px",
-                                        width: "100%", outline: "none",
-                                      };
-                                      const patch = (p: Partial<CcRow>) => setCcRows(rs => rs.map((r, j) => j === ridx ? { ...r, ...p } : r));
-                                      return (
-                                        <div key={ridx} style={{ display: "grid", gridTemplateColumns: "130px 1.6fr 1fr .6fr .6fr 40px", position: "relative" }}>
-                                          <div style={{ ...cellStyle, display: "block" }}>
-                                            <StyledSelect
-                                              value={row.action}
-                                              onChange={v => { const a = v as CcRow["action"]; patch({ action: a, ...(a === "Remove" ? { payroll: "", ft: "", pt: "" } : {}) }); }}
-                                              options={["Add", "Edit", "Remove"]}
-                                              labelFor={v => v}
-                                              triggerStyle={{ ...rowInputStyle, padding: "10px 16px", background: "transparent", border: "none" }}
-                                              c={{ text: c.text, muted: c.muted, border: c.border, cardBg: c.cardBg, hoverBg: c.hoverBg, razz: c.razz, razzTintBg: c.razzTintBg }}
-                                              font={{ fontFamily: FONT }}
-                                            />
-                                          </div>
-                                          <div style={cellStyle}>
-                                            <input value={row.code} onChange={e => patch({ code: e.target.value })} placeholder="e.g. 5190" style={rowInputStyle} />
-                                          </div>
-                                          <div style={cellStyle}>
-                                            <input value={row.payroll} onChange={e => patch({ payroll: e.target.value })} placeholder="50,000" disabled={isRemove} style={{ ...rowInputStyle, opacity: isRemove ? 0.35 : 1, cursor: isRemove ? "not-allowed" : "text" }} />
-                                          </div>
-                                          <div style={cellStyle}>
-                                            <input value={row.ft} onChange={e => patch({ ft: e.target.value })} placeholder="0" disabled={isRemove} style={{ ...rowInputStyle, opacity: isRemove ? 0.35 : 1, cursor: isRemove ? "not-allowed" : "text" }} />
-                                          </div>
-                                          <div style={cellStyle}>
-                                            <input value={row.pt} onChange={e => patch({ pt: e.target.value })} placeholder="0" disabled={isRemove} style={{ ...rowInputStyle, opacity: isRemove ? 0.35 : 1, cursor: isRemove ? "not-allowed" : "text" }} />
-                                          </div>
-                                          <div style={{ ...cellStyle, borderRight: "none", justifyContent: "center" }}>
-                                            <button
-                                              type="button"
-                                              onClick={() => setCcRows(rs => rs.length > 1 ? rs.filter((_, j) => j !== ridx) : rs)}
-                                              title="Remove line"
-                                              style={{ background: "transparent", border: "none", color: c.muted, cursor: "pointer", padding: 4, display: "flex", alignItems: "center", justifyContent: "center" }}
-                                              onMouseEnter={e => (e.currentTarget.style.color = "#EF4444")}
-                                              onMouseLeave={e => (e.currentTarget.style.color = c.muted)}
-                                            >
-                                              <X className="w-3.5 h-3.5" strokeWidth={2} />
-                                            </button>
-                                          </div>
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                  <button
-                                    type="button"
-                                    onClick={() => setCcRows(rs => [...rs, emptyCcRow()])}
-                                    style={{
-                                      width: "100%",
-                                      fontFamily: FONT, fontSize: 12.5, fontWeight: 600,
-                                      color: c.razz, background: "transparent",
-                                      border: `1px dashed ${c.border}`, borderRadius: 8,
-                                      padding: "10px 14px", cursor: "pointer", marginTop: 4,
-                                    }}
-                                    onMouseEnter={e => { e.currentTarget.style.background = c.razzTintBg; e.currentTarget.style.borderColor = c.razz; }}
-                                    onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = c.border; }}
-                                  >
-                                    + Add line
-                                  </button>
-                                </div>
-                              )}
+                              {showCcGrid && renderCcGrid("classcode")}
+                              {k === "entity" && i === 7 && renderOwnerGrid()}
                             <div className="flex flex-col gap-1.5" style={{ gridColumn: `span ${f.span ?? 2}` }}>
                               <label className="text-[11.5px] font-semibold flex items-center gap-1" style={{ fontFamily: FONT, color: c.text }}>
                                 {f.label}
@@ -1190,6 +1366,7 @@ export default function EndorsementBoard({ isDark, onBack }: Props) {
                             </Fragment>
                           );
                         })}
+                        {(k === "location" || k === "entity") && renderCcGrid(k)}
                       </div>
                       {cm.footNote && (
                         <p className="text-[11.5px] mt-3" style={{ fontFamily: FONT, color: c.muted, lineHeight: 1.5 }}>{cm.footNote}</p>
@@ -1310,7 +1487,7 @@ export default function EndorsementBoard({ isDark, onBack }: Props) {
                 onMouseEnter={e => { e.currentTarget.style.background = c.razzTintBg; e.currentTarget.style.borderColor = c.razz; }}
                 onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = "#D1D5DB"; }}
               >
-                <Plus className="w-3.5 h-3.5" />Add another change
+                <Plus className="w-3.5 h-3.5" />Add more Changes
               </button>
 
               {/* Preview & submit — lives at the bottom of the form so users
@@ -1476,8 +1653,8 @@ export default function EndorsementBoard({ isDark, onBack }: Props) {
           >
             <div className="flex items-center justify-between px-6 pt-5 pb-4">
               <div>
-                <h3 className="text-[16px] font-bold mb-0.5" style={{ color: c.text }}>Preview request</h3>
-                <p className="text-[12.5px]" style={{ color: c.muted }}>Review everything before it goes to the carrier.</p>
+                <h3 className="text-[16px] font-bold mb-0.5" style={{ color: c.text }}>Preview Endorsement Request</h3>
+                <p className="text-[12.5px]" style={{ color: c.muted }}>Review everything before it goes to our team.</p>
               </div>
               <button
                 type="button"
@@ -1508,18 +1685,7 @@ export default function EndorsementBoard({ isDark, onBack }: Props) {
                     .map((f, i) => ({ label: f.label, value: (values[k]?.[i] ?? "").trim(), optional: !!f.optional }));
                   return (
                     <div key={k} className="rounded-xl px-4 py-3" style={{ background: c.cardBg, border: `1px solid ${c.border}` }}>
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="text-[10.5px] font-bold uppercase tracking-wider" style={{ color: c.muted, letterSpacing: "0.08em" }}>{meta.group}</div>
-                        <button
-                          type="button"
-                          onClick={() => { setPreviewOpen(false); setTimeout(() => jumpToSection(k), 60); }}
-                          title="Edit this change"
-                          className="inline-flex items-center gap-1 text-[11px] font-semibold transition-opacity hover:opacity-70"
-                          style={{ color: c.razz, background: "transparent", border: "none", padding: 0, cursor: "pointer" }}
-                        >
-                          <FileEdit className="w-3 h-3" />Edit
-                        </button>
-                      </div>
+                      <div className="text-[10.5px] font-bold uppercase tracking-wider mb-2" style={{ color: c.muted, letterSpacing: "0.08em" }}>{meta.group}</div>
                       <div className="text-[14px] font-semibold mb-2" style={{ color: c.text }}>{meta.label}</div>
                       <div className="flex flex-col gap-1.5">
                         {rows.map(r => (

@@ -75,6 +75,9 @@ export default function Endorsements({ isDark, layout = "3col", skipSearch = fal
   // time so re-opening the chooser without navigating doesn't retarget the
   // in-flight intake.
   const [intakePolicy, setIntakePolicy] = useState<SearchResult | null>(skipSearch ? SEARCH_RESULTS[0] : null);
+  // When true, EndorsementBoard opens directly in its submitted recap state —
+  // used by "View Existing" so users see the review page for a prior request.
+  const [viewingExisting, setViewingExisting] = useState(false);
 
   // Pagination — matches the Policies table footer (10 / 20 / 50 per page).
   const [page, setPage] = useState(1);
@@ -120,19 +123,20 @@ export default function Endorsements({ isDark, layout = "3col", skipSearch = fal
   // "New Request" → snapshot the row and open the structured intake.
   const handleChooseNew = () => {
     if (pendingResult) setIntakePolicy(pendingResult);
+    setViewingExisting(false);
     setChooseOpen(false);
     setView("form");
   };
 
-  // "View Existing" — drop straight into the submission success view so the
-  // user sees the submitted-request recap (the same page they'd reach after
-  // clicking Submit on a New Request). In the mock this shows the confirmation
-  // recap; wired against a real backend it would hydrate with the previously-
-  // submitted request's data.
+  // "View Existing" — open the intake surface but jump straight to its
+  // submitted-recap view. Mock seeds a sample Contact Info change so the
+  // recap has something to show; a real backend hookup would hydrate with
+  // the previously-submitted request's data.
   const handleChooseExisting = () => {
     if (pendingResult) setIntakePolicy(pendingResult);
+    setViewingExisting(true);
     setChooseOpen(false);
-    setView("success");
+    setView("form");
   };
 
   const handleSubmit = () => setView("success");
@@ -176,7 +180,12 @@ export default function Endorsements({ isDark, layout = "3col", skipSearch = fal
       )}
 
       {view === "form" && intakePolicy && (
-        <EndorsementBoard isDark={isDark} onBack={handleBack} />
+        <EndorsementBoard
+          key={viewingExisting ? "existing" : "new"}
+          isDark={isDark}
+          onBack={handleBack}
+          initialSubmitted={viewingExisting}
+        />
       )}
 
       {view !== "form" && (
@@ -271,7 +280,7 @@ export default function Endorsements({ isDark, layout = "3col", skipSearch = fal
             {[
               { icon: Search,        title: "1. Find your policy",   body: "Search by policy number, submission ID, or insured name — we'll pull it up instantly." },
               { icon: ClipboardList, title: "2. Tell us what changed", body: "Add coverage, update limits, swap a vehicle — just describe the change and attach docs." },
-              { icon: Send,          title: "3. We route it",         body: "Your request lands with the right carrier team the moment you hit submit." },
+              { icon: Send,          title: "3. We route it",         body: "Your request lands with our team the moment you hit submit." },
             ].map(step => {
               const Icon = step.icon;
               return (
