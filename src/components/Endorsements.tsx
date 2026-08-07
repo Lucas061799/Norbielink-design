@@ -185,6 +185,7 @@ export default function Endorsements({ isDark, layout = "3col", skipSearch = fal
           isDark={isDark}
           onBack={handleBack}
           initialSubmitted={viewingExisting}
+          onNewRequest={() => setViewingExisting(false)}
         />
       )}
 

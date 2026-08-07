@@ -264,9 +264,13 @@ interface Props {
   // (e.g. from the "View Existing" chooser on the Endorsements landing) so it
   // opens straight in the submitted-recap view instead of the fresh intake.
   initialSubmitted?: boolean;
+  // Fired from the recap page's "Submit a new Request" CTA. Parents use this
+  // to remount the board in fresh-intake mode with the same policy still
+  // selected — instead of falling back to onBack which returns to search.
+  onNewRequest?: () => void;
 }
 
-export default function EndorsementBoard({ isDark, onBack, initialSubmitted = false }: Props) {
+export default function EndorsementBoard({ isDark, onBack, initialSubmitted = false, onNewRequest }: Props) {
   const c = {
     text: isDark ? "#F9FAFB" : "#1F2937",
     muted: isDark ? "#8B8FA8" : "#6B7280",
@@ -862,10 +866,10 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
                 >
                   <Printer className="w-3.5 h-3.5" />Print
                 </button>
-                {onBack && (
+                {(onNewRequest || onBack) && (
                   <button
                     type="button"
-                    onClick={onBack}
+                    onClick={onNewRequest ?? onBack}
                     className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-[13px] font-semibold transition-all"
                     style={{ fontFamily: FONT, color: "#fff", background: razzGrad, border: "none", cursor: "pointer" }}
                     onMouseEnter={e => (e.currentTarget.style.filter = "brightness(1.08)")}
