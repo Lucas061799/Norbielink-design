@@ -880,14 +880,24 @@ export default function EndorsementBoard({ isDark, onBack }: Props) {
                             width: "100%",
                           };
                           const showCcGrid = k === "classcode" && i === 1;
-                          // Compact the classcode Location block onto 2 rows:
-                          // row 1 is Address (full width), row 2 packs City +
-                          // State + Zip into a nested 3-col grid inside a
-                          // span-2 cell. Suppress the individual City/State/Zip
-                          // renders (indices 3–5) since they're rendered inside
-                          // the composite block appended to Address (i === 2).
-                          if (k === "classcode" && (i === 3 || i === 4 || i === 5)) return null;
-                          const showCcAddressExtras = k === "classcode" && i === 2;
+                          // Compact every Address / City / State / Zip 4-tuple
+                          // onto 2 rows: Address full-width, then City + State
+                          // + Zip packed into a nested 3-col grid inside the
+                          // span-2 cell attached to Address. Each entry is the
+                          // index of the Address field; the following 3 fields
+                          // (+1/+2/+3) are treated as City / State / Zip.
+                          const ADDR_BLOCKS: Partial<Record<EndorsementKey, number[]>> = {
+                            mailing:       [1],  // Street/City/State/ZIP
+                            classcode:     [2],
+                            waiver:        [5, 9], // Holder block + Jobsite block
+                            thirdpartynoc: [2],
+                            location:      [2],
+                            entity:        [12],
+                          };
+                          const addrIdxs = ADDR_BLOCKS[k] ?? [];
+                          if (addrIdxs.some(a => i === a + 1 || i === a + 2 || i === a + 3)) return null;
+                          const currentAddrIdx = addrIdxs.find(a => a === i);
+                          const showCcAddressExtras = currentAddrIdx !== undefined;
                           return (
                             <Fragment key={i}>
                               {showCcGrid && (
@@ -1133,9 +1143,9 @@ export default function EndorsementBoard({ isDark, onBack }: Props) {
                                 })()
                               )}
                             </div>
-                            {showCcAddressExtras && (
-                              <div style={{ gridColumn: "span 2", display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: 16 }}>
-                                {[3, 4, 5].map(subI => {
+                            {showCcAddressExtras && currentAddrIdx !== undefined && (
+                              <div style={{ gridColumn: "span 2", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
+                                {[currentAddrIdx + 1, currentAddrIdx + 2, currentAddrIdx + 3].map(subI => {
                                   const subF = cm.fields[subI];
                                   const subVal = values[k]?.[subI] ?? "";
                                   const subInputStyle: React.CSSProperties = {
