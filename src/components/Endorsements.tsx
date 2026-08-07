@@ -124,10 +124,15 @@ export default function Endorsements({ isDark, layout = "3col", skipSearch = fal
     setView("form");
   };
 
-  // "View Existing" — stub for the design mock: close the modal and stay on
-  // the results table until we wire real historical endorsements.
+  // "View Existing" — drop straight into the submission success view so the
+  // user sees the submitted-request recap (the same page they'd reach after
+  // clicking Submit on a New Request). In the mock this shows the confirmation
+  // recap; wired against a real backend it would hydrate with the previously-
+  // submitted request's data.
   const handleChooseExisting = () => {
+    if (pendingResult) setIntakePolicy(pendingResult);
     setChooseOpen(false);
+    setView("success");
   };
 
   const handleSubmit = () => setView("success");
