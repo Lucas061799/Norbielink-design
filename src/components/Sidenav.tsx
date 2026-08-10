@@ -169,7 +169,6 @@ export default function Sidenav({ isDark = false, onToggleDark, activeItem = "Ma
     { label: "ProSuite",          icon: <Briefcase  className="w-[18px] h-[18px]" />, badge: "PRO", hasChevron: true },
     { label: "Make a Payment",    icon: <CreditCard className="w-[18px] h-[18px]" /> },
     { label: "Payment Info",      icon: <Calculator className="w-[18px] h-[18px]" />, hasChevron: true, children: [
-      { label: "Make a Payment" },
       { label: "eCheck / Credit Authorization Form" },
       { label: "Payment Types" },
     ] },

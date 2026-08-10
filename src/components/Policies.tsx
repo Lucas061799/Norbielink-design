@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Search, Plus, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, ChevronsUpDown, RefreshCw, Download, MessageSquare, MessageCircle, Mail, Phone, Printer, Minus, Maximize2, FileText, FolderOpen, Eye, X, MoreVertical, Calendar, RotateCcw, MoreHorizontal, Check, Columns3, Pencil, RotateCw, UserPlus, ArrowUpRight, Trash2, Sparkles, AlertTriangle, HelpCircle } from "lucide-react";
+import { Search, Plus, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, ChevronsUpDown, RefreshCw, Download, MessageSquare, MessageCircle, Mail, Phone, Printer, Minus, Maximize2, FileText, FolderOpen, Eye, X, MoreVertical, Calendar, RotateCcw, MoreHorizontal, Check, Columns3, Pencil, RotateCw, UserPlus, ArrowUpRight, Trash2, Sparkles, AlertTriangle, HelpCircle, Info } from "lucide-react";
 import { DatePicker } from "./DatePicker";
 
 const FONT = "var(--font-montserrat), Montserrat, sans-serif";
@@ -794,6 +794,10 @@ export default function Policies({ isDark }: { isDark: boolean }) {
                       </div>
                     </button>
                   ))}
+                </div>
+                <div className="mx-4 mt-3 pt-3 flex items-start gap-1.5 text-[11.5px]" style={{ fontFamily: FONT, color: c.muted, lineHeight: 1.4, borderTop: `1px solid ${c.border}` }}>
+                  <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: "#A614C3" }} strokeWidth={2} />
+                  <span>Some policies are hosted on the carrier&apos;s site. Please try checking there.</span>
                 </div>
                 <svg width="0" height="0" className="absolute">
                   <defs>
@@ -1623,8 +1627,9 @@ export default function Policies({ isDark }: { isDark: boolean }) {
         {/* Rows — no detail navigation */}
         <div>
           {pageItems.length === 0 ? (
-            <div className="py-16 text-center text-[13px]" style={{ fontFamily: FONT, color: c.muted }}>
-              No policies found
+            <div className="py-16 flex items-center justify-center gap-1.5 text-[13px]" style={{ fontFamily: FONT, color: c.muted }}>
+              <Info className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#A614C3" }} strokeWidth={2} />
+              <span>Can&apos;t find it? Some policies are hosted on the carrier&apos;s site. Please try checking there.</span>
             </div>
           ) : pageItems.map((p, i, arr) => (
             <div key={p.id} className="grid px-5 py-3.5 items-center gap-4 transition-colors cursor-pointer"
