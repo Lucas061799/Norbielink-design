@@ -754,7 +754,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
   // Sub-tabs across the top of the Accounting tab. Splitting Statements into
   // Commission vs Account lets users jump straight to the file type they want
   // without a second-level tab switch inside the Statements card.
-  const [accountingView, setAccountingView] = useState<"comm" | "soa">("comm");
+  const [accountingView, setAccountingView] = useState<"record" | "comm" | "soa">("record");
   // Statements view state — mirrors the Documents toolbar language
   // (search, filter by type, sort, select mode, per-item preview).
   const [stmtSearch, setStmtSearch] = useState("");
@@ -5743,6 +5743,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                   style={{ borderBottom: `1px solid ${c.border}` }}
                 >
                   {([
+                    { key: "record" as const, label: "ITC Record" },
                     { key: "comm"   as const, label: "Commission Statement" },
                     { key: "soa"    as const, label: "Statement of Account" },
                   ]).map(t => {
@@ -5766,6 +5767,96 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                   })}
                 </div>
 
+
+                {accountingView === "record" && (
+                <div className="rounded-2xl p-8 mb-8" style={{ background: c.cardBg, border: `1px solid ${c.border}` }}>
+                  <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-[17px] font-bold" style={{ ...font, color: c.text }}>ITC Record</h3>
+                    <button onClick={() => { setItcDraft(record); setItcEditing(true); }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-colors"
+                      style={{ ...font, border: `1px solid ${isDark ? "rgba(255,255,255,0.10)" : "#E5E7EB"}`, color: c.muted }}
+                      onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+                      onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                      <Pencil className="w-3.5 h-3.5" />Edit
+                    </button>
+                  </div>
+
+                  <SectionHeader title="Producer" first />
+                  <div className="grid grid-cols-3 gap-x-12 gap-y-6">
+                    <LabelValue label="Producer Code" value={record.producerCode} />
+                    <LabelValue label="Agent / Broker" value={record.agentOrBroker} />
+                    <div>
+                      <p className="text-[13px] font-semibold mb-2" style={{ ...font, color: c.text }}>Status:</p>
+                      {statusBadge}
+                    </div>
+                    <LabelValue label="Short Name" value={record.shortName || "—"} />
+                    <div className="col-span-2">
+                      <p className="text-[13px] font-semibold mb-1" style={{ ...font, color: c.text }}>Name:</p>
+                      <p className="text-[13px]" style={{ ...font, color: c.muted }}>{record.name}</p>
+                    </div>
+                    <div className="col-span-3">
+                      <p className="text-[13px] font-semibold mb-1" style={{ ...font, color: c.text }}>DBA:</p>
+                      <p className="text-[13px]" style={{ ...font, color: c.muted }}>{record.dba || "—"}</p>
+                    </div>
+                  </div>
+
+                  <SectionHeader title="Contact" />
+                  <div className="grid grid-cols-3 gap-x-12 gap-y-6">
+                    <div className="col-span-3">
+                      <p className="text-[13px] font-semibold mb-1" style={{ ...font, color: c.text }}>Address:</p>
+                      <p className="text-[13px]" style={{ ...font, color: c.muted }}>{fullAddr || "—"}</p>
+                    </div>
+                    <LabelValue label="Telephone" value={record.telephone || "—"} />
+                    <div className="col-span-2">
+                      <p className="text-[13px] font-semibold mb-1" style={{ ...font, color: c.text }}>Email:</p>
+                      <p className="text-[13px]" style={{ ...font, color: c.muted }}>{record.email || "—"}</p>
+                    </div>
+                    <LabelValue label="Accounting Email" value={record.accountingEmail || "—"} />
+                    <LabelValue label="Statement Email" value={record.statementEmail || "—"} />
+                  </div>
+
+                  <SectionHeader title="Appointment & Compliance" />
+                  <div className="grid grid-cols-3 gap-x-12 gap-y-6">
+                    <LabelValue label="Appointment Date" value={record.appointmentDate} />
+                    <LabelValue label="License No" value={record.licenseNo || "—"} />
+                    <LabelValue label="License Expires" value={record.licenseExpires || "—"} />
+                    <LabelValue label="E&O Policy No" value={record.eoPolicyNo || "—"} />
+                    <LabelValue label="E&O Expires" value={record.eoPolicyExpires || "—"} />
+                    <div /> {/* spacer */}
+                    <LabelValue label="Tax ID" value={record.taxId || "—"} />
+                    <LabelValue label="1099 Type" value={record.tax1099Type} />
+                    <LabelValue label="1099 Name" value={record.tax1099Name || "—"} />
+                  </div>
+
+                  <SectionHeader title="Preferences" />
+                  <div className="grid grid-cols-3 gap-x-12 gap-y-6">
+                    <LabelValue label="Email Statements"                    value={<YesNo v={record.emailStatements} />} />
+                    <LabelValue label="Direct Deposits"                     value={<YesNo v={record.directDeposits} />} />
+                    <LabelValue label="Direct Deposits (Commission Only)"   value={<YesNo v={record.directDepositsCommissionOnly} />} />
+                    <LabelValue label="Farmers Agent"                       value={<YesNo v={record.farmersAgent} />} />
+                    <LabelValue label="Smart Choice Agent"                  value={<YesNo v={record.smartChoiceAgent} />} />
+                    <LabelValue label="PIIB Agent"                          value={<YesNo v={record.piibAgent} />} />
+                  </div>
+
+                  <SectionHeader title="Consolidated Billing" />
+                  <div className="grid grid-cols-3 gap-x-12 gap-y-6">
+                    <LabelValue label="Use Consolidated Billing ID"        value={<YesNo v={record.useConsolidatedBillingId} />} />
+                    <LabelValue label="Consolidated Billing ID"            value={record.consolidatedBillingId || "—"} />
+                    <LabelValue label="Is Consolidated Billing Producer"   value={<YesNo v={record.isConsolidatedBillingProducer} />} />
+                  </div>
+
+                  <SectionHeader title="Affiliation" />
+                  <div className="grid grid-cols-3 gap-x-12 gap-y-6">
+                    <LabelValue label="Is Affiliated With"      value={<YesNo v={record.isAffiliatedWith} />} />
+                    <LabelValue label="Affiliated With ID"      value={record.affiliatedWithId || "—"} />
+                    <LabelValue label="Is Affiliation Main"     value={<YesNo v={record.isAffiliationMain} />} />
+                    <div className="col-span-3">
+                      <p className="text-[13px] font-semibold mb-1" style={{ ...font, color: c.text }}>Sub-Producer Name:</p>
+                      <p className="text-[13px]" style={{ ...font, color: c.muted }}>{record.subProducerName || "—"}</p>
+                    </div>
+                  </div>
+                </div>
+                )}
 
                 {/* ── Statements card — 12-month rolling archive.
                     Phase 1 scope: two statements per month (commission +
