@@ -452,8 +452,8 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
   // data lives in the flat CARD_META fields (First / Last / Title / Status);
   // any extras added via "+ Add another officer" get their own row here so
   // the intake can capture multiple officer changes in a single request.
-  type OfficerExtra = { first: string; last: string; title: string; status: "Included" | "Excluded" };
-  const emptyOfficerExtra = (): OfficerExtra => ({ first: "", last: "", title: "", status: "Included" });
+  type OfficerExtra = { eff: string; first: string; last: string; title: string; status: "Included" | "Excluded" };
+  const emptyOfficerExtra = (): OfficerExtra => ({ eff: "", first: "", last: "", title: "", status: "Included" });
   const [officerExtras, setOfficerExtras] = useState<OfficerExtra[]>([]);
   // Additional class-code / payroll / employee entries for a Specific
   // Waiver of Subrogation. The primary set lives in the flat CARD_META
@@ -1489,6 +1489,9 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
                                 })()
                               )}
                             </div>
+                            {k === "officer" && i === 0 && (
+                              <div style={{ gridColumn: "span 1" }} />
+                            )}
                             {showCcAddressExtras && currentAddrIdx !== undefined && (
                               <div style={{ gridColumn: "span 2", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
                                 {[currentAddrIdx + 1, currentAddrIdx + 2, currentAddrIdx + 3].map(subI => {
@@ -1604,7 +1607,7 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
                                 onMouseEnter={e => { e.currentTarget.style.background = c.razzTintBg; e.currentTarget.style.borderColor = c.razz; }}
                                 onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = c.border; }}
                               >
-                                <Plus className="w-3.5 h-3.5" />Add another class code
+                                <Plus className="w-3.5 h-3.5" />Add another class code &amp; payroll
                               </button>
                             </>
                           );
@@ -1640,6 +1643,21 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
                                     </button>
                                   </div>
                                   <div className="grid grid-cols-2 gap-x-4 gap-y-4">
+                                    <div className="flex flex-col gap-1.5">
+                                      <label className="text-[11.5px] font-semibold flex items-center gap-1" style={{ fontFamily: FONT, color: c.text }}>
+                                        Effective date<span style={{ color: c.razz }}>*</span>
+                                      </label>
+                                      <DatePicker
+                                        value={row.eff}
+                                        onChange={v => patchOfficer(idx, { eff: v })}
+                                        inputStyle={inputStyleXtra}
+                                        c={c as unknown as Record<string, string>}
+                                        btnGrad={razzGrad}
+                                        font={{ fontFamily: FONT }}
+                                      />
+                                    </div>
+                                    <div />
+
                                     <div className="flex flex-col gap-1.5">
                                       <label className="text-[11.5px] font-semibold flex items-center gap-1" style={{ fontFamily: FONT, color: c.text }}>
                                         First Name<span style={{ color: c.razz }}>*</span>
