@@ -8,6 +8,80 @@ import { StyledSelect } from "./StyledSelect";
 
 const FONT = "var(--font-montserrat), Montserrat, sans-serif";
 
+// Excel-spec character constraints per field label. Keyed on the lowercased
+// label so both the main flat-field render and the grid renderers can share
+// the same rules. Formatters strip disallowed characters, cap length, and
+// apply light auto-formatting (dashes / percent sign).
+type FieldConstraint = {
+  maxLength?: number;
+  inputMode: "numeric";
+  format: (raw: string) => string;
+};
+function constraintFor(label: string): FieldConstraint | null {
+  const l = label.toLowerCase().trim();
+  // FEIN — must be 9 numerals; auto-format as xx-xxxxxxx
+  if (l === "fein" || l.endsWith(" fein") || l === "alternate employer fein") {
+    return {
+      maxLength: 10,
+      inputMode: "numeric",
+      format: raw => {
+        const d = raw.replace(/\D/g, "").slice(0, 9);
+        return d.length > 2 ? `${d.slice(0, 2)}-${d.slice(2)}` : d;
+      },
+    };
+  }
+  // Phone Number — 10 numerals; auto-format as xxx-xxx-xxxx
+  if (l === "phone number" || l === "phone") {
+    return {
+      maxLength: 12,
+      inputMode: "numeric",
+      format: raw => {
+        let d = raw.replace(/\D/g, "").slice(0, 11);
+        if (d.length === 11 && d.startsWith("1")) d = d.slice(1);
+        d = d.slice(0, 10);
+        if (d.length > 6) return `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}`;
+        if (d.length > 3) return `${d.slice(0, 3)}-${d.slice(3)}`;
+        return d;
+      },
+    };
+  }
+  // Class Code — 4 numerals
+  if (l === "class code") {
+    return { maxLength: 4, inputMode: "numeric", format: raw => raw.replace(/\D/g, "").slice(0, 4) };
+  }
+  // FT / PT / Employees at Jobsite — 3 numerals
+  if (l === "full time employees" || l === "part time employees" || l === "employees at jobsite") {
+    return { maxLength: 3, inputMode: "numeric", format: raw => raw.replace(/\D/g, "").slice(0, 3) };
+  }
+  // Ownership % — 3 numerals with % suffix
+  if (l === "ownership %") {
+    return {
+      maxLength: 4,
+      inputMode: "numeric",
+      format: raw => {
+        const d = raw.replace(/\D/g, "").slice(0, 3);
+        return d ? `${d}%` : "";
+      },
+    };
+  }
+  // Zip — 5 numerals
+  if (l === "zip" || l === "zip code") {
+    return { maxLength: 5, inputMode: "numeric", format: raw => raw.replace(/\D/g, "").slice(0, 5) };
+  }
+  // Payroll — open numeric with auto-comma formatting (spec: "Open Numeric Box").
+  // No explicit length cap; we soft-cap at 10 digits (~$10B) to keep the input sane.
+  if (l === "payroll") {
+    return {
+      inputMode: "numeric",
+      format: raw => {
+        const d = raw.replace(/\D/g, "").slice(0, 10);
+        return d ? Number(d).toLocaleString("en-US") : "";
+      },
+    };
+  }
+  return null;
+}
+
 type EndorsementKey =
   | "contact" | "namedinsured" | "mailing" | "effdate"
   | "classcode" | "limits" | "waiver" | "officer"
@@ -90,10 +164,10 @@ const CARD_META: Record<EndorsementKey, { blurb: string; footNote?: string; fiel
                   fields: [
                     { label: "Effective date", type: "date", span: 1 },
                     { label: "Contact",        type: "select", options: ["Agent", "Insured"], span: 1 },
-                    { label: "First Name",     type: "text", placeholder: "Jane", span: 1 },
-                    { label: "Last Name",      type: "text", placeholder: "Doe",  span: 1 },
-                    { label: "Phone Number",   type: "text", placeholder: "(555) 123-4567", span: 1 },
-                    { label: "Email Address",  type: "text", placeholder: "name@example.com", span: 1 },
+                    { label: "First Name",     type: "text", placeholder: "Jane", span: 1, optional: true },
+                    { label: "Last Name",      type: "text", placeholder: "Doe",  span: 1, optional: true },
+                    { label: "Phone Number",   type: "text", placeholder: "(555) 123-4567", span: 1, optional: true },
+                    { label: "Email Address",  type: "text", placeholder: "name@example.com", span: 1, optional: true },
                   ] },
   namedinsured: { blurb: "Are you amending the Legal Name or DBA of the entity? If changing the entity or ownership structure, use the Entity endorsement instead.",
                   footNote: "At least one of New Legal Name or New DBA must be completed in order to submit.",
@@ -106,8 +180,8 @@ const CARD_META: Record<EndorsementKey, { blurb: string; footNote?: string; fiel
                     { label: "Reason for the change (please clearly explain what is changing)", type: "textarea", placeholder: "Reason for the name change, any related restructuring…", span: 2 },
                   ] },
   mailing:      { blurb: "Change the mailing address on the policy.",      fields: [
-                    { label: "Effective date", type: "date", span: 2 },
-                    { label: "Street",         type: "text", placeholder: "123 Main St", span: 2 },
+                    { label: "Effective date", type: "date", span: 1 },
+                    { label: "Address",        type: "text", placeholder: "123 Main St", span: 2 },
                     { label: "City",           type: "text", placeholder: "Des Moines", span: 1 },
                     { label: "State",          type: "select", options: US_STATES, span: 1 },
                     { label: "ZIP",            type: "text", placeholder: "50314", span: 1 },
@@ -151,7 +225,7 @@ const CARD_META: Record<EndorsementKey, { blurb: string; footNote?: string; fiel
                     { label: "Employees at Jobsite", type: "text", placeholder: "e.g. 3", span: 1, optional: true },
                     { label: "Description of Work",  type: "textarea", placeholder: "Describe the work performed at this jobsite…", span: 2, optional: true },
                   ] },
-  officer:      { blurb: "Include or exclude an officer from coverage. Ownership % and eligibility rules vary by state.",
+  officer:      { blurb: "This page is for requests to exclude or include an officer previously disclosed. If ownership is changing, please complete an Entity endorsement. A signed officer waiver may be required for excluded officers.",
                   fields: [
                     { label: "Effective date", type: "date", span: 1 },
                     { label: "First Name",     type: "text", placeholder: "Jane", span: 1 },
@@ -163,7 +237,7 @@ const CARD_META: Record<EndorsementKey, { blurb: string; footNote?: string; fiel
                     { label: "Effective date",  type: "date", span: 1 },
                     { label: "MCP 65 Number",   type: "text", placeholder: "e.g. MC123456", span: 1 },
                   ] },
-  puc:          { blurb: "File a PUC Filing for the California Public Utilities Commission.",
+  puc:          { blurb: "File a PUC Filing for the Public Utilities Commission.",
                   fields: [
                     { label: "Effective date",     type: "date", span: 1 },
                     { label: "PUC Filing Number",  type: "text", placeholder: "PUC ID", span: 1 },
@@ -171,7 +245,7 @@ const CARD_META: Record<EndorsementKey, { blurb: string; footNote?: string; fiel
   thirdpartynoc:{ blurb: "Third Party Notice of Cancellation — carrier will notify the named party if the policy is cancelled.",
                   fields: [
                     { label: "Effective date",     type: "date", span: 1 },
-                    { label: "Third Party Name",   type: "text", placeholder: "e.g. City of Sacramento", span: 2 },
+                    { label: "Third Party Name",   type: "text", placeholder: "e.g. City of Sacramento", span: 1 },
                     { label: "Address",            type: "text", placeholder: "Street", span: 2 },
                     { label: "City",               type: "text", placeholder: "City", span: 1 },
                     { label: "State",              type: "select", options: US_STATES, span: 1 },
@@ -181,25 +255,25 @@ const CARD_META: Record<EndorsementKey, { blurb: string; footNote?: string; fiel
                   fields: [
                     { label: "Effective date",         type: "date", span: 1 },
                     { label: "State",                  type: "select", options: US_STATES, span: 1 },
-                    { label: "Form Number",            type: "text", placeholder: "e.g. WC 00 03 01 A", span: 2 },
-                    { label: "Name of Alternate Employer", type: "text", placeholder: "Legal name", span: 2 },
+                    { label: "Form Number",            type: "text", placeholder: "e.g. WC 00 03 01 A", span: 1 },
+                    { label: "Name of Alternate Employer", type: "text", placeholder: "Legal name", span: 1 },
                     { label: "Alternate Employer FEIN", type: "text", placeholder: "12-3456789", span: 1 },
                   ] },
-  fein:         { blurb: "Add or update the FEIN on the policy.",          fields: [
+  fein:         { blurb: "",                                                fields: [
                     { label: "Effective date", type: "date", span: 1 },
                     { label: "FEIN",           type: "text", placeholder: "12-3456789", span: 1 },
-                    { label: "Legal Name",     type: "text", placeholder: "Entity legal name", span: 2 },
-                    { label: "DBA",            type: "text", placeholder: "Doing-business-as name", span: 2, optional: true },
+                    { label: "Legal Name",     type: "text", placeholder: "Entity legal name", span: 1 },
+                    { label: "DBA",            type: "text", placeholder: "Doing-business-as name", span: 1, optional: true },
                   ] },
   xmod:         { blurb: "Apply or update the experience mod on the policy.",
                   fields: [
                     { label: "Ex-Mod Effective Date", type: "date", span: 1 },
                     { label: "Ex-Mod Factor",         type: "text", placeholder: "e.g. 0.95", span: 1 },
-                    { label: "Legal Name",            type: "text", placeholder: "Entity legal name", span: 2 },
-                    { label: "DBA",                   type: "text", placeholder: "Doing-business-as name", span: 2, optional: true },
+                    { label: "Legal Name",            type: "text", placeholder: "Entity legal name", span: 1 },
+                    { label: "DBA",                   type: "text", placeholder: "Doing-business-as name", span: 1, optional: true },
                     { label: "FEIN",                  type: "text", placeholder: "12-3456789", span: 1 },
                     { label: "Rating State(s)",       type: "text", placeholder: "e.g. CA, NV", span: 1 },
-                    { label: "Upload Ex-Mod Worksheet", type: "file", span: 2 },
+                    { label: "Please upload ex-mod worksheet if available", type: "file", span: 2, optional: true },
                   ] },
   location:     { blurb: "Add, edit, or remove a location on the policy. If also changing entity or ownership structure, use the Entity endorsement.",
                   fields: [
@@ -209,8 +283,8 @@ const CARD_META: Record<EndorsementKey, { blurb: string; footNote?: string; fiel
                     { label: "City",                    type: "text", placeholder: "City", span: 1 },
                     { label: "State",                   type: "select", options: US_STATES, span: 1 },
                     { label: "Zip",                     type: "text", placeholder: "ZIP", span: 1 },
-                    { label: "Legal Name at this location", type: "text", placeholder: "Entity legal name", span: 2 },
-                    { label: "DBA",                     type: "text", placeholder: "Doing-business-as name", span: 2, optional: true },
+                    { label: "Legal Name at this location", type: "text", placeholder: "Entity legal name", span: 1 },
+                    { label: "DBA",                     type: "text", placeholder: "Doing-business-as name", span: 1, optional: true },
                     { label: "Operations performed at this location", type: "textarea", placeholder: "Describe operations…", span: 2 },
                   ] },
   entity:       { blurb: "Add, edit, or remove an entity on the policy — including ownership, entity type, and location exposure.",
@@ -219,8 +293,8 @@ const CARD_META: Record<EndorsementKey, { blurb: string; footNote?: string; fiel
                     { label: "Add/Edit/Remove Entity",  type: "select", options: ["Add New Entity", "Edit Entity", "Remove Entity"], span: 1 },
                     { label: "Entity Type",             type: "select", options: ENTITY_TYPES, span: 1 },
                     { label: "Other Entity Type (if Other selected)", type: "text", placeholder: "Describe entity type", span: 1, optional: true },
-                    { label: "Legal Name",              type: "text", placeholder: "Entity legal name", span: 2 },
-                    { label: "DBA",                     type: "text", placeholder: "Doing-business-as name", span: 2, optional: true },
+                    { label: "Legal Name",              type: "text", placeholder: "Entity legal name", span: 1 },
+                    { label: "DBA",                     type: "text", placeholder: "Doing-business-as name", span: 1, optional: true },
                     { label: "FEIN",                    type: "text", placeholder: "12-3456789", span: 2 },
                     { label: "Entity Location — Address", type: "text", placeholder: "Street", span: 2 },
                     { label: "City",                    type: "text", placeholder: "City", span: 1 },
@@ -245,7 +319,7 @@ const CARD_META: Record<EndorsementKey, { blurb: string; footNote?: string; fiel
                         "Other",
                       ],
                       span: 1 },
-                    { label: "Upload Acord 25 LPR / Replacement Coverage Document", type: "file", span: 2 },
+                    { label: "Upload Acord 35 LPR / Replacement Coverage Document", type: "file", span: 2 },
                   ] },
   other:        { blurb: "Anything else — free-form request.",             fields: [
                     { label: "Describe the request", type: "textarea", placeholder: "Tell the underwriter what you need…", span: 2 },
@@ -374,6 +448,21 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
   type OwnerRow = { first: string; last: string; title: string; pct: string; status: "Included" | "Excluded" };
   const emptyOwnerRow = (): OwnerRow => ({ first: "", last: "", title: "", pct: "", status: "Included" });
   const [entityOwners, setEntityOwners] = useState<OwnerRow[]>([emptyOwnerRow()]);
+  // Additional officer entries on the Officer card. The primary officer's
+  // data lives in the flat CARD_META fields (First / Last / Title / Status);
+  // any extras added via "+ Add another officer" get their own row here so
+  // the intake can capture multiple officer changes in a single request.
+  type OfficerExtra = { first: string; last: string; title: string; status: "Included" | "Excluded" };
+  const emptyOfficerExtra = (): OfficerExtra => ({ first: "", last: "", title: "", status: "Included" });
+  const [officerExtras, setOfficerExtras] = useState<OfficerExtra[]>([]);
+  // Additional class-code / payroll / employee entries for a Specific
+  // Waiver of Subrogation. The primary set lives in the flat CARD_META
+  // fields (Class Code / Payroll / Employees at Jobsite); extras added
+  // via "+ Add another class code" append here so one waiver can cover
+  // multiple class codes on the same jobsite.
+  type WaiverClassExtra = { code: string; payroll: string; employees: string };
+  const emptyWaiverClassExtra = (): WaiverClassExtra => ({ code: "", payroll: "", employees: "" });
+  const [waiverClassExtras, setWaiverClassExtras] = useState<WaiverClassExtra[]>([]);
   // Collapsible section headers in the left rail — all open by default.
   const [openSections, setOpenSections] = useState<Set<string>>(new Set(["request", "policy", "help"]));
   // Preview-before-submit + top-right confirmation toast + submitted-state
@@ -396,18 +485,58 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
   const isCcCard = (k: EndorsementKey): k is CcCard => k === "classcode" || k === "location" || k === "entity";
   const ccHasValidRow = (card: CcCard) => getCcRows(card).some(r => r.code.trim().length > 0);
   const entityHasValidOwner = () => entityOwners.some(o => o.first.trim().length > 0);
+  // "At-least-one-of" gates: cards where a group of otherwise-optional fields
+  // must have at least one filled to submit. Enforced as a single extra
+  // required item in the doneCount / requiredCount math so the progress
+  // counter reads truthfully without user-facing footnote copy.
+  const AT_LEAST_ONE: Partial<Record<EndorsementKey, number[]>> = {
+    contact:      [2, 3, 4, 5], // First / Last / Phone / Email
+    namedinsured: [3, 4],       // New Legal Name / New DBA
+  };
+  const hasAnyOf = (k: EndorsementKey, idxs: number[]) =>
+    idxs.some(i => (values[k]?.[i] ?? "").trim().length > 0);
+  // Location Remove mode hides Legal Name (6) / DBA (7) / Operations (8)
+  // and drops the class-code grid — those requirements should not block
+  // submit for a location being removed.
+  const locationRemoveMode = () => (values["location"]?.[1] ?? "") === "Remove";
+  // Entity Remove mode: only the identifying fields (Legal Name + FEIN)
+  // are needed to point us at which entity to drop. Entity type, address,
+  // operations, ownership grid, and class-code grid all fall away.
+  const entityAction = () => values["entity"]?.[1] ?? "";
+  const entityRemoveMode = () => entityAction() === "Remove Entity";
+  const ENTITY_REMOVE_HIDDEN = new Set([2, 3, 5, 7, 8, 9, 10, 11]); // Type, Other Type, DBA, Address, City, State, Zip, Operations
+  // Waiver of Subrogation: fields 2..14 belong to the holder / jobsite /
+  // class-code block. They only apply when Specific is chosen — Blanket
+  // waivers don't need them, so we hide the whole block. When Specific
+  // is chosen, the same fields become required (Excel spec).
+  const waiverType = () => values["waiver"]?.[1] ?? "";
+  const isWaiverExtra = (i: number) => i >= 2 && i <= 14;
+  const isHiddenField = (k: EndorsementKey, i: number) => {
+    if (k === "location" && locationRemoveMode() && (i === 6 || i === 7 || i === 8)) return true;
+    if (k === "waiver" && waiverType() === "Blanket" && isWaiverExtra(i)) return true;
+    return false;
+  };
+  const isForcedRequired = (k: EndorsementKey, i: number) =>
+    k === "waiver" && waiverType() === "Specific" && isWaiverExtra(i);
   const doneCount = (k: EndorsementKey) => {
-    const base = CARD_META[k].fields.reduce((n, f, i) => n + (!f.optional && (values[k]?.[i] ?? "").trim() ? 1 : 0), 0);
+    const base = CARD_META[k].fields.reduce((n, f, i) => {
+      if (isHiddenField(k, i)) return n;
+      const req = !f.optional || isForcedRequired(k, i);
+      return n + (req && (values[k]?.[i] ?? "").trim() ? 1 : 0);
+    }, 0);
     let extra = 0;
-    if (isCcCard(k) && ccHasValidRow(k)) extra += 1;
+    if (isCcCard(k) && !(k === "location" && locationRemoveMode()) && ccHasValidRow(k)) extra += 1;
     if (k === "entity" && entityHasValidOwner()) extra += 1;
+    const oneOf = AT_LEAST_ONE[k];
+    if (oneOf && hasAnyOf(k, oneOf)) extra += 1;
     return base + extra;
   };
   const requiredCount = (k: EndorsementKey) => {
-    const base = CARD_META[k].fields.filter(f => !f.optional).length;
+    const base = CARD_META[k].fields.filter((f, i) => (!f.optional || isForcedRequired(k, i)) && !isHiddenField(k, i)).length;
     let extra = 0;
-    if (isCcCard(k)) extra += 1;         // class-code grid
+    if (isCcCard(k) && !(k === "location" && locationRemoveMode())) extra += 1;  // class-code grid
     if (k === "entity") extra += 1;      // ownership grid
+    if (AT_LEAST_ONE[k]) extra += 1;     // at-least-one-of guardrail
     return base + extra;
   };
   const totalRequired = orderedSelected.reduce((sum, k) => sum + requiredCount(k), 0);
@@ -553,7 +682,17 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
                   <input value={row.title} onChange={e => patch({ title: e.target.value })} placeholder="e.g. President" style={rowInputStyle} />
                 </div>
                 <div style={cellStyle}>
-                  <input value={row.pct} onChange={e => patch({ pct: e.target.value })} placeholder="e.g. 100" inputMode="numeric" style={rowInputStyle} />
+                  <input
+                    value={row.pct}
+                    onChange={e => {
+                      const d = e.target.value.replace(/\D/g, "").slice(0, 3);
+                      patch({ pct: d ? `${d}%` : "" });
+                    }}
+                    placeholder="e.g. 100%"
+                    inputMode="numeric"
+                    maxLength={4}
+                    style={rowInputStyle}
+                  />
                 </div>
                 <div style={{ ...cellStyle, display: "block" }}>
                   <StyledSelect
@@ -601,7 +740,7 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
     );
   };
 
-  const renderCcGrid = (card: CcCard) => {
+  const renderCcGrid = (card: CcCard, opts?: { hideAction?: boolean; addLabel?: string }) => {
     const rows = getCcRows(card);
     // Section headers come straight from the Excel spec ("Please provide
     // exposure for this new location only.", etc.). Class Code / Payroll
@@ -613,6 +752,12 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
       entity:    "Please provide exposure for this entity.",
     };
     const header = CC_HEADERS[card];
+    // When the parent card is in "Add" mode, every row is implicitly
+    // "Add Class Code" — hide the Action column so the user isn't offered
+    // a dropdown with only one option.
+    const hideAction = opts?.hideAction ?? false;
+    const cols = hideAction ? "1.4fr 1fr .6fr .6fr 40px" : "180px 1.4fr 1fr .6fr .6fr 40px";
+    const headers = hideAction ? ["Class code","Payroll","FT","PT",""] : ["Action","Class code","Payroll","FT","PT",""];
     return (
       <div className="flex flex-col gap-2" style={{ gridColumn: "span 2" }}>
         {header && (
@@ -621,8 +766,8 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
           </p>
         )}
         <div style={{ border: `1px solid ${c.border}`, borderRadius: 10, marginTop: 4 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "180px 1.4fr 1fr .6fr .6fr 40px", background: c.helperBg, borderTopLeftRadius: 10, borderTopRightRadius: 10 }}>
-            {["Action","Class code","Payroll","FT","PT",""].map((h, hi) => (
+          <div style={{ display: "grid", gridTemplateColumns: cols, background: c.helperBg, borderTopLeftRadius: 10, borderTopRightRadius: 10 }}>
+            {headers.map((h, hi) => (
               <div key={hi} style={{ padding: "8px 12px", borderBottom: `1px solid ${c.border}`, fontFamily: FONT, fontSize: 10.5, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", color: c.muted }}>{h}</div>
             ))}
           </div>
@@ -642,29 +787,41 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
             };
             const patch = (p: Partial<CcRow>) => setCcRowsForCard(card, rs => rs.map((r, j) => j === ridx ? { ...r, ...p } : r));
             return (
-              <div key={ridx} style={{ display: "grid", gridTemplateColumns: "180px 1.4fr 1fr .6fr .6fr 40px", position: "relative" }}>
-                <div style={{ ...cellStyle, display: "block" }}>
-                  <StyledSelect
-                    value={row.action}
-                    onChange={v => { const a = v as CcRow["action"]; patch({ action: a, ...(a === "Remove Class Code" ? { payroll: "", ft: "", pt: "" } : {}) }); }}
-                    options={["Add Class Code", "Remove Class Code", "Edit Payroll"]}
-                    labelFor={v => v}
-                    triggerStyle={{ ...rowInputStyle, padding: "10px 16px", background: "transparent", border: "none" }}
-                    c={{ text: c.text, muted: c.muted, border: c.border, cardBg: c.cardBg, hoverBg: c.hoverBg, razz: c.razz, razzTintBg: c.razzTintBg }}
-                    font={{ fontFamily: FONT }}
+              <div key={ridx} style={{ display: "grid", gridTemplateColumns: cols, position: "relative" }}>
+                {!hideAction && (
+                  <div style={{ ...cellStyle, display: "block" }}>
+                    <StyledSelect
+                      value={row.action}
+                      onChange={v => { const a = v as CcRow["action"]; patch({ action: a, ...(a === "Remove Class Code" ? { payroll: "", ft: "", pt: "" } : {}) }); }}
+                      options={["Add Class Code", "Remove Class Code", "Edit Payroll"]}
+                      labelFor={v => v}
+                      triggerStyle={{ ...rowInputStyle, padding: "10px 16px", background: "transparent", border: "none" }}
+                      c={{ text: c.text, muted: c.muted, border: c.border, cardBg: c.cardBg, hoverBg: c.hoverBg, razz: c.razz, razzTintBg: c.razzTintBg }}
+                      font={{ fontFamily: FONT }}
+                    />
+                  </div>
+                )}
+                <div style={cellStyle}>
+                  <input value={row.code} onChange={e => patch({ code: e.target.value.replace(/\D/g, "").slice(0, 4) })} placeholder="e.g. 5190" inputMode="numeric" maxLength={4} style={rowInputStyle} />
+                </div>
+                <div style={cellStyle}>
+                  <input
+                    value={row.payroll}
+                    onChange={e => {
+                      const d = e.target.value.replace(/\D/g, "").slice(0, 10);
+                      patch({ payroll: d ? Number(d).toLocaleString("en-US") : "" });
+                    }}
+                    placeholder="50,000"
+                    disabled={isRemove}
+                    inputMode="numeric"
+                    style={{ ...rowInputStyle, opacity: isRemove ? 0.35 : 1, cursor: isRemove ? "not-allowed" : "text" }}
                   />
                 </div>
                 <div style={cellStyle}>
-                  <input value={row.code} onChange={e => patch({ code: e.target.value })} placeholder="e.g. 5190" style={rowInputStyle} />
+                  <input value={row.ft} onChange={e => patch({ ft: e.target.value.replace(/\D/g, "").slice(0, 3) })} placeholder="0" disabled={isRemove} inputMode="numeric" maxLength={3} style={{ ...rowInputStyle, opacity: isRemove ? 0.35 : 1, cursor: isRemove ? "not-allowed" : "text" }} />
                 </div>
                 <div style={cellStyle}>
-                  <input value={row.payroll} onChange={e => patch({ payroll: e.target.value })} placeholder="50,000" disabled={isRemove} style={{ ...rowInputStyle, opacity: isRemove ? 0.35 : 1, cursor: isRemove ? "not-allowed" : "text" }} />
-                </div>
-                <div style={cellStyle}>
-                  <input value={row.ft} onChange={e => patch({ ft: e.target.value })} placeholder="0" disabled={isRemove} style={{ ...rowInputStyle, opacity: isRemove ? 0.35 : 1, cursor: isRemove ? "not-allowed" : "text" }} />
-                </div>
-                <div style={cellStyle}>
-                  <input value={row.pt} onChange={e => patch({ pt: e.target.value })} placeholder="0" disabled={isRemove} style={{ ...rowInputStyle, opacity: isRemove ? 0.35 : 1, cursor: isRemove ? "not-allowed" : "text" }} />
+                  <input value={row.pt} onChange={e => patch({ pt: e.target.value.replace(/\D/g, "").slice(0, 3) })} placeholder="0" disabled={isRemove} inputMode="numeric" maxLength={3} style={{ ...rowInputStyle, opacity: isRemove ? 0.35 : 1, cursor: isRemove ? "not-allowed" : "text" }} />
                 </div>
                 <div style={{ ...cellStyle, borderRight: "none", justifyContent: "center" }}>
                   <button
@@ -695,7 +852,7 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
           onMouseEnter={e => { e.currentTarget.style.background = c.razzTintBg; e.currentTarget.style.borderColor = c.razz; }}
           onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = c.border; }}
         >
-          + Add line
+          + {opts?.addLabel ?? "Add line"}
         </button>
       </div>
     );
@@ -1154,27 +1311,43 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
                           const ADDR_BLOCKS: Partial<Record<EndorsementKey, number[]>> = {
                             mailing:       [1],  // Street/City/State/ZIP
                             classcode:     [2],
-                            waiver:        [5, 9], // Holder block + Jobsite block
+                            waiver:        [3, 7], // Holder block + Jobsite block
                             thirdpartynoc: [2],
                             location:      [2],
                             entity:        [7],
                           };
                           const addrIdxs = ADDR_BLOCKS[k] ?? [];
                           if (addrIdxs.some(a => i === a + 1 || i === a + 2 || i === a + 3)) return null;
+                          // Location Remove mode: hide Legal Name (6),
+                          // DBA (7), and Operations (8) — the user is only
+                          // identifying which location to drop, not editing
+                          // it. Nested-address block (idx 2 + 3/4/5) still
+                          // renders so the location can be identified.
+                          if (k === "location" && (values["location"]?.[1] ?? "") === "Remove" && (i === 6 || i === 7 || i === 8)) return null;
+                          // Waiver of Subrogation: hide the holder / jobsite /
+                          // class-code block when Blanket is selected — those
+                          // fields only apply to Specific waivers.
+                          if (k === "waiver" && waiverType() === "Blanket" && i >= 2 && i <= 14) return null;
                           const currentAddrIdx = addrIdxs.find(a => a === i);
                           const showCcAddressExtras = currentAddrIdx !== undefined;
                           return (
                             <Fragment key={i}>
                               {showCcGrid && renderCcGrid("classcode")}
                               {k === "entity" && i === 7 && renderOwnerGrid()}
+                              {k === "fein" && i === 2 && (
+                                <p className="text-[12px]" style={{ gridColumn: "span 2", fontFamily: FONT, color: c.text, margin: "4px 0 -4px", fontWeight: 500 }}>
+                                  Entity the FEIN applies to
+                                </p>
+                              )}
+                              {k === "reinstate" && i === 2 && (
+                                <p className="text-[12px]" style={{ gridColumn: "span 2", fontFamily: FONT, color: c.muted, margin: "4px 0 -4px", lineHeight: 1.5 }}>
+                                  A carrier specific no loss statement may be required. If needed, we will reach out.
+                                </p>
+                              )}
                             <div className="flex flex-col gap-1.5" style={{ gridColumn: `span ${f.span ?? 2}` }}>
                               <label className="text-[11.5px] font-semibold flex items-center gap-1" style={{ fontFamily: FONT, color: c.text }}>
                                 {f.label}
-                                {f.optional ? (
-                                  <span className="text-[10.5px] font-medium" style={{ color: c.muted }}>optional</span>
-                                ) : (
-                                  <span style={{ color: c.razz }}>*</span>
-                                )}
+                                {(!f.optional || isForcedRequired(k, i)) && <span style={{ color: c.razz }}>*</span>}
                               </label>
                               {f.type === "select" ? (
                                 <StyledSelect<string>
@@ -1294,28 +1467,21 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
                                       />
                                     );
                                   }
-                                  // Auto-format on every keystroke for phone
-                                  // fields — reshape digits into (XXX) XXX-XXXX
-                                  // so the field always reads correctly, no
-                                  // matter what the user pastes.
-                                  const isPhone = /phone/i.test(f.label) || (f.placeholder && /\(\d{3}\)/.test(f.placeholder));
+                                  // Excel-spec character constraints per field label
+                                  // (Phone / FEIN / Class Code / FT / PT / Zip / Ownership %).
+                                  // Strips disallowed chars, caps length, and applies
+                                  // light auto-formatting where the spec calls for it.
+                                  const cons = constraintFor(f.label);
                                   return (
                                     <input
                                       type="text"
                                       value={val}
                                       onChange={e => {
-                                        if (!isPhone) { setValue(k, i, e.target.value); return; }
-                                        // Drop a leading "1" country code so we always
-                                        // format the 10-digit US number.
-                                        let d = e.target.value.replace(/\D/g, "").slice(0, 11);
-                                        if (d.length === 11 && d.startsWith("1")) d = d.slice(1);
-                                        d = d.slice(0, 10);
-                                        let formatted = d;
-                                        if (d.length > 6)      formatted = `(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}`;
-                                        else if (d.length > 3) formatted = `(${d.slice(0,3)}) ${d.slice(3)}`;
-                                        else if (d.length > 0) formatted = `(${d}`;
-                                        setValue(k, i, formatted);
+                                        if (!cons) { setValue(k, i, e.target.value); return; }
+                                        setValue(k, i, cons.format(e.target.value));
                                       }}
+                                      inputMode={cons?.inputMode}
+                                      maxLength={cons?.maxLength}
                                       placeholder={f.placeholder}
                                       style={inputStyle}
                                     />
@@ -1328,6 +1494,7 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
                                 {[currentAddrIdx + 1, currentAddrIdx + 2, currentAddrIdx + 3].map(subI => {
                                   const subF = cm.fields[subI];
                                   const subVal = values[k]?.[subI] ?? "";
+                                  const subCons = constraintFor(subF.label);
                                   const subInputStyle: React.CSSProperties = {
                                     fontFamily: FONT, fontSize: 13, color: c.text,
                                     background: c.cardBg, border: `1px solid ${c.border}`,
@@ -1337,11 +1504,7 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
                                     <div key={subI} className="flex flex-col gap-1.5">
                                       <label className="text-[11.5px] font-semibold flex items-center gap-1" style={{ fontFamily: FONT, color: c.text }}>
                                         {subF.label}
-                                        {subF.optional ? (
-                                          <span className="text-[10.5px] font-medium" style={{ color: c.muted }}>optional</span>
-                                        ) : (
-                                          <span style={{ color: c.razz }}>*</span>
-                                        )}
+                                        {!subF.optional && <span style={{ color: c.razz }}>*</span>}
                                       </label>
                                       {subF.type === "select" ? (
                                         <StyledSelect
@@ -1357,7 +1520,9 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
                                         <input
                                           type="text"
                                           value={subVal}
-                                          onChange={e => setValue(k, subI, e.target.value)}
+                                          inputMode={subCons?.inputMode}
+                                          maxLength={subCons?.maxLength}
+                                          onChange={e => setValue(k, subI, subCons ? subCons.format(e.target.value) : e.target.value)}
                                           placeholder={subF.placeholder}
                                           style={subInputStyle}
                                         />
@@ -1370,7 +1535,181 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
                             </Fragment>
                           );
                         })}
-                        {(k === "location" || k === "entity") && renderCcGrid(k)}
+                        {k === "entity" && renderCcGrid(k)}
+                        {k === "waiver" && waiverType() === "Specific" && (() => {
+                          const inputStyleXtra: React.CSSProperties = {
+                            fontFamily: FONT, fontSize: 13, color: c.text,
+                            background: c.cardBg, border: `1px solid ${c.border}`,
+                            borderRadius: 8, padding: "9px 12px", outline: "none", width: "100%",
+                          };
+                          const patchWC = (idx: number, p: Partial<WaiverClassExtra>) =>
+                            setWaiverClassExtras(rs => rs.map((r, j) => j === idx ? { ...r, ...p } : r));
+                          return (
+                            <>
+                              {waiverClassExtras.map((row, idx) => (
+                                <div key={idx} style={{
+                                  gridColumn: "span 2", marginTop: 12, paddingTop: 12,
+                                  borderTop: `1px solid ${c.softDivider}`,
+                                }}>
+                                  <div className="flex items-center justify-between mb-3">
+                                    <div className="text-[11.5px] font-bold uppercase tracking-wider" style={{ fontFamily: FONT, color: c.muted, letterSpacing: "0.06em" }}>
+                                      Class code {idx + 2}
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => setWaiverClassExtras(rs => rs.filter((_, j) => j !== idx))}
+                                      title="Remove class code"
+                                      style={{ background: "transparent", border: "none", color: c.muted, cursor: "pointer", padding: 4, display: "flex", alignItems: "center", justifyContent: "center" }}
+                                      onMouseEnter={e => (e.currentTarget.style.color = "#EF4444")}
+                                      onMouseLeave={e => (e.currentTarget.style.color = c.muted)}
+                                    >
+                                      <X className="w-3.5 h-3.5" strokeWidth={2} />
+                                    </button>
+                                  </div>
+                                  <div className="grid grid-cols-3 gap-x-4 gap-y-4">
+                                    <div className="flex flex-col gap-1.5">
+                                      <label className="text-[11.5px] font-semibold flex items-center gap-1" style={{ fontFamily: FONT, color: c.text }}>
+                                        Class Code<span style={{ color: c.razz }}>*</span>
+                                      </label>
+                                      <input value={row.code} onChange={e => patchWC(idx, { code: e.target.value.replace(/\D/g, "").slice(0, 4) })} placeholder="e.g. 5190" inputMode="numeric" maxLength={4} style={inputStyleXtra} />
+                                    </div>
+                                    <div className="flex flex-col gap-1.5">
+                                      <label className="text-[11.5px] font-semibold flex items-center gap-1" style={{ fontFamily: FONT, color: c.text }}>
+                                        Payroll<span style={{ color: c.razz }}>*</span>
+                                      </label>
+                                      <input value={row.payroll} onChange={e => { const d = e.target.value.replace(/\D/g, "").slice(0, 10); patchWC(idx, { payroll: d ? Number(d).toLocaleString("en-US") : "" }); }} placeholder="e.g. 50,000" inputMode="numeric" style={inputStyleXtra} />
+                                    </div>
+                                    <div className="flex flex-col gap-1.5">
+                                      <label className="text-[11.5px] font-semibold flex items-center gap-1" style={{ fontFamily: FONT, color: c.text }}>
+                                        Employees at Jobsite<span style={{ color: c.razz }}>*</span>
+                                      </label>
+                                      <input value={row.employees} onChange={e => patchWC(idx, { employees: e.target.value.replace(/\D/g, "").slice(0, 3) })} placeholder="e.g. 3" inputMode="numeric" maxLength={3} style={inputStyleXtra} />
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                              <button
+                                type="button"
+                                onClick={() => setWaiverClassExtras(rs => [...rs, emptyWaiverClassExtra()])}
+                                className="w-full inline-flex items-center justify-center gap-1.5 py-3 rounded-2xl text-[12.5px] font-semibold transition-colors"
+                                style={{
+                                  fontFamily: FONT,
+                                  color: c.razz,
+                                  background: "transparent",
+                                  border: `1px dashed ${c.border}`,
+                                  cursor: "pointer",
+                                  marginTop: 16,
+                                  gridColumn: "span 2",
+                                }}
+                                onMouseEnter={e => { e.currentTarget.style.background = c.razzTintBg; e.currentTarget.style.borderColor = c.razz; }}
+                                onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = c.border; }}
+                              >
+                                <Plus className="w-3.5 h-3.5" />Add another class code
+                              </button>
+                            </>
+                          );
+                        })()}
+                        {k === "officer" && (() => {
+                          const inputStyleXtra: React.CSSProperties = {
+                            fontFamily: FONT, fontSize: 13, color: c.text,
+                            background: c.cardBg, border: `1px solid ${c.border}`,
+                            borderRadius: 8, padding: "9px 12px", outline: "none", width: "100%",
+                          };
+                          const patchOfficer = (idx: number, p: Partial<OfficerExtra>) =>
+                            setOfficerExtras(rs => rs.map((r, j) => j === idx ? { ...r, ...p } : r));
+                          return (
+                            <>
+                              {officerExtras.map((row, idx) => (
+                                <div key={idx} style={{
+                                  gridColumn: "span 2", marginTop: 12, paddingTop: 12,
+                                  borderTop: `1px solid ${c.softDivider}`,
+                                }}>
+                                  <div className="flex items-center justify-between mb-3">
+                                    <div className="text-[11.5px] font-bold uppercase tracking-wider" style={{ fontFamily: FONT, color: c.muted, letterSpacing: "0.06em" }}>
+                                      Officer {idx + 2}
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => setOfficerExtras(rs => rs.filter((_, j) => j !== idx))}
+                                      title="Remove officer"
+                                      style={{ background: "transparent", border: "none", color: c.muted, cursor: "pointer", padding: 4, display: "flex", alignItems: "center", justifyContent: "center" }}
+                                      onMouseEnter={e => (e.currentTarget.style.color = "#EF4444")}
+                                      onMouseLeave={e => (e.currentTarget.style.color = c.muted)}
+                                    >
+                                      <X className="w-3.5 h-3.5" strokeWidth={2} />
+                                    </button>
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-x-4 gap-y-4">
+                                    <div className="flex flex-col gap-1.5">
+                                      <label className="text-[11.5px] font-semibold flex items-center gap-1" style={{ fontFamily: FONT, color: c.text }}>
+                                        First Name<span style={{ color: c.razz }}>*</span>
+                                      </label>
+                                      <input value={row.first} onChange={e => patchOfficer(idx, { first: e.target.value })} placeholder="Jane" style={inputStyleXtra} />
+                                    </div>
+                                    <div className="flex flex-col gap-1.5">
+                                      <label className="text-[11.5px] font-semibold flex items-center gap-1" style={{ fontFamily: FONT, color: c.text }}>
+                                        Last Name<span style={{ color: c.razz }}>*</span>
+                                      </label>
+                                      <input value={row.last} onChange={e => patchOfficer(idx, { last: e.target.value })} placeholder="Doe" style={inputStyleXtra} />
+                                    </div>
+                                    <div className="flex flex-col gap-1.5">
+                                      <label className="text-[11.5px] font-semibold flex items-center gap-1" style={{ fontFamily: FONT, color: c.text }}>
+                                        Title<span style={{ color: c.razz }}>*</span>
+                                      </label>
+                                      <input value={row.title} onChange={e => patchOfficer(idx, { title: e.target.value })} placeholder="e.g. President" style={inputStyleXtra} />
+                                    </div>
+                                    <div className="flex flex-col gap-1.5">
+                                      <label className="text-[11.5px] font-semibold flex items-center gap-1" style={{ fontFamily: FONT, color: c.text }}>
+                                        Included / Excluded<span style={{ color: c.razz }}>*</span>
+                                      </label>
+                                      <StyledSelect
+                                        value={row.status}
+                                        onChange={v => patchOfficer(idx, { status: v as OfficerExtra["status"] })}
+                                        options={["Included", "Excluded"]}
+                                        labelFor={v => v}
+                                        triggerStyle={inputStyleXtra}
+                                        c={{ text: c.text, muted: c.muted, border: c.border, cardBg: c.cardBg, hoverBg: c.hoverBg, razz: c.razz, razzTintBg: c.razzTintBg }}
+                                        font={{ fontFamily: FONT }}
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                              <button
+                                type="button"
+                                onClick={() => setOfficerExtras(rs => [...rs, emptyOfficerExtra()])}
+                                className="w-full inline-flex items-center justify-center gap-1.5 py-3 rounded-2xl text-[12.5px] font-semibold transition-colors"
+                                style={{
+                                  fontFamily: FONT,
+                                  color: c.razz,
+                                  background: "transparent",
+                                  border: `1px dashed ${c.border}`,
+                                  cursor: "pointer",
+                                  marginTop: 16,
+                                  gridColumn: "span 2",
+                                }}
+                                onMouseEnter={e => { e.currentTarget.style.background = c.razzTintBg; e.currentTarget.style.borderColor = c.razz; }}
+                                onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = c.border; }}
+                              >
+                                <Plus className="w-3.5 h-3.5" />Add another officer
+                              </button>
+                            </>
+                          );
+                        })()}
+                        {k === "location" && (() => {
+                          const locAction = values["location"]?.[1] ?? "";
+                          // Remove mode: no class-code exposure needed —
+                          // the user is only identifying the location to drop.
+                          if (locAction === "Remove") return null;
+                          // Add mode: every row is implicitly Add Class Code,
+                          // so hide the per-row Action dropdown.
+                          // The grid's own "+ Add" button doubles as the
+                          // add-another-location entry point for this card.
+                          return renderCcGrid("location", {
+                            hideAction: locAction === "Add",
+                            addLabel: "Add another location",
+                          });
+                        })()}
                       </div>
                       {cm.footNote && (
                         <p className="text-[11.5px] mt-3" style={{ fontFamily: FONT, color: c.muted, lineHeight: 1.5 }}>{cm.footNote}</p>
@@ -1399,7 +1738,6 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
                     <div className="flex flex-col gap-1.5">
                       <label className="text-[11.5px] font-semibold flex items-center gap-1" style={{ fontFamily: FONT, color: c.text }}>
                         Additional comment
-                        <span className="text-[10.5px] font-medium" style={{ color: c.muted }}>optional</span>
                       </label>
                       <textarea
                         value={notes}
@@ -1416,7 +1754,6 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
                     <div className="flex flex-col gap-1.5">
                       <label className="text-[11.5px] font-semibold flex items-center gap-1" style={{ fontFamily: FONT, color: c.text }}>
                         Upload supporting document
-                        <span className="text-[10.5px] font-medium" style={{ color: c.muted }}>optional</span>
                       </label>
                       <p className="text-[11.5px]" style={{ fontFamily: FONT, color: c.muted, marginBottom: 4 }}>
                         Attach any forms, letters, or documentation that are required for processing.
