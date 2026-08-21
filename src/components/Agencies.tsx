@@ -708,7 +708,7 @@ const StatusPill = ({ status, isDark }: { status: string; isDark: boolean }) => 
   </span>
 );
 
-function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleStar, inactiveUserIds, setInactiveUserIds, statusInactiveUserIds, setStatusInactiveUserIds, removedUserIds, setRemovedUserIds, bookRolled, setBookRolled, allAgencies, initialTab, onNavigateToAgency, viewMode = "internal", itcRecords, setItcRecords }: {
+function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleStar, inactiveUserIds, setInactiveUserIds, statusInactiveUserIds, setStatusInactiveUserIds, removedUserIds, setRemovedUserIds, bookRolled, setBookRolled, allAgencies, initialTab, onNavigateToAgency, viewMode = "internal", itcRecords, setItcRecords, isSuperAdmin = true }: {
   agency: AgencyDetail;
   isDark: boolean;
   onBack: () => void;
@@ -736,6 +736,11 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
   // (which never renders the Accounting tab anyway) can leave them off.
   itcRecords?: Record<string, ITCRecord | null>;
   setItcRecords?: React.Dispatch<React.SetStateAction<Record<string, ITCRecord | null>>>;
+  // BTIS super-admin gate for the ITC Record surface. Only super admins can
+  // Edit the record — regular internal users see the read-only card without
+  // the Edit button. Defaults to true so demo/mock use is unaffected until
+  // real auth wires it up.
+  isSuperAdmin?: boolean;
 }) {
   // Mock role toggle for the Admin (client) section. In production internal & client are
   // separate deployments and this flag would come from auth; here we let the demo user
@@ -748,13 +753,21 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
   // changes survive when the user switches agencies.
   const [itcEditing, setItcEditing] = useState(false);
   const [itcDraft, setItcDraft] = useState<ITCRecord | null>(null);
+  // Review-changes modal (Super-Admin two-step commit). Amit's rule: no
+  // silent push to ITC — admin sees a diff of only the changed fields
+  // before Update ITC actually writes.
+  const [itcReviewing, setItcReviewing] = useState(false);
+  // Side-panel expansion for the ITC edit form. Same UX as the Overview
+  // edit expand — a long form is easier to eyeball when it fills the
+  // right 70vw with the read-only card still visible on the left.
+  const [itcEditExpanded, setItcEditExpanded] = useState(false);
   // Sub-tabs within the Accounting tab — same segmented-control pattern
   // as the Documents toolbar so users don't have to scroll to switch
   // between the ITC record and the monthly statements archive.
   // Sub-tabs across the top of the Accounting tab. Splitting Statements into
   // Commission vs Account lets users jump straight to the file type they want
   // without a second-level tab switch inside the Statements card.
-  const [accountingView, setAccountingView] = useState<"record" | "comm" | "soa">("record");
+  const [accountingView, setAccountingView] = useState<"record" | "comm" | "soa">(viewMode === "internal" ? "record" : "comm");
   // Statements view state — mirrors the Documents toolbar language
   // (search, filter by type, sort, select mode, per-item preview).
   const [stmtSearch, setStmtSearch] = useState("");
@@ -5494,7 +5507,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
           const statusColor = (s: ITCStatus) => s === "Active" ? "#73C9B7"
             : s === "Suspended" ? "#F59E0B"
             : s === "Terminated" ? "#EF4444"
-            : "#6366F1";
+            : "#A614C3";
 
           const SectionHeader = ({ title, first }: { title: string; first?: boolean }) => (
             <div className={first ? "mb-4" : "mt-8 pt-6 mb-4"} style={first ? undefined : { borderTop: `1px solid ${c.border}` }}>
@@ -5506,8 +5519,10 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
             <span className="text-[13px]" style={{ ...font, color: c.text }}>{v ? "Yes" : "No"}</span>
           );
 
-          // ── Empty state ──
-          if (!record && !itcEditing) {
+          // ── Empty state ── (BTIS-internal only; client view skips
+          // straight to the statements sub-tabs since ITC record surface
+          // is gated to super-admin BTIS users per spec.)
+          if (viewMode === "internal" && !record && !itcEditing) {
             return (
               <div className="pb-6">
                 <div className="rounded-2xl p-8 mb-8" style={{ background: c.cardBg, border: `1px solid ${c.border}` }}>
@@ -5524,8 +5539,8 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
             );
           }
 
-          // ── Edit mode ──
-          if (itcEditing && itcDraft) {
+          // ── Edit mode ── (BTIS-internal only)
+          if (viewMode === "internal" && itcEditing && itcDraft) {
             const set = <K extends keyof ITCRecord>(k: K, v: ITCRecord[K]) => setItcDraft(prev => prev ? { ...prev, [k]: v } : prev);
             // Tokens the StyledSelect needs — c doesn't ship razz, so provide it here.
             const selectC = {
@@ -5588,27 +5603,73 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                 </div>
               );
             };
+            // Diff pristine record vs current draft — used by the Review
+            // modal. Only fields whose display value differs are listed;
+            // booleans are Yes/No so the diff reads naturally to the admin.
+            const FIELD_LABELS: [keyof ITCRecord, string][] = [
+              ["producerCode", "Producer Code"],
+              ["agentOrBroker", "Agent / Broker"],
+              ["status", "Status"],
+              ["shortName", "Short Name"],
+              ["name", "Name"],
+              ["dba", "DBA"],
+              ["address", "Address"],
+              ["city", "City"],
+              ["state", "State"],
+              ["zip", "Zip"],
+              ["telephone", "Telephone"],
+              ["email", "Email"],
+              ["accountingEmail", "Accounting Email"],
+              ["statementEmail", "Statement Email"],
+              ["appointmentDate", "Appointment Date"],
+              ["licenseNo", "License No"],
+              ["licenseExpires", "License Expires"],
+              ["eoPolicyNo", "E&O Policy No"],
+              ["eoPolicyExpires", "E&O Expires"],
+              ["taxId", "Tax ID"],
+              ["tax1099Type", "1099 Type"],
+              ["tax1099Name", "1099 Name"],
+              ["emailStatements", "Email Statements"],
+              ["directDeposits", "Direct Deposits"],
+              ["directDepositsCommissionOnly", "Direct Deposits (Commission Only)"],
+              ["farmersAgent", "Farmers Agent"],
+              ["smartChoiceAgent", "Smart Choice Agent"],
+              ["piibAgent", "PIIB Agent"],
+              ["useConsolidatedBillingId", "Use Consolidated Billing ID"],
+              ["consolidatedBillingId", "Consolidated Billing ID"],
+              ["isConsolidatedBillingProducer", "Is Consolidated Billing Producer"],
+              ["isAffiliatedWith", "Is Affiliated With"],
+              ["affiliatedWithId", "Affiliated With ID"],
+              ["isAffiliationMain", "Is Affiliation Main"],
+              ["subProducerName", "Sub-Producer Name"],
+            ];
+            const fmt = (v: string | boolean) => typeof v === "boolean" ? (v ? "Yes" : "No") : (v || "—");
+            const diff = record
+              ? FIELD_LABELS
+                  .filter(([k]) => (record[k] as unknown) !== (itcDraft[k] as unknown))
+                  .map(([k, label]) => ({ key: k, label, before: fmt(record[k] as string | boolean), after: fmt(itcDraft[k] as string | boolean) }))
+              : [];
             return (
-              <div className="pb-6">
-                <div className="rounded-2xl p-6 mb-6" style={{ background: c.cardBg, border: `1px solid ${c.border}` }}>
+              <>
+              {itcEditExpanded && <div className="fixed inset-0 z-40" style={{ background: "rgba(0,0,0,0.35)" }} onClick={() => setItcEditExpanded(false)} />}
+              <div className={itcEditExpanded ? "fixed inset-y-0 right-0 z-50 flex flex-col shadow-2xl overflow-y-auto" : "pb-6"}
+                style={itcEditExpanded ? { width: "70vw", background: c.cardBg, borderLeft: `1px solid ${c.border}` } : undefined}>
+                <div className={itcEditExpanded ? "p-6 mb-6" : "rounded-2xl p-6 mb-6"} style={itcEditExpanded ? { background: c.cardBg } : { background: c.cardBg, border: `1px solid ${c.border}` }}>
                   <div className="flex items-center justify-between mb-6">
                     <h3 className="text-[17px] font-bold" style={{ ...font, color: c.text }}>ITC Record</h3>
                     <div className="flex items-center gap-2">
-                      <button onClick={() => { setItcEditing(false); setItcDraft(null); }}
+                      <button onClick={() => setItcEditExpanded(p => !p)} title={itcEditExpanded ? "Collapse" : "Expand"}
+                        className="p-1.5 rounded-md transition-colors" style={{ color: itcEditExpanded ? "#A855F7" : c.muted }}
+                        onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+                        onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                        {itcEditExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                      </button>
+                      <button onClick={() => { setItcEditing(false); setItcDraft(null); setItcEditExpanded(false); }}
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-colors"
                         style={{ ...font, border: `1px solid ${isDark ? "rgba(255,255,255,0.10)" : "#E5E7EB"}`, color: c.text }}
                         onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
                         onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-                        Cancel
-                      </button>
-                      <button onClick={() => {
-                        if (itcDraft && setItcRecords) setItcRecords(prev => ({ ...prev, [agency.code]: itcDraft }));
-                        setItcEditing(false); setItcDraft(null);
-                        showToast({ title: "Changes saved", description: `ITC Record updated for ${agency.name}.` });
-                      }}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold text-white transition-colors"
-                        style={{ ...font, background: btnGrad }}>
-                        Save changes
+                        <Pencil className="w-3.5 h-3.5" />Cancel Edit
                       </button>
                     </div>
                   </div>
@@ -5654,7 +5715,20 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                     <div className="col-span-2"><label style={labelStyle}>Zip:</label>
                       <input value={itcDraft.zip} onChange={e => set("zip", e.target.value)} style={inputStyle} /></div>
                     <div className="col-span-2"><label style={labelStyle}>Telephone:</label>
-                      <input value={itcDraft.telephone} onChange={e => set("telephone", e.target.value)} style={inputStyle} /></div>
+                      <input
+                        value={itcDraft.telephone}
+                        onChange={e => {
+                          const d = e.target.value.replace(/\D/g, "").slice(0, 10);
+                          const formatted = d.length > 6 ? `${d.slice(0,3)}-${d.slice(3,6)}-${d.slice(6)}`
+                            : d.length > 3 ? `${d.slice(0,3)}-${d.slice(3)}`
+                            : d;
+                          set("telephone", formatted);
+                        }}
+                        inputMode="numeric"
+                        maxLength={12}
+                        placeholder="xxx-xxx-xxxx"
+                        style={inputStyle}
+                      /></div>
                     <div className="col-span-4"><label style={labelStyle}>Email:</label>
                       <input value={itcDraft.email} onChange={e => set("email", e.target.value)} style={inputStyle} /></div>
                     <div className="col-span-3"><label style={labelStyle}>Accounting Email:</label>
@@ -5718,21 +5792,107 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                     <div className="col-span-3"><label style={labelStyle}>Sub-Producer Name:</label>
                       <input value={itcDraft.subProducerName} onChange={e => set("subProducerName", e.target.value)} style={inputStyle} /></div>
                   </div>
+
+                  {/* Mirror the header action pair at the bottom so the
+                      admin doesn't have to scroll back up to submit after
+                      editing the tail of a long form. */}
+                  <div className="flex items-center justify-between gap-2 mt-8 pt-6" style={{ borderTop: `1px solid ${c.border}` }}>
+                    <button onClick={() => { setItcEditing(false); setItcDraft(null); setItcEditExpanded(false); }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-colors"
+                      style={{ ...font, border: `1px solid ${isDark ? "rgba(255,255,255,0.10)" : "#E5E7EB"}`, color: c.text }}
+                      onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+                      onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                      <Pencil className="w-3.5 h-3.5" />Cancel Edit
+                    </button>
+                    <button onClick={() => setItcReviewing(true)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold text-white transition-colors"
+                      style={{ ...font, background: btnGrad }}>
+                      Review Changes &amp; Update
+                    </button>
+                  </div>
                 </div>
+
+                {/* ── Review Changes modal ──
+                    Fires on Review Changes button. Lists only fields that
+                    differ from the pristine ITC record so the super admin
+                    can eyeball the exact payload that Update ITC will push
+                    (no "spot the yellow highlight in 40 fields" like the
+                    legacy WIN screen). */}
+                {itcReviewing && (
+                  <>
+                    <div className="fixed inset-0 z-40" style={{ background: "rgba(0,0,0,0.35)" }} onClick={() => setItcReviewing(false)} />
+                    <div className="fixed left-1/2 top-1/2 z-50 rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+                      style={{ transform: "translate(-50%, -50%)", background: c.cardBg, border: `1px solid ${c.border}`, width: "min(560px, 92vw)", maxHeight: "82vh" }}>
+                      <div className="p-6 pb-4">
+                        <h3 className="text-[17px] font-bold mb-1" style={{ ...font, color: c.text }}>Review ITC Changes</h3>
+                        <p className="text-[12.5px]" style={{ ...font, color: c.muted }}>
+                          {diff.length === 0
+                            ? "No changes yet — go back and edit a field first."
+                            : `${diff.length} ${diff.length === 1 ? "change" : "changes"} will be updated in ITC.`}
+                        </p>
+                      </div>
+                      <div className="overflow-y-auto px-6" style={{ flex: "1 1 auto" }}>
+                        {diff.map(d => (
+                          <div key={d.key as string} className="py-4" style={{ borderTop: `1px solid ${c.border}` }}>
+                            <p className="text-[13px] font-semibold mb-2" style={{ ...font, color: c.text }}>{d.label}</p>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <p className="text-[11px] uppercase tracking-wider mb-1" style={{ ...font, color: c.muted, letterSpacing: "0.06em" }}>Current ITC value</p>
+                                <p className="text-[13px]" style={{ ...font, color: c.muted, textDecoration: "line-through" }}>{d.before}</p>
+                              </div>
+                              <div>
+                                <p className="text-[11px] uppercase tracking-wider mb-1" style={{ ...font, color: c.muted, letterSpacing: "0.06em" }}>New value</p>
+                                <p className="text-[13px] font-semibold" style={{ ...font, color: c.text }}>{d.after}</p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="p-6 pt-4 flex items-center justify-between gap-2" style={{ borderTop: `1px solid ${c.border}` }}>
+                        <button onClick={() => setItcReviewing(false)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-colors"
+                          style={{ ...font, border: `1px solid ${isDark ? "rgba(255,255,255,0.10)" : "#E5E7EB"}`, color: c.text }}
+                          onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+                          onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                          Back to Edit
+                        </button>
+                        <button
+                          disabled={diff.length === 0}
+                          onClick={() => {
+                            if (itcDraft && setItcRecords) setItcRecords(prev => ({ ...prev, [agency.code]: itcDraft }));
+                            setItcReviewing(false);
+                            setItcEditing(false);
+                            setItcDraft(null);
+                            showToast({ title: "ITC updated", description: `${diff.length} ${diff.length === 1 ? "change" : "changes"} pushed to ITC for ${agency.name}.` });
+                          }}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold text-white transition-colors"
+                          style={{ ...font, background: btnGrad, opacity: diff.length === 0 ? 0.5 : 1, cursor: diff.length === 0 ? "not-allowed" : "pointer" }}>
+                          Update ITC
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
+              </>
             );
           }
 
-          // ── View mode ──
-          if (record) {
-            const statusBadge = (
+          // ── View mode ── (clients also enter here — even when the
+          // agency has no ITC record — so they can reach the Commission
+          // Statement / Statement of Account sub-tabs. The ITC Record
+          // card render itself is gated to internal below.)
+          if (record || viewMode === "client") {
+            const statusBadge = record ? (
               <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[12px] font-semibold"
                 style={{ background: `${statusColor(record.status)}1A`, color: statusColor(record.status) }}>
                 <span className="w-1.5 h-1.5 rounded-full" style={{ background: statusColor(record.status) }} />
                 {record.status}
               </span>
-            );
-            const fullAddr = [record.address, [record.city, record.state].filter(Boolean).join(", "), record.zip].filter(Boolean).join(" · ");
+            ) : null;
+            const fullAddr = record
+              ? [record.address, [record.city, record.state].filter(Boolean).join(", "), record.zip].filter(Boolean).join(" · ")
+              : "";
             return (
               <div className="pb-6">
                 {/* Sub-tab toolbar — same segmented-control language as
@@ -5743,7 +5903,9 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                   style={{ borderBottom: `1px solid ${c.border}` }}
                 >
                   {([
-                    { key: "record" as const, label: "ITC Record" },
+                    ...(viewMode === "internal"
+                      ? [{ key: "record" as const, label: "ITC Record" }]
+                      : []),
                     { key: "comm"   as const, label: "Commission Statement" },
                     { key: "soa"    as const, label: "Statement of Account" },
                   ]).map(t => {
@@ -5768,17 +5930,19 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                 </div>
 
 
-                {accountingView === "record" && (
+                {viewMode === "internal" && record && accountingView === "record" && (
                 <div className="rounded-2xl p-8 mb-8" style={{ background: c.cardBg, border: `1px solid ${c.border}` }}>
                   <div className="flex items-center justify-between mb-6">
                     <h3 className="text-[17px] font-bold" style={{ ...font, color: c.text }}>ITC Record</h3>
-                    <button onClick={() => { setItcDraft(record); setItcEditing(true); }}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-colors"
-                      style={{ ...font, border: `1px solid ${isDark ? "rgba(255,255,255,0.10)" : "#E5E7EB"}`, color: c.muted }}
-                      onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
-                      onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-                      <Pencil className="w-3.5 h-3.5" />Edit
-                    </button>
+                    {isSuperAdmin && (
+                      <button onClick={() => { setItcDraft(record); setItcEditing(true); }}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-colors"
+                        style={{ ...font, border: `1px solid ${isDark ? "rgba(255,255,255,0.10)" : "#E5E7EB"}`, color: c.muted }}
+                        onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+                        onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                        <Pencil className="w-3.5 h-3.5" />Edit
+                      </button>
+                    )}
                   </div>
 
                   <SectionHeader title="Producer" first />
@@ -5806,7 +5970,10 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                       <p className="text-[13px] font-semibold mb-1" style={{ ...font, color: c.text }}>Address:</p>
                       <p className="text-[13px]" style={{ ...font, color: c.muted }}>{fullAddr || "—"}</p>
                     </div>
-                    <LabelValue label="Telephone" value={record.telephone || "—"} />
+                    <LabelValue label="Telephone" value={(() => {
+                      const d = (record.telephone || "").replace(/\D/g, "");
+                      return d.length === 10 ? `${d.slice(0,3)}-${d.slice(3,6)}-${d.slice(6)}` : (record.telephone || "—");
+                    })()} />
                     <div className="col-span-2">
                       <p className="text-[13px] font-semibold mb-1" style={{ ...font, color: c.text }}>Email:</p>
                       <p className="text-[13px]" style={{ ...font, color: c.muted }}>{record.email || "—"}</p>
