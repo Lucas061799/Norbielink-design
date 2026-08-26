@@ -295,7 +295,7 @@ const CARD_META: Record<EndorsementKey, { blurb: string; footNote?: string; fiel
                     { label: "Other Entity Type (if Other selected)", type: "text", placeholder: "Describe entity type", span: 1, optional: true },
                     { label: "Legal Name",              type: "text", placeholder: "Entity legal name", span: 1 },
                     { label: "DBA",                     type: "text", placeholder: "Doing-business-as name", span: 1, optional: true },
-                    { label: "FEIN",                    type: "text", placeholder: "12-3456789", span: 2 },
+                    { label: "FEIN",                    type: "text", placeholder: "12-3456789", span: 1 },
                     { label: "Entity Location — Address", type: "text", placeholder: "Street", span: 2 },
                     { label: "City",                    type: "text", placeholder: "City", span: 1 },
                     { label: "State",                   type: "select", options: US_STATES, span: 1 },
@@ -514,6 +514,9 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
   const isHiddenField = (k: EndorsementKey, i: number) => {
     if (k === "location" && locationRemoveMode() && (i === 6 || i === 7 || i === 8)) return true;
     if (k === "waiver" && waiverType() === "Blanket" && isWaiverExtra(i)) return true;
+    // Entity: "Other Entity Type" is a follow-up only meaningful when the
+    // Entity Type dropdown (idx 2) is set to "Other" — hide otherwise.
+    if (k === "entity" && i === 3 && (values["entity"]?.[2] ?? "") !== "Other") return true;
     return false;
   };
   const isForcedRequired = (k: EndorsementKey, i: number) =>
@@ -1328,8 +1331,19 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
                           // class-code block when Blanket is selected — those
                           // fields only apply to Specific waivers.
                           if (k === "waiver" && waiverType() === "Blanket" && i >= 2 && i <= 14) return null;
+                          // Entity: "Other Entity Type" (idx 3) only
+                          // renders when Entity Type (idx 2) is "Other".
+                          if (k === "entity" && i === 3 && (values["entity"]?.[2] ?? "") !== "Other") return null;
                           const currentAddrIdx = addrIdxs.find(a => a === i);
                           const showCcAddressExtras = currentAddrIdx !== undefined;
+                          // Waiver Specific: Class Code / Payroll /
+                          // Employees at Jobsite share a 3-col row (same
+                          // treatment as City/State/Zip in the address
+                          // block). Render at Class Code (11); hide the
+                          // next two so they don't lay out separately.
+                          const ccTripleStart = k === "waiver" ? 11 : -1;
+                          if (k === "waiver" && (i === ccTripleStart + 1 || i === ccTripleStart + 2)) return null;
+                          const showCcPayrollTriple = k === "waiver" && i === ccTripleStart;
                           return (
                             <Fragment key={i}>
                               {showCcGrid && renderCcGrid("classcode")}
@@ -1344,7 +1358,38 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
                                   A carrier specific no loss statement may be required. If needed, we will reach out.
                                 </p>
                               )}
-                            <div className="flex flex-col gap-1.5" style={{ gridColumn: `span ${f.span ?? 2}` }}>
+                              {showCcPayrollTriple && (
+                                <div style={{ gridColumn: "span 2", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
+                                  {[ccTripleStart, ccTripleStart + 1, ccTripleStart + 2].map(subI => {
+                                    const subF = cm.fields[subI];
+                                    const subVal = values[k]?.[subI] ?? "";
+                                    const subCons = constraintFor(subF.label);
+                                    const subInputStyle: React.CSSProperties = {
+                                      fontFamily: FONT, fontSize: 13, color: c.text,
+                                      background: c.cardBg, border: `1px solid ${c.border}`,
+                                      borderRadius: 8, padding: "9px 12px", outline: "none", width: "100%",
+                                    };
+                                    return (
+                                      <div key={subI} className="flex flex-col gap-1.5">
+                                        <label className="text-[11.5px] font-semibold flex items-center gap-1" style={{ fontFamily: FONT, color: c.text }}>
+                                          {subF.label}
+                                          {(!subF.optional || isForcedRequired(k, subI)) && <span style={{ color: c.razz }}>*</span>}
+                                        </label>
+                                        <input
+                                          type="text"
+                                          value={subVal}
+                                          inputMode={subCons?.inputMode}
+                                          maxLength={subCons?.maxLength}
+                                          onChange={e => setValue(k, subI, subCons ? subCons.format(e.target.value) : e.target.value)}
+                                          placeholder={subF.placeholder}
+                                          style={subInputStyle}
+                                        />
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            <div className="flex flex-col gap-1.5" style={{ gridColumn: `span ${f.span ?? 2}`, display: showCcPayrollTriple ? "none" : "flex" }}>
                               <label className="text-[11.5px] font-semibold flex items-center gap-1" style={{ fontFamily: FONT, color: c.text }}>
                                 {f.label}
                                 {(!f.optional || isForcedRequired(k, i)) && <span style={{ color: c.razz }}>*</span>}

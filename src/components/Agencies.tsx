@@ -353,8 +353,11 @@ interface ITCRecord {
 const INITIAL_ITC_RECORDS: Record<string, ITCRecord | null> = {
   ACME01: {
     producerCode: "AC192", agentOrBroker: "Agent", shortName: "AC192", name: "ACME INSURANCE AGENCY", dba: "", status: "Active",
-    address: "1111 6th Ave", city: "Des Moines", state: "IA", zip: "50314",
-    telephone: "5152221000", email: "jason@acmeins.com", accountingEmail: "d.kim@acmeins.com", statementEmail: "d.kim@acmeins.com",
+    // Deliberate demo mismatch: agency Overview has 1111 6th Ave / 515-222-1000,
+    // ITC still has the older Cherry Ave + a stale phone — surfaces as
+    // "2 pending updates" on the ITC Record for the super admin to review.
+    address: "980 Cherry Ave", city: "Des Moines", state: "IA", zip: "50314",
+    telephone: "5152220999", email: "jason@acmeins.com", accountingEmail: "d.kim@acmeins.com", statementEmail: "d.kim@acmeins.com",
     appointmentDate: "03/24/2026", licenseNo: "LC-88210", licenseExpires: "03/24/2028",
     eoPolicyNo: "EO-4421", eoPolicyExpires: "03/24/2027", taxId: "121222334455", tax1099Type: "LLC", tax1099Name: "Acme Insurance Agency LLC",
     emailStatements: true, directDeposits: true, directDepositsCommissionOnly: false,
@@ -506,6 +509,32 @@ function getDetail(a: Agency): AgencyDetail {
     workersComp:   d.workersComp   ?? ["AIG"],
     badges:        d.badges        ?? [],
   };
+}
+
+// Shared with the agency-list badge: how many Norbielink agency-info fields
+// differ from what's currently frozen in the ITC producer record. Same
+// normalization the ITC Record view uses so pure formatting differences
+// (phone digits, name casing) don't count as diffs.
+function countPendingItcUpdates(a: AgencyDetail, record: ITCRecord | null): number {
+  if (!record) return 0;
+  const norm = (label: string, v: string) => {
+    const s = (v ?? "").trim();
+    if (label === "Telephone") return s.replace(/\D/g, "");
+    if (label === "Name" || label === "DBA") return s.toLowerCase();
+    return s;
+  };
+  const map: Array<[keyof ITCRecord, string, string]> = [
+    ["name",           "Name",            a.name],
+    ["address",        "Address",         a.street],
+    ["city",           "City",            a.city],
+    ["state",          "State",           a.state],
+    ["zip",            "Zip",             a.zip],
+    ["telephone",      "Telephone",       a.phone],
+    ["email",          "Email",           a.contactEmail],
+    ["licenseNo",      "License No",      a.licenseNo],
+    ["licenseExpires", "License Expires", a.licenseExp],
+  ];
+  return map.reduce((n, [k, label, av]) => n + (norm(label, av) !== norm(label, String(record[k] ?? "")) ? 1 : 0), 0);
 }
 
 /* ─── Agency Quotes & Policies ──────────────────────────────────────────── */
@@ -761,6 +790,11 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
   // edit expand — a long form is easier to eyeball when it fills the
   // right 70vw with the read-only card still visible on the left.
   const [itcEditExpanded, setItcEditExpanded] = useState(false);
+  // Modal that lists fields the agency has edited on Overview (or an
+  // external agent edited on their side) that aren't yet pushed to ITC.
+  // Super admin approves each Push to ITC in the same review-first
+  // pattern as the Review Changes modal.
+  const [pendingItcOpen, setPendingItcOpen] = useState(false);
   // Sub-tabs within the Accounting tab — same segmented-control pattern
   // as the Documents toolbar so users don't have to scroll to switch
   // between the ITC record and the monthly statements archive.
@@ -5698,19 +5732,20 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                       /></div>
                     <div><label style={labelStyle}>Short Name:</label>
                       <input value={itcDraft.shortName} onChange={e => set("shortName", e.target.value)} style={inputStyle} /></div>
-                    <div className="col-span-2"><label style={labelStyle}>Name:</label>
+                    <div><label style={labelStyle}>Name:</label>
                       <input value={itcDraft.name} onChange={e => set("name", e.target.value)} style={inputStyle} /></div>
-                    <div className="col-span-3"><label style={labelStyle}>DBA:</label>
+                    <div><label style={labelStyle}>DBA:</label>
                       <input value={itcDraft.dba} onChange={e => set("dba", e.target.value)} style={inputStyle} /></div>
                   </div>
 
                   <SectionHeader title="Contact" />
                   <div className="grid grid-cols-6 gap-6">
-                    <div className="col-span-6"><label style={labelStyle}>Address:</label>
+                    <div className="col-span-3"><label style={labelStyle}>Address:</label>
                       <input value={itcDraft.address} onChange={e => set("address", e.target.value)} style={inputStyle} /></div>
-                    <div className="col-span-3"><label style={labelStyle}>City:</label>
+                    <div className="col-span-3" />{/* spacer so Address stays half-width like the Overview edit */}
+                    <div className="col-span-2"><label style={labelStyle}>City:</label>
                       <input value={itcDraft.city} onChange={e => set("city", e.target.value)} style={inputStyle} /></div>
-                    <div className="col-span-1"><label style={labelStyle}>State:</label>
+                    <div className="col-span-2"><label style={labelStyle}>State:</label>
                       <input value={itcDraft.state} onChange={e => set("state", e.target.value)} maxLength={2} style={inputStyle} /></div>
                     <div className="col-span-2"><label style={labelStyle}>Zip:</label>
                       <input value={itcDraft.zip} onChange={e => set("zip", e.target.value)} style={inputStyle} /></div>
@@ -5789,7 +5824,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                     <div><label style={labelStyle}>Affiliated With ID:</label>
                       <input value={itcDraft.affiliatedWithId} onChange={e => set("affiliatedWithId", e.target.value)} style={{ ...inputStyle, height: 40, boxSizing: "border-box", display: "block" }} /></div>
                     <div><label style={labelStyle}>Is Affiliation Main:</label><YesNoSelect k="isAffiliationMain" /></div>
-                    <div className="col-span-3"><label style={labelStyle}>Sub-Producer Name:</label>
+                    <div><label style={labelStyle}>Sub-Producer Name:</label>
                       <input value={itcDraft.subProducerName} onChange={e => set("subProducerName", e.target.value)} style={inputStyle} /></div>
                   </div>
 
@@ -5893,6 +5928,35 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
             const fullAddr = record
               ? [record.address, [record.city, record.state].filter(Boolean).join(", "), record.zip].filter(Boolean).join(" · ")
               : "";
+            // Pending updates = fields that were edited on the Overview
+            // tab (or on the external agent side) but haven't been pushed
+            // to ITC yet. Compares agency detail (source of truth for
+            // Norbielink) against the frozen ITC record, with light
+            // normalization so pure formatting differences (phone digits,
+            // Name casing) don't false-positive.
+            const norm = (label: string, v: string) => {
+              const s = (v ?? "").trim();
+              if (label === "Telephone") return s.replace(/\D/g, "");
+              if (label === "Name" || label === "DBA") return s.toLowerCase();
+              return s;
+            };
+            const ITC_AGENCY_MAP: Array<{ key: keyof ITCRecord; label: string; agencyValue: string }> = record ? [
+              { key: "name",           label: "Name",            agencyValue: agency.name },
+              { key: "address",        label: "Address",         agencyValue: agency.street },
+              { key: "city",           label: "City",            agencyValue: agency.city },
+              { key: "state",          label: "State",           agencyValue: agency.state },
+              { key: "zip",            label: "Zip",             agencyValue: agency.zip },
+              { key: "telephone",      label: "Telephone",       agencyValue: agency.phone },
+              { key: "email",          label: "Email",           agencyValue: agency.contactEmail },
+              { key: "licenseNo",      label: "License No",      agencyValue: agency.licenseNo },
+              { key: "licenseExpires", label: "License Expires", agencyValue: agency.licenseExp },
+            ] : [];
+            const pendingUpdates = record
+              ? ITC_AGENCY_MAP
+                  .map(m => ({ ...m, itcValue: String(record[m.key] ?? "") }))
+                  .filter(m => norm(m.label, m.agencyValue) !== norm(m.label, m.itcValue))
+              : [];
+            const pendingKeys = new Set(pendingUpdates.map(p => p.key as string));
             return (
               <div className="pb-6">
                 {/* Sub-tab toolbar — same segmented-control language as
@@ -5930,6 +5994,29 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                 </div>
 
 
+                {/* Pending-updates alert — surfaces Overview / external-agent
+                    edits that haven't been synced to ITC yet, so the super
+                    admin knows the frozen ITC record is now stale and can
+                    review/push in one action. */}
+                {viewMode === "internal" && isSuperAdmin && record && accountingView === "record" && pendingUpdates.length > 0 && (
+                  <div className="rounded-xl p-4 mb-6 flex items-start gap-3"
+                    style={{ background: "rgba(166,20,195,0.06)", border: "1px solid rgba(166,20,195,0.28)" }}>
+                    <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: "#A614C3" }} strokeWidth={2} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-bold" style={{ ...font, color: c.text }}>
+                        {pendingUpdates.length} pending {pendingUpdates.length === 1 ? "update" : "updates"} from recent edits
+                      </p>
+                      <p className="text-[12px] mt-0.5" style={{ ...font, color: c.muted }}>
+                        The agency info was edited — the ITC record is now behind. Review the changes and push to ITC.
+                      </p>
+                    </div>
+                    <button onClick={() => setPendingItcOpen(true)}
+                      className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold text-white transition-colors"
+                      style={{ ...font, background: btnGrad }}>
+                      Review Updates
+                    </button>
+                  </div>
+                )}
                 {viewMode === "internal" && record && accountingView === "record" && (
                 <div className="rounded-2xl p-8 mb-8" style={{ background: c.cardBg, border: `1px solid ${c.border}` }}>
                   <div className="flex items-center justify-between mb-6">
@@ -6023,6 +6110,70 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                     </div>
                   </div>
                 </div>
+                )}
+
+                {/* ── Pending ITC Updates modal ──
+                    Same review-first pattern as Review Changes, but the
+                    diff direction is inverted: Current ITC on the left,
+                    New value (from the Overview edit) on the right. Push
+                    to ITC applies the agency values field-by-field. */}
+                {pendingItcOpen && record && (
+                  <>
+                    <div className="fixed inset-0 z-40" style={{ background: "rgba(0,0,0,0.35)" }} onClick={() => setPendingItcOpen(false)} />
+                    <div className="fixed left-1/2 top-1/2 z-50 rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+                      style={{ transform: "translate(-50%, -50%)", background: c.cardBg, border: `1px solid ${c.border}`, width: "min(560px, 92vw)", maxHeight: "82vh" }}>
+                      <div className="p-6 pb-4">
+                        <h3 className="text-[17px] font-bold mb-1" style={{ ...font, color: c.text }}>Pending Updates from Agency Info</h3>
+                        <p className="text-[12.5px]" style={{ ...font, color: c.muted }}>
+                          {pendingUpdates.length} {pendingUpdates.length === 1 ? "field is" : "fields are"} out of sync with ITC. Review and push.
+                        </p>
+                      </div>
+                      <div className="overflow-y-auto px-6" style={{ flex: "1 1 auto" }}>
+                        {pendingUpdates.map(p => (
+                          <div key={p.key as string} className="py-4" style={{ borderTop: `1px solid ${c.border}` }}>
+                            <p className="text-[13px] font-semibold mb-2" style={{ ...font, color: c.text }}>{p.label}</p>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <p className="text-[11px] uppercase tracking-wider mb-1" style={{ ...font, color: c.muted, letterSpacing: "0.06em" }}>Current ITC value</p>
+                                <p className="text-[13px]" style={{ ...font, color: c.muted, textDecoration: "line-through" }}>{p.itcValue || "—"}</p>
+                              </div>
+                              <div>
+                                <p className="text-[11px] uppercase tracking-wider mb-1" style={{ ...font, color: c.muted, letterSpacing: "0.06em" }}>New value (from Agency Info)</p>
+                                <p className="text-[13px] font-semibold" style={{ ...font, color: c.text }}>{p.agencyValue || "—"}</p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="p-6 pt-4 flex items-center justify-between gap-2" style={{ borderTop: `1px solid ${c.border}` }}>
+                        <button onClick={() => { setPendingItcOpen(false); setItcDraft(record); setItcEditing(true); }}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-colors"
+                          style={{ ...font, border: `1px solid ${isDark ? "rgba(255,255,255,0.10)" : "#E5E7EB"}`, color: c.text }}
+                          onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+                          onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                          Edit ITC Instead
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (setItcRecords) setItcRecords(prev => {
+                              const cur = prev[agency.code];
+                              if (!cur) return prev;
+                              const next = { ...cur };
+                              pendingUpdates.forEach(p => {
+                                (next as unknown as Record<string, string>)[p.key as string] = p.agencyValue;
+                              });
+                              return { ...prev, [agency.code]: next };
+                            });
+                            setPendingItcOpen(false);
+                            showToast({ title: "ITC updated", description: `${pendingUpdates.length} ${pendingUpdates.length === 1 ? "change" : "changes"} pushed to ITC for ${agency.name}.` });
+                          }}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold text-white transition-colors"
+                          style={{ ...font, background: btnGrad }}>
+                          Push to ITC
+                        </button>
+                      </div>
+                    </div>
+                  </>
                 )}
 
                 {/* ── Statements card — 12-month rolling archive.
