@@ -211,7 +211,8 @@ const CARD_META: Record<EndorsementKey, { blurb: string; footNote?: string; fiel
                   fields: [
                     { label: "Effective date",       type: "date", span: 1 },
                     { label: "Waiver of Subrogation", type: "select", options: ["Blanket", "Specific"], span: 1 },
-                    { label: "Waiver Holder Name",   type: "text", placeholder: "Name on certificate", span: 2, optional: true },
+                    { label: "Holder First Name",    type: "text", placeholder: "Jane", span: 1, optional: true },
+                    { label: "Holder Last Name",     type: "text", placeholder: "Doe",  span: 1, optional: true },
                     { label: "Holder Address",       type: "text", placeholder: "Street", span: 2, optional: true },
                     { label: "Holder City",          type: "text", placeholder: "City", span: 1, optional: true },
                     { label: "Holder State",         type: "select", options: US_STATES, span: 1, optional: true },
@@ -510,7 +511,7 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
   // waivers don't need them, so we hide the whole block. When Specific
   // is chosen, the same fields become required (Excel spec).
   const waiverType = () => values["waiver"]?.[1] ?? "";
-  const isWaiverExtra = (i: number) => i >= 2 && i <= 14;
+  const isWaiverExtra = (i: number) => i >= 2 && i <= 15;
   const isHiddenField = (k: EndorsementKey, i: number) => {
     if (k === "location" && locationRemoveMode() && (i === 6 || i === 7 || i === 8)) return true;
     if (k === "waiver" && waiverType() === "Blanket" && isWaiverExtra(i)) return true;
@@ -1314,7 +1315,7 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
                           const ADDR_BLOCKS: Partial<Record<EndorsementKey, number[]>> = {
                             mailing:       [1],  // Street/City/State/ZIP
                             classcode:     [2],
-                            waiver:        [3, 7], // Holder block + Jobsite block
+                            waiver:        [4, 8], // Holder block + Jobsite block
                             thirdpartynoc: [2],
                             location:      [2],
                             entity:        [7],
@@ -1330,7 +1331,7 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
                           // Waiver of Subrogation: hide the holder / jobsite /
                           // class-code block when Blanket is selected — those
                           // fields only apply to Specific waivers.
-                          if (k === "waiver" && waiverType() === "Blanket" && i >= 2 && i <= 14) return null;
+                          if (k === "waiver" && waiverType() === "Blanket" && i >= 2 && i <= 15) return null;
                           // Entity: "Other Entity Type" (idx 3) only
                           // renders when Entity Type (idx 2) is "Other".
                           if (k === "entity" && i === 3 && (values["entity"]?.[2] ?? "") !== "Other") return null;
@@ -1341,7 +1342,7 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
                           // treatment as City/State/Zip in the address
                           // block). Render at Class Code (11); hide the
                           // next two so they don't lay out separately.
-                          const ccTripleStart = k === "waiver" ? 11 : -1;
+                          const ccTripleStart = k === "waiver" ? 12 : -1;
                           if (k === "waiver" && (i === ccTripleStart + 1 || i === ccTripleStart + 2)) return null;
                           const showCcPayrollTriple = k === "waiver" && i === ccTripleStart;
                           return (
