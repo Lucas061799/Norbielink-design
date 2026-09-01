@@ -159,7 +159,8 @@ const US_STATES = [
 const ENTITY_TYPES = [
   "Association","Common Ownership","Corporation","Government Entity","Individual",
   "Joint Employers","Joint Venture","Labor Union","Limited Liability Company",
-  "Limited Partnership","Partnership","Sole Proprietorship","Trust","Other",
+  "Limited Liability Partnership","Limited Partnership","Partnership",
+  "Religious Organization","Trust or Estate","Other",
 ];
 // Types with their own required supporting field baked in — everyone else
 // falls back to the shared "Notes & documents" block at the bottom of the request.
@@ -478,6 +479,29 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
   type OfficerExtra = { eff: string; first: string; last: string; title: string; status: "Included" | "Excluded" };
   const emptyOfficerExtra = (): OfficerExtra => ({ eff: "", first: "", last: "", title: "", status: "Included" });
   const [officerExtras, setOfficerExtras] = useState<OfficerExtra[]>([]);
+  // Entity endorsement gate — controls whether the exposure section
+  // (Operations performed + Class Code / Payroll / FT / PT grid) is
+  // visible. Off by default so the form stays short unless the user
+  // confirms that the new entity's exposure differs from the parent.
+  const [entityExposureChange, setEntityExposureChange] = useState(false);
+  // Entity Remove flow — "Is ownership changing?" gates the Revised
+  // Ownership Information grid; off by default per Amit's spec so the
+  // owner grid stays collapsed until the admin confirms it needs edits.
+  const [entityOwnershipChanging, setEntityOwnershipChanging] = useState(false);
+  // Entity Edit flow — "Is the entity location changing?" gates the
+  // Entity Location + address block (Excel spec: if unchecked, hide
+  // address, city, state and zip).
+  const [entityLocationChanging, setEntityLocationChanging] = useState(false);
+  // Entity Edit flow — the spec splits the identifying fields into
+  // "Current entity info" (what's on file) and "New entity info"
+  // (what the user is changing to). The existing card fields (idx 2-6)
+  // carry the CURRENT values; the NEW values live in this separate
+  // record so the review recap can diff them.
+  const [entityNewInfo, setEntityNewInfo] = useState<{ type: string; otherType: string; legal: string; dba: string; fein: string }>({
+    type: "", otherType: "", legal: "", dba: "", fein: "",
+  });
+  const isEntityRemove = () => (values["entity"]?.[1] ?? "") === "Remove Entity";
+  const isEntityEdit   = () => (values["entity"]?.[1] ?? "") === "Edit Entity";
   // Additional class-code / payroll / employee entries for a Specific
   // Waiver of Subrogation. The primary set lives in the flat CARD_META
   // fields (Class Code / Payroll / Employees at Jobsite); extras added
@@ -522,6 +546,33 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
   // and drops the class-code grid — those requirements should not block
   // submit for a location being removed.
   const locationRemoveMode = () => (values["location"]?.[1] ?? "") === "Remove";
+  const isLocationEdit  = () => (values["location"]?.[1] ?? "") === "Edit";
+  // Location Remove/Edit — "Any change in exposure..." checkbox that
+  // gates the exposure header + Class Code / Payroll / FT / PT grid.
+  const [locationExposureChange, setLocationExposureChange] = useState(false);
+  // Location Edit — "New location info" duplicate address/legal/DBA
+  // block bound to a separate state so the review recap can diff.
+  const [locationNewInfo, setLocationNewInfo] = useState<{ address: string; city: string; state: string; zip: string; legal: string; dba: string }>({
+    address: "", city: "", state: "", zip: "", legal: "", dba: "",
+  });
+  // Location — additional location sets appended to a single request
+  // (Amit spec: "+ Add another location"). Effective date + Action
+  // stay shared at the top; each extra carries its own address /
+  // legal / DBA / operations + class-code grid.
+  type LocationExtraCcRow = { code: string; payroll: string; ft: string; pt: string };
+  type LocationExtra = {
+    address: string; city: string; state: string; zip: string;
+    legal: string; dba: string; operations: string;
+    exposureChange: boolean;
+    ccRows: LocationExtraCcRow[];
+  };
+  const emptyExtraCcRow = (): LocationExtraCcRow => ({ code: "", payroll: "", ft: "", pt: "" });
+  const emptyLocationExtra = (): LocationExtra => ({
+    address: "", city: "", state: "", zip: "", legal: "", dba: "", operations: "",
+    exposureChange: false,
+    ccRows: [emptyExtraCcRow(), emptyExtraCcRow()],
+  });
+  const [locationExtras, setLocationExtras] = useState<LocationExtra[]>([]);
   // Entity Remove mode: only the identifying fields (Legal Name + FEIN)
   // are needed to point us at which entity to drop. Entity type, address,
   // operations, ownership grid, and class-code grid all fall away.
@@ -535,11 +586,20 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
   const waiverType = () => values["waiver"]?.[1] ?? "";
   const isWaiverExtra = (i: number) => i >= 2 && i <= 14;
   const isHiddenField = (k: EndorsementKey, i: number) => {
-    if (k === "location" && locationRemoveMode() && (i === 6 || i === 7 || i === 8)) return true;
-    if (k === "waiver" && waiverType() === "Blanket" && isWaiverExtra(i)) return true;
+    if (k === "location" && locationRemoveMode() && i === 8) return true;
+    // Location Edit: Operations (idx 8) gates behind the exposure
+    // checkbox — same "operations may or may not have changed" flow
+    // used on Entity Edit.
+    if (k === "location" && isLocationEdit() && i === 8 && !locationExposureChange) return true;
+    if (k === "waiver" && waiverType() !== "Specific" && isWaiverExtra(i)) return true;
     // Entity: "Other Entity Type" is a follow-up only meaningful when the
     // Entity Type dropdown (idx 2) is set to "Other" — hide otherwise.
     if (k === "entity" && i === 3 && (values["entity"]?.[2] ?? "") !== "Other") return true;
+    // Entity: "Operations performed at this location" (idx 11) is always
+    // hidden from the flat field map — it's rendered manually after the
+    // "Any change in exposure or operations..." checkbox so the field
+    // appears below the gate (not above it) when unchecked.
+    if (k === "entity" && i === 11) return true;
     return false;
   };
   const isForcedRequired = (k: EndorsementKey, i: number) =>
@@ -674,7 +734,13 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
     return (
       <div className="flex flex-col gap-2" style={{ gridColumn: "span 2" }}>
         <p className="text-[12px]" style={{ fontFamily: FONT, color: c.text, margin: 0, fontWeight: 500 }}>
-          Ownership Information <span style={{ color: c.muted, fontWeight: 400 }}>(if adding excluded owners, please attach a signed waiver form)</span>
+          {isEntityRemove() ? (
+            "Revised Ownership Information"
+          ) : isEntityEdit() ? (
+            "New Entity Ownership"
+          ) : (
+            <>Ownership Information <span style={{ color: c.muted, fontWeight: 400 }}>(if adding excluded owners, please attach a signed waiver form if required)</span></>
+          )}
         </p>
         <div style={{ border: `1px solid ${c.border}`, borderRadius: 10, marginTop: 4 }}>
           <div style={{ display: "grid", gridTemplateColumns: cols, background: c.helperBg, borderTopLeftRadius: 10, borderTopRightRadius: 10 }}>
@@ -774,8 +840,16 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
     // field into the grid.
     const CC_HEADERS: Record<CcCard, string | null> = {
       classcode: null,
-      location:  "Please provide exposure for this location.",
-      entity:    "Please provide exposure for this entity.",
+      location:  (values["location"]?.[1] ?? "") === "Edit"
+        ? "Please provide revised prorated exposure for location(s) in the given state."
+        : (values["location"]?.[1] ?? "") === "Remove"
+        ? "If payroll is being updated due to location removal, please provide revised total exposure for remaining location(s) in the given state."
+        : "Please provide exposure for this new location only.",
+      entity:    isEntityRemove()
+        ? "If payroll is being updated due to location removal, please provide revised prorated exposure for remaining location(s) in the given state."
+        : isEntityEdit()
+        ? "Please provide revised prorated exposure for location(s) in the given state."
+        : "Please provide exposure for this new entity only.",
     };
     const header = CC_HEADERS[card];
     // When the parent card is in "Add" mode, every row is implicitly
@@ -1349,14 +1423,29 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
                           // identifying which location to drop, not editing
                           // it. Nested-address block (idx 2 + 3/4/5) still
                           // renders so the location can be identified.
-                          if (k === "location" && (values["location"]?.[1] ?? "") === "Remove" && (i === 6 || i === 7 || i === 8)) return null;
+                          if (k === "location" && (values["location"]?.[1] ?? "") === "Remove" && i === 8) return null;
+                          // Location Edit — mirror the isHiddenField Operations
+                          // gate: hide idx 8 unless the exposure checkbox is on.
+                          if (k === "location" && isLocationEdit() && i === 8 && !locationExposureChange) return null;
                           // Waiver of Subrogation: hide the holder / jobsite /
-                          // class-code block when Blanket is selected — those
-                          // fields only apply to Specific waivers.
-                          if (k === "waiver" && waiverType() === "Blanket" && i >= 2 && i <= 14) return null;
+                          // class-code block unless Specific is picked. Blanket
+                          // and the pre-selection default both skip this block.
+                          if (k === "waiver" && waiverType() !== "Specific" && i >= 2 && i <= 14) return null;
                           // Entity: "Other Entity Type" (idx 3) only
                           // renders when Entity Type (idx 2) is "Other".
                           if (k === "entity" && i === 3 && (values["entity"]?.[2] ?? "") !== "Other") return null;
+                          // Entity Operations (idx 11) is rendered
+                          // manually AFTER the exposure-change checkbox
+                          // so it doesn't appear above the gate.
+                          if (k === "entity" && i === 11) return null;
+                          // Entity Edit flow — address block (Entity
+                          // Location — Address, idx 7, plus the City /
+                          // State / Zip triple that renders inside it)
+                          // is gated behind the "Is the entity location
+                          // changing?" checkbox. Field render is hidden
+                          // via display:none below so the ownership /
+                          // location injections at i === 7 still render.
+                          const hideEntityAddress = k === "entity" && i === 7 && isEntityEdit() && !entityLocationChanging;
                           const currentAddrIdx = addrIdxs.find(a => a === i);
                           const showCcAddressExtras = currentAddrIdx !== undefined;
                           // Waiver Specific: Class Code / Payroll /
@@ -1370,7 +1459,179 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
                           return (
                             <Fragment key={i}>
                               {showCcGrid && renderCcGrid("classcode")}
-                              {k === "entity" && i === 7 && renderOwnerGrid()}
+                              {/* Entity — "Current entity info" section
+                                  header for the Edit flow. Marks the
+                                  block of identifying fields (Type / Legal /
+                                  DBA / FEIN) that describe what's on file. */}
+                              {k === "entity" && i === 2 && isEntityEdit() && (
+                                <p className="text-[12px]" style={{ gridColumn: "span 2", fontFamily: FONT, color: c.text, margin: "4px 0 -4px", fontWeight: 600 }}>
+                                  Current entity info
+                                </p>
+                              )}
+                              {/* Location — "Current location info" header
+                                  for the Edit flow, above Address (idx 2). */}
+                              {k === "location" && i === 2 && isLocationEdit() && (
+                                <p className="text-[12px]" style={{ gridColumn: "span 2", fontFamily: FONT, color: c.text, margin: "4px 0 -4px", fontWeight: 600 }}>
+                                  Current location info
+                                </p>
+                              )}
+                              {/* Location Edit — "New location info" header
+                                  + duplicate Address / City / State / Zip /
+                                  Legal Name / DBA block bound to a separate
+                                  state. Renders after DBA (idx 7). */}
+                              {k === "location" && i === 8 && isLocationEdit() && (
+                                <>
+                                  <p className="text-[12px]" style={{ gridColumn: "span 2", fontFamily: FONT, color: c.text, margin: "12px 0 -4px", fontWeight: 600 }}>
+                                    New location info
+                                  </p>
+                                  <div style={{ gridColumn: "span 2", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                                    <div className="flex flex-col gap-1.5" style={{ gridColumn: "span 2" }}>
+                                      <label className="text-[11.5px] font-semibold flex items-center gap-1" style={{ fontFamily: FONT, color: c.text }}>
+                                        Address<span style={{ color: c.razz }}>*</span>
+                                      </label>
+                                      <input type="text" value={locationNewInfo.address} onChange={e => setLocationNewInfo(s => ({ ...s, address: e.target.value }))} placeholder="Street" style={{ fontFamily: FONT, fontSize: 13, color: c.text, background: c.cardBg, border: `1px solid ${c.border}`, borderRadius: 8, padding: "9px 12px", outline: "none", width: "100%" }} />
+                                    </div>
+                                    <div style={{ gridColumn: "span 2", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
+                                      <div className="flex flex-col gap-1.5">
+                                        <label className="text-[11.5px] font-semibold flex items-center gap-1" style={{ fontFamily: FONT, color: c.text }}>
+                                          City<span style={{ color: c.razz }}>*</span>
+                                        </label>
+                                        <input type="text" value={locationNewInfo.city} onChange={e => setLocationNewInfo(s => ({ ...s, city: e.target.value }))} placeholder="City" style={{ fontFamily: FONT, fontSize: 13, color: c.text, background: c.cardBg, border: `1px solid ${c.border}`, borderRadius: 8, padding: "9px 12px", outline: "none", width: "100%" }} />
+                                      </div>
+                                      <div className="flex flex-col gap-1.5">
+                                        <label className="text-[11.5px] font-semibold flex items-center gap-1" style={{ fontFamily: FONT, color: c.text }}>
+                                          State<span style={{ color: c.razz }}>*</span>
+                                        </label>
+                                        <StyledSelect<string>
+                                          value={locationNewInfo.state}
+                                          onChange={v => setLocationNewInfo(s => ({ ...s, state: v }))}
+                                          options={US_STATES}
+                                          labelFor={v => v || "Select…"}
+                                          triggerStyle={{ fontFamily: FONT, fontSize: 13, color: c.text, background: c.cardBg, border: `1px solid ${c.border}`, borderRadius: 8, padding: "9px 12px", outline: "none", width: "100%" }}
+                                          c={{ text: c.text, muted: c.muted, border: c.border, cardBg: c.cardBg, hoverBg: c.hoverBg, razz: c.razz, razzTintBg: c.razzTintBg }}
+                                          font={{ fontFamily: FONT }}
+                                        />
+                                      </div>
+                                      <div className="flex flex-col gap-1.5">
+                                        <label className="text-[11.5px] font-semibold flex items-center gap-1" style={{ fontFamily: FONT, color: c.text }}>
+                                          Zip<span style={{ color: c.razz }}>*</span>
+                                        </label>
+                                        <input type="text" value={locationNewInfo.zip} onChange={e => { const cons = constraintFor("Zip"); setLocationNewInfo(s => ({ ...s, zip: cons ? cons.format(e.target.value) : e.target.value })); }} inputMode="numeric" maxLength={5} placeholder="ZIP" style={{ fontFamily: FONT, fontSize: 13, color: c.text, background: c.cardBg, border: `1px solid ${c.border}`, borderRadius: 8, padding: "9px 12px", outline: "none", width: "100%" }} />
+                                      </div>
+                                    </div>
+                                    <div className="flex flex-col gap-1.5">
+                                      <label className="text-[11.5px] font-semibold flex items-center gap-1" style={{ fontFamily: FONT, color: c.text }}>
+                                        Legal Name<span style={{ color: c.razz }}>*</span>
+                                      </label>
+                                      <input type="text" value={locationNewInfo.legal} onChange={e => setLocationNewInfo(s => ({ ...s, legal: e.target.value }))} placeholder="Entity legal name" style={{ fontFamily: FONT, fontSize: 13, color: c.text, background: c.cardBg, border: `1px solid ${c.border}`, borderRadius: 8, padding: "9px 12px", outline: "none", width: "100%" }} />
+                                    </div>
+                                    <div className="flex flex-col gap-1.5">
+                                      <label className="text-[11.5px] font-semibold flex items-center gap-1" style={{ fontFamily: FONT, color: c.text }}>
+                                        DBA
+                                      </label>
+                                      <input type="text" value={locationNewInfo.dba} onChange={e => setLocationNewInfo(s => ({ ...s, dba: e.target.value }))} placeholder="Doing-business-as name" style={{ fontFamily: FONT, fontSize: 13, color: c.text, background: c.cardBg, border: `1px solid ${c.border}`, borderRadius: 8, padding: "9px 12px", outline: "none", width: "100%" }} />
+                                    </div>
+                                  </div>
+                                </>
+                              )}
+                              {/* Entity Edit flow — "New entity info"
+                                  section header + duplicate identifying
+                                  fields (Type / Other / Legal / DBA /
+                                  FEIN) bound to a separate state so the
+                                  reviewer can diff old vs new. Renders
+                                  after FEIN (idx 6). */}
+                              {k === "entity" && i === 7 && isEntityEdit() && (
+                                <>
+                                  <p className="text-[12px]" style={{ gridColumn: "span 2", fontFamily: FONT, color: c.text, margin: "12px 0 -4px", fontWeight: 600 }}>
+                                    New entity info
+                                  </p>
+                                  <div style={{ gridColumn: "span 2", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                                    <div className="flex flex-col gap-1.5">
+                                      <label className="text-[11.5px] font-semibold flex items-center gap-1" style={{ fontFamily: FONT, color: c.text }}>
+                                        Entity Type<span style={{ color: c.razz }}>*</span>
+                                      </label>
+                                      <StyledSelect<string>
+                                        value={entityNewInfo.type}
+                                        onChange={v => setEntityNewInfo(s => ({ ...s, type: v }))}
+                                        options={ENTITY_TYPES}
+                                        labelFor={v => v || "Select…"}
+                                        triggerStyle={{ fontFamily: FONT, fontSize: 13, color: c.text, background: c.cardBg, border: `1px solid ${c.border}`, borderRadius: 8, padding: "9px 12px", outline: "none", width: "100%" }}
+                                        c={{ text: c.text, muted: c.muted, border: c.border, cardBg: c.cardBg, hoverBg: c.hoverBg, razz: c.razz, razzTintBg: c.razzTintBg }}
+                                        font={{ fontFamily: FONT }}
+                                      />
+                                    </div>
+                                    {entityNewInfo.type === "Other" && (
+                                      <div className="flex flex-col gap-1.5">
+                                        <label className="text-[11.5px] font-semibold flex items-center gap-1" style={{ fontFamily: FONT, color: c.text }}>
+                                          Other Entity Type<span style={{ color: c.razz }}>*</span>
+                                        </label>
+                                        <input type="text" value={entityNewInfo.otherType} onChange={e => setEntityNewInfo(s => ({ ...s, otherType: e.target.value }))} placeholder="Describe entity type" style={{ fontFamily: FONT, fontSize: 13, color: c.text, background: c.cardBg, border: `1px solid ${c.border}`, borderRadius: 8, padding: "9px 12px", outline: "none", width: "100%" }} />
+                                      </div>
+                                    )}
+                                    <div className="flex flex-col gap-1.5">
+                                      <label className="text-[11.5px] font-semibold flex items-center gap-1" style={{ fontFamily: FONT, color: c.text }}>
+                                        Legal Name<span style={{ color: c.razz }}>*</span>
+                                      </label>
+                                      <input type="text" value={entityNewInfo.legal} onChange={e => setEntityNewInfo(s => ({ ...s, legal: e.target.value }))} placeholder="Entity legal name" style={{ fontFamily: FONT, fontSize: 13, color: c.text, background: c.cardBg, border: `1px solid ${c.border}`, borderRadius: 8, padding: "9px 12px", outline: "none", width: "100%" }} />
+                                    </div>
+                                    <div className="flex flex-col gap-1.5">
+                                      <label className="text-[11.5px] font-semibold flex items-center gap-1" style={{ fontFamily: FONT, color: c.text }}>
+                                        DBA
+                                      </label>
+                                      <input type="text" value={entityNewInfo.dba} onChange={e => setEntityNewInfo(s => ({ ...s, dba: e.target.value }))} placeholder="Doing-business-as name" style={{ fontFamily: FONT, fontSize: 13, color: c.text, background: c.cardBg, border: `1px solid ${c.border}`, borderRadius: 8, padding: "9px 12px", outline: "none", width: "100%" }} />
+                                    </div>
+                                    <div className="flex flex-col gap-1.5">
+                                      <label className="text-[11.5px] font-semibold flex items-center gap-1" style={{ fontFamily: FONT, color: c.text }}>
+                                        FEIN<span style={{ color: c.razz }}>*</span>
+                                      </label>
+                                      <input type="text" value={entityNewInfo.fein} onChange={e => { const cons = constraintFor("FEIN"); setEntityNewInfo(s => ({ ...s, fein: cons ? cons.format(e.target.value) : e.target.value })); }} inputMode="numeric" maxLength={10} placeholder="12-3456789" style={{ fontFamily: FONT, fontSize: 13, color: c.text, background: c.cardBg, border: `1px solid ${c.border}`, borderRadius: 8, padding: "9px 12px", outline: "none", width: "100%" }} />
+                                    </div>
+                                  </div>
+                                </>
+                              )}
+                              {/* Entity Edit / Remove flow — "Is ownership
+                                  changing?" checkbox that gates the
+                                  ownership grid below (New Entity
+                                  Ownership for Edit, Revised Ownership
+                                  Information for Remove). */}
+                              {k === "entity" && i === 7 && (isEntityRemove() || isEntityEdit()) && (
+                                <label
+                                  className="flex items-start gap-2 cursor-pointer"
+                                  style={{ gridColumn: "span 2", padding: "10px 12px", background: c.helperBg, border: `1px solid ${c.border}`, borderRadius: 8, marginTop: 4 }}>
+                                  <input
+                                    type="checkbox"
+                                    checked={entityOwnershipChanging}
+                                    onChange={e => setEntityOwnershipChanging(e.target.checked)}
+                                    style={{ marginTop: 2, accentColor: c.razz }}
+                                  />
+                                  <span className="text-[12px]" style={{ fontFamily: FONT, color: c.text, lineHeight: 1.5 }}>
+                                    Is ownership changing?
+                                  </span>
+                                </label>
+                              )}
+                              {k === "entity" && i === 7 && (
+                                ((!isEntityRemove() && !isEntityEdit()) || entityOwnershipChanging)
+                              ) && renderOwnerGrid()}
+                              {/* Entity Edit flow — "Is the entity location
+                                  changing?" gates the Entity Location +
+                                  address block (idx 7). Off by default so
+                                  the form stays short when the location
+                                  isn't changing. */}
+                              {k === "entity" && i === 7 && isEntityEdit() && (
+                                <label
+                                  className="flex items-start gap-2 cursor-pointer"
+                                  style={{ gridColumn: "span 2", padding: "10px 12px", background: c.helperBg, border: `1px solid ${c.border}`, borderRadius: 8, marginTop: 4 }}>
+                                  <input
+                                    type="checkbox"
+                                    checked={entityLocationChanging}
+                                    onChange={e => setEntityLocationChanging(e.target.checked)}
+                                    style={{ marginTop: 2, accentColor: c.razz }}
+                                  />
+                                  <span className="text-[12px]" style={{ fontFamily: FONT, color: c.text, lineHeight: 1.5 }}>
+                                    Is the entity location changing?
+                                  </span>
+                                </label>
+                              )}
                               {k === "fein" && i === 2 && (
                                 <p className="text-[12px]" style={{ gridColumn: "span 2", fontFamily: FONT, color: c.text, margin: "4px 0 -4px", fontWeight: 500 }}>
                                   Entity the FEIN applies to
@@ -1402,7 +1663,7 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
                                 <div className="flex items-start gap-2"
                                   style={{ gridColumn: "span 2", padding: "10px 12px", background: c.helperBg, border: `1px solid ${c.border}`, borderRadius: 8, marginTop: 4 }}>
                                   <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: c.razz }} />
-                                  <p className="text-[12.5px]" style={{ fontFamily: FONT, color: c.text, lineHeight: 1.5, margin: 0, fontWeight: 600 }}>
+                                  <p className="text-[12px]" style={{ fontFamily: FONT, color: c.text, lineHeight: 1.5, margin: 0 }}>
                                     Class Code / Payroll associated with job
                                   </p>
                                 </div>
@@ -1438,7 +1699,7 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
                                   })}
                                 </div>
                               )}
-                            <div className="flex flex-col gap-1.5" style={{ gridColumn: `span ${f.span ?? 2}`, display: showCcPayrollTriple ? "none" : "flex" }}>
+                            <div className="flex flex-col gap-1.5" style={{ gridColumn: `span ${f.span ?? 2}`, display: (showCcPayrollTriple || hideEntityAddress) ? "none" : "flex" }}>
                               <label className="text-[11.5px] font-semibold flex items-center gap-1" style={{ fontFamily: FONT, color: c.text }}>
                                 {f.label}
                                 {(!f.optional || isForcedRequired(k, i)) && <span style={{ color: c.razz }}>*</span>}
@@ -1586,7 +1847,7 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
                             {k === "officer" && i === 0 && (
                               <div style={{ gridColumn: "span 1" }} />
                             )}
-                            {showCcAddressExtras && currentAddrIdx !== undefined && (
+                            {showCcAddressExtras && currentAddrIdx !== undefined && !hideEntityAddress && (
                               <div style={{ gridColumn: "span 2", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
                                 {[currentAddrIdx + 1, currentAddrIdx + 2, currentAddrIdx + 3].map(subI => {
                                   const subF = cm.fields[subI];
@@ -1632,7 +1893,58 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
                             </Fragment>
                           );
                         })}
-                        {k === "entity" && renderCcGrid(k)}
+                        {/* Entity — gate the exposure section (Operations
+                            + Class Code / Payroll / FT / PT grid) behind
+                            a checkbox. Off by default per Amit's spec so
+                            the form stays short when the new entity's
+                            exposure matches the parent policy. */}
+                        {k === "entity" && (
+                          <label
+                            className="flex items-start gap-2 cursor-pointer"
+                            style={{ gridColumn: "span 2", padding: "10px 12px", background: c.helperBg, border: `1px solid ${c.border}`, borderRadius: 8, marginTop: 4 }}>
+                            <input
+                              type="checkbox"
+                              checked={entityExposureChange}
+                              onChange={e => setEntityExposureChange(e.target.checked)}
+                              style={{ marginTop: 2, accentColor: c.razz }}
+                            />
+                            <span className="text-[12px]" style={{ fontFamily: FONT, color: c.text, lineHeight: 1.5 }}>
+                              Any change in exposure or operations at this location?
+                            </span>
+                          </label>
+                        )}
+                        {k === "entity" && entityExposureChange && (() => {
+                          // Operations textarea — gated behind the exposure
+                          // checkbox per spec: "if box isn't checked,
+                          // header, class code, payroll and FT/PT are
+                          // removed"; the operations block travels with
+                          // the same gate so nothing exposure-related
+                          // shows until the user opts in.
+                          const opsIdx = 11;
+                          const opsF = cm.fields[opsIdx];
+                          const opsVal = values["entity"]?.[opsIdx] ?? "";
+                          const opsInputStyle: React.CSSProperties = {
+                            fontFamily: FONT, fontSize: 13, color: c.text,
+                            background: c.cardBg, border: `1px solid ${c.border}`,
+                            borderRadius: 8, padding: "9px 12px", outline: "none", width: "100%",
+                            resize: "vertical", minHeight: 96,
+                          };
+                          return (
+                            <div className="flex flex-col gap-1.5" style={{ gridColumn: "span 2" }}>
+                              <label className="text-[11.5px] font-semibold flex items-center gap-1" style={{ fontFamily: FONT, color: c.text }}>
+                                {opsF.label}
+                                <span style={{ color: c.razz }}>*</span>
+                              </label>
+                              <textarea
+                                value={opsVal}
+                                onChange={e => setValue("entity", opsIdx, e.target.value)}
+                                placeholder={opsF.placeholder}
+                                style={opsInputStyle}
+                              />
+                            </div>
+                          );
+                        })()}
+                        {k === "entity" && entityExposureChange && renderCcGrid(k)}
                         {k === "waiver" && waiverType() === "Specific" && (() => {
                           const inputStyleXtra: React.CSSProperties = {
                             fontFamily: FONT, fontSize: 13, color: c.text,
@@ -1808,20 +2120,177 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
                             </>
                           );
                         })()}
+                        {k === "location" && (locationRemoveMode() || isLocationEdit()) && (
+                          <label
+                            className="flex items-start gap-2 cursor-pointer"
+                            style={{ gridColumn: "span 2", padding: "10px 12px", background: c.helperBg, border: `1px solid ${c.border}`, borderRadius: 8, marginTop: 4 }}>
+                            <input
+                              type="checkbox"
+                              checked={locationExposureChange}
+                              onChange={e => setLocationExposureChange(e.target.checked)}
+                              style={{ marginTop: 2, accentColor: c.razz }}
+                            />
+                            <span className="text-[12px]" style={{ fontFamily: FONT, color: c.text, lineHeight: 1.5 }}>
+                              {locationRemoveMode()
+                                ? "Any change in exposure for remaining locations?"
+                                : "Any change in exposure or operations at this location?"}
+                            </span>
+                          </label>
+                        )}
                         {k === "location" && (() => {
                           const locAction = values["location"]?.[1] ?? "";
-                          // Remove mode: no class-code exposure needed —
-                          // the user is only identifying the location to drop.
-                          if (locAction === "Remove") return null;
+                          // Remove / Edit mode: exposure section is gated
+                          // behind the "Any change in exposure..." checkbox
+                          // (Excel spec). When unchecked, hide the whole
+                          // header + class-code / payroll / FT / PT grid.
+                          if ((locAction === "Remove" || locAction === "Edit") && !locationExposureChange) return null;
                           // Add mode: every row is implicitly Add Class Code,
                           // so hide the per-row Action dropdown.
-                          // The grid's own "+ Add" button doubles as the
-                          // add-another-location entry point for this card.
                           return renderCcGrid("location", {
                             hideAction: locAction === "Add",
-                            addLabel: "Add another location",
                           });
                         })()}
+                        {/* Location — extra location sets appended to the
+                            same request. Effective date + Action stay
+                            shared at the top; each extra carries its own
+                            address / legal / DBA / operations + class-code
+                            grid (Amit spec: "+ Add another location"). */}
+                        {k === "location" && locationExtras.map((ex, ei) => {
+                          const locAction = values["location"]?.[1] ?? "";
+                          const isRemove = locAction === "Remove";
+                          const inputStyleX: React.CSSProperties = {
+                            fontFamily: FONT, fontSize: 13, color: c.text,
+                            background: c.cardBg, border: `1px solid ${c.border}`,
+                            borderRadius: 8, padding: "9px 12px", outline: "none", width: "100%",
+                          };
+                          const patch = (p: Partial<LocationExtra>) =>
+                            setLocationExtras(rs => rs.map((r, j) => j === ei ? { ...r, ...p } : r));
+                          const patchCc = (ri: number, p: Partial<LocationExtraCcRow>) =>
+                            setLocationExtras(rs => rs.map((r, j) => j === ei ? { ...r, ccRows: r.ccRows.map((c2, k2) => k2 === ri ? { ...c2, ...p } : c2) } : r));
+                          const showExposureGrid = !(isRemove || locAction === "Edit") || ex.exposureChange;
+                          return (
+                            <div key={ei} style={{
+                              gridColumn: "span 2", marginTop: 16, paddingTop: 14,
+                              borderTop: `1px solid ${c.softDivider}`,
+                              display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16,
+                            }}>
+                              <div className="flex items-center justify-between" style={{ gridColumn: "span 2" }}>
+                                <div className="text-[11.5px] font-bold uppercase tracking-wider" style={{ fontFamily: FONT, color: c.muted, letterSpacing: "0.06em" }}>
+                                  Location {ei + 2}
+                                </div>
+                                <button type="button" onClick={() => setLocationExtras(rs => rs.filter((_, j) => j !== ei))}
+                                  className="text-[11px] font-medium hover:opacity-70"
+                                  style={{ color: c.muted, background: "transparent", border: "none", cursor: "pointer", padding: 0 }}>
+                                  Remove
+                                </button>
+                              </div>
+                              <div className="flex flex-col gap-1.5" style={{ gridColumn: "span 2" }}>
+                                <label className="text-[11.5px] font-semibold flex items-center gap-1" style={{ fontFamily: FONT, color: c.text }}>Address<span style={{ color: c.razz }}>*</span></label>
+                                <input type="text" value={ex.address} onChange={e => patch({ address: e.target.value })} placeholder="Street" style={inputStyleX} />
+                              </div>
+                              <div style={{ gridColumn: "span 2", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
+                                <div className="flex flex-col gap-1.5">
+                                  <label className="text-[11.5px] font-semibold flex items-center gap-1" style={{ fontFamily: FONT, color: c.text }}>City<span style={{ color: c.razz }}>*</span></label>
+                                  <input type="text" value={ex.city} onChange={e => patch({ city: e.target.value })} placeholder="City" style={inputStyleX} />
+                                </div>
+                                <div className="flex flex-col gap-1.5">
+                                  <label className="text-[11.5px] font-semibold flex items-center gap-1" style={{ fontFamily: FONT, color: c.text }}>State<span style={{ color: c.razz }}>*</span></label>
+                                  <StyledSelect<string> value={ex.state} onChange={v => patch({ state: v })} options={US_STATES} labelFor={v => v || "Select…"} triggerStyle={inputStyleX} c={{ text: c.text, muted: c.muted, border: c.border, cardBg: c.cardBg, hoverBg: c.hoverBg, razz: c.razz, razzTintBg: c.razzTintBg }} font={{ fontFamily: FONT }} />
+                                </div>
+                                <div className="flex flex-col gap-1.5">
+                                  <label className="text-[11.5px] font-semibold flex items-center gap-1" style={{ fontFamily: FONT, color: c.text }}>Zip<span style={{ color: c.razz }}>*</span></label>
+                                  <input type="text" value={ex.zip} inputMode="numeric" maxLength={5} onChange={e => patch({ zip: e.target.value.replace(/\D/g, "").slice(0, 5) })} placeholder="ZIP" style={inputStyleX} />
+                                </div>
+                              </div>
+                              <div className="flex flex-col gap-1.5">
+                                <label className="text-[11.5px] font-semibold flex items-center gap-1" style={{ fontFamily: FONT, color: c.text }}>Legal Name<span style={{ color: c.razz }}>*</span></label>
+                                <input type="text" value={ex.legal} onChange={e => patch({ legal: e.target.value })} placeholder="Entity legal name" style={inputStyleX} />
+                              </div>
+                              <div className="flex flex-col gap-1.5">
+                                <label className="text-[11.5px] font-semibold flex items-center gap-1" style={{ fontFamily: FONT, color: c.text }}>DBA</label>
+                                <input type="text" value={ex.dba} onChange={e => patch({ dba: e.target.value })} placeholder="Doing-business-as name" style={inputStyleX} />
+                              </div>
+                              {!isRemove && (
+                                <div className="flex flex-col gap-1.5" style={{ gridColumn: "span 2" }}>
+                                  <label className="text-[11.5px] font-semibold flex items-center gap-1" style={{ fontFamily: FONT, color: c.text }}>Operations performed at this location<span style={{ color: c.razz }}>*</span></label>
+                                  <textarea value={ex.operations} onChange={e => patch({ operations: e.target.value })} placeholder="Describe operations…" style={{ ...inputStyleX, resize: "vertical", minHeight: 80 }} />
+                                </div>
+                              )}
+                              {(isRemove || locAction === "Edit") && (
+                                <label className="flex items-start gap-2 cursor-pointer" style={{ gridColumn: "span 2", padding: "10px 12px", background: c.helperBg, border: `1px solid ${c.border}`, borderRadius: 8, marginTop: 4 }}>
+                                  <input type="checkbox" checked={ex.exposureChange} onChange={e => patch({ exposureChange: e.target.checked })} style={{ marginTop: 2, accentColor: c.razz }} />
+                                  <span className="text-[12px]" style={{ fontFamily: FONT, color: c.text, lineHeight: 1.5 }}>
+                                    {isRemove ? "Any change in exposure for remaining locations?" : "Any change in exposure or operations at this location?"}
+                                  </span>
+                                </label>
+                              )}
+                              {showExposureGrid && (
+                                <div className="flex flex-col gap-2" style={{ gridColumn: "span 2" }}>
+                                  <p className="text-[12px]" style={{ fontFamily: FONT, color: c.text, margin: 0, fontWeight: 500 }}>
+                                    {isRemove
+                                      ? "If payroll is being updated due to location removal, please provide revised total exposure for remaining location(s) in the given state."
+                                      : locAction === "Edit"
+                                      ? "Please provide revised prorated exposure for location(s) in the given state."
+                                      : "Please provide exposure for this new location only."}
+                                  </p>
+                                  <div style={{ border: `1px solid ${c.border}`, borderRadius: 10, marginTop: 4 }}>
+                                    <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr .6fr .6fr 40px", background: c.helperBg, borderTopLeftRadius: 10, borderTopRightRadius: 10 }}>
+                                      {["Class code","Payroll","FT","PT",""].map((h, hi) => (
+                                        <div key={hi} style={{ padding: "8px 12px", borderBottom: `1px solid ${c.border}`, fontFamily: FONT, fontSize: 10.5, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", color: c.muted }}>{h}</div>
+                                      ))}
+                                    </div>
+                                    {ex.ccRows.map((row, ri) => {
+                                      const cellSt: React.CSSProperties = { padding: 0, borderBottom: ri === ex.ccRows.length - 1 ? "none" : `1px solid ${c.softDivider}`, borderRight: `1px solid ${c.softDivider}`, display: "flex", alignItems: "stretch", minHeight: 44 };
+                                      const inSt: React.CSSProperties = { flex: 1, fontFamily: FONT, fontSize: 13, color: c.text, background: "transparent", border: "none", outline: "none", padding: "0 12px", minWidth: 0 };
+                                      return (
+                                        <div key={ri} style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr .6fr .6fr 40px" }}>
+                                          <div style={cellSt}><input type="text" value={row.code} inputMode="numeric" maxLength={4} onChange={e => patchCc(ri, { code: e.target.value.replace(/\D/g, "").slice(0, 4) })} placeholder="e.g. 5190" style={inSt} /></div>
+                                          <div style={cellSt}><input type="text" value={row.payroll} inputMode="numeric" onChange={e => patchCc(ri, { payroll: e.target.value.replace(/\D/g, "").slice(0, 10) })} placeholder="50,000" style={inSt} /></div>
+                                          <div style={cellSt}><input type="text" value={row.ft} inputMode="numeric" maxLength={3} onChange={e => patchCc(ri, { ft: e.target.value.replace(/\D/g, "").slice(0, 3) })} placeholder="0" style={inSt} /></div>
+                                          <div style={cellSt}><input type="text" value={row.pt} inputMode="numeric" maxLength={3} onChange={e => patchCc(ri, { pt: e.target.value.replace(/\D/g, "").slice(0, 3) })} placeholder="0" style={inSt} /></div>
+                                          <div style={{ ...cellSt, borderRight: "none", justifyContent: "center", alignItems: "center" }}>
+                                            <button type="button" onClick={() => patch({ ccRows: ex.ccRows.length > 1 ? ex.ccRows.filter((_, kk) => kk !== ri) : ex.ccRows })} style={{ background: "transparent", border: "none", cursor: "pointer", color: c.muted, padding: 6 }}>
+                                              <X className="w-3.5 h-3.5" />
+                                            </button>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                  <button type="button" onClick={() => patch({ ccRows: [...ex.ccRows, emptyExtraCcRow()] })}
+                                    style={{ width: "100%", fontFamily: FONT, fontSize: 12.5, fontWeight: 600, color: c.razz, background: "transparent", border: `1px dashed ${c.border}`, borderRadius: 8, padding: "10px 14px", cursor: "pointer", marginTop: 4 }}
+                                    onMouseEnter={e => { e.currentTarget.style.background = c.razzTintBg; e.currentTarget.style.borderColor = c.razz; }}
+                                    onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = c.border; }}>
+                                    + Add line
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                        {k === "location" && (
+                          <div style={{
+                            gridColumn: "span 2", marginTop: 4, height: 1,
+                            backgroundImage: `linear-gradient(to right, ${c.border} 70%, transparent 30%)`,
+                            backgroundSize: "18px 1px",
+                            backgroundRepeat: "repeat-x",
+                          }} />
+                        )}
+                        {k === "location" && (
+                          <button type="button" onClick={() => setLocationExtras(rs => [...rs, emptyLocationExtra()])}
+                            className="flex items-center justify-center gap-1.5 rounded-lg"
+                            style={{
+                              gridColumn: "span 2", marginTop: 4,
+                              fontFamily: FONT, fontSize: 12.5, fontWeight: 600,
+                              color: c.razz, background: "transparent",
+                              border: `1px dashed ${c.border}`, borderRadius: 8,
+                              padding: "12px 14px", cursor: "pointer",
+                            }}
+                            onMouseEnter={e => { e.currentTarget.style.background = c.razzTintBg; e.currentTarget.style.borderColor = c.razz; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = c.border; }}>
+                            <Plus className="w-3.5 h-3.5" />Add another location
+                          </button>
+                        )}
                       </div>
                       {cm.footNote && (
                         <p className="text-[11.5px] mt-3" style={{ fontFamily: FONT, color: c.muted, lineHeight: 1.5 }}>{cm.footNote}</p>
