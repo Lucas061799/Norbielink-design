@@ -222,7 +222,7 @@ interface Agency {
   lastLogin: string;
 }
 
-type FilterStatus = "All" | "Starred" | "Appointed" | "Unappointed";
+type FilterStatus = "All" | "Starred" | "Appointed" | "Unappointed" | "NeedsAction";
 type SortKey = "name" | "code" | "location" | "totalUsers" | "lastLogin" | "status" | null;
 type SortDir = "asc" | "desc";
 type TabKey = "agencies" | "users" | "affiliations";
@@ -795,6 +795,12 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
   // Super admin approves each Push to ITC in the same review-first
   // pattern as the Review Changes modal.
   const [pendingItcOpen, setPendingItcOpen] = useState(false);
+  // Per-field editable overrides for the pending-updates modal. Lets the
+  // super admin tweak the incoming value inline instead of having to
+  // bounce out to the full ITC edit form. Keyed by ITCRecord field name,
+  // cleared whenever the modal closes so a fresh diff loads next time.
+  const [pendingOverrides, setPendingOverrides] = useState<Record<string, string>>({});
+  const closePendingItc = () => { setPendingItcOpen(false); setPendingOverrides({}); };
   // Sub-tabs within the Accounting tab — same segmented-control pattern
   // as the Documents toolbar so users don't have to scroll to switch
   // between the ITC record and the monthly statements archive.
@@ -2093,8 +2099,14 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
   return (
     <div className="flex flex-col flex-1 min-h-0 overflow-y-auto" style={{ fontFamily: FONT, overflowX: "hidden" }}>
       {userToast && (
-        <div className="fixed top-[68px] right-6 z-50 flex items-center gap-8"
+        <div className="fixed top-[68px] right-6 z-50 flex items-center gap-3"
           style={{ background: isDark ? "#1E2240" : "#fff", border: `1px solid ${c.border}`, borderRadius: 12, padding: "12px 16px", boxShadow: "0 4px 16px rgba(0,0,0,0.10)", minWidth: 360, maxWidth: 460, fontFamily: FONT }}>
+          <span className="flex items-center justify-center flex-shrink-0"
+            style={{ width: 26, height: 26, borderRadius: 9999, background: isDark ? "rgba(168,85,247,0.22)" : "rgba(166,20,195,0.10)" }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={isDark ? "#D946EF" : "#A614C3"} strokeWidth={2.75} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M20 6 9 17l-5-5" />
+            </svg>
+          </span>
           <div className="flex-1 min-w-0">
             <div className="text-[13px] font-semibold truncate" style={{ color: c.text }}>{userToast.title}</div>
             {userToast.description && (
@@ -3221,6 +3233,13 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
             const activeTextColor  = isDark ? "#fff"     : "#A614C3";
             const activeIconColor  = "#A614C3";
             const activeUnderline  = "linear-gradient(90deg,#5C2ED4 0%,#A614C3 65%)";
+            // Accounting tab surfaces a pending-updates dot when the
+            // agency's ITC record is behind the Norbielink agency info,
+            // so the super admin knows there's something to review before
+            // opening the tab. Internal + super-admin gated.
+            const pendingItc = key === "accounting" && viewMode === "internal" && isSuperAdmin
+              ? countPendingItcUpdates(agency, itcRecords?.[agency.code] ?? null)
+              : 0;
             return (
               <button key={key} onClick={() => { setDetailTab(key); }}
                 className="flex items-center gap-1.5 px-4 py-3 text-[13px] font-normal relative transition-colors"
@@ -3229,6 +3248,17 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                 onMouseLeave={e => { if (!active) e.currentTarget.style.color = c.muted; }}>
                 <span style={{ color: active ? activeIconColor : undefined }}>{icon}</span>
                 {label}
+                {pendingItc > 0 && (
+                  <span
+                    title={`${pendingItc} pending ${pendingItc === 1 ? "update" : "updates"} to push to ITC`}
+                    className="text-[11px] font-bold px-1.5 py-0.5 rounded-full"
+                    style={{ background: "rgba(166, 20, 195, 0.1)" }}
+                  >
+                    <span style={{ backgroundImage: "linear-gradient(88.54deg, #5C2ED4 0%, #A614C3 100%)", backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+                      {pendingItc}
+                    </span>
+                  </span>
+                )}
                 {active && <div className="absolute bottom-0 left-0 right-0 h-[2px]" style={{ background: activeUnderline }} />}
               </button>
             );
@@ -3812,7 +3842,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
               </button>
               <button onClick={() => {
                   // Doc-refresh gate is internal-staff only. External (client) principals go
-                  // straight through — their edits are forwarded to the Register Team for
+                  // straight through — their edits are forwarded to the Accounting team for
                   // review instead of forcing a W-9 / license upload here.
                   if (!clientLocked) {
                     const w9Changed = (
@@ -3838,12 +3868,13 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                   setIsEditing(false);
                   if (clientLocked) {
                     // Principal (external admin) submitted their editable-tier changes.
-                    // Show a top-right toast so they know we've forwarded the update to
-                    // the Register Team for review. Generic stable copy — no echoing of
-                    // user-entered values into transient UI.
+                    // Show a top-right toast so they know we've emailed the Accounting
+                    // team; the diff also lights up the ITC Record via the pending-
+                    // updates alert on the internal super-admin view. Generic stable
+                    // copy — no echoing of user-entered values into transient UI.
                     showToast({
-                      title: "Changes sent to Register Team",
-                      description: "We've forwarded your update — you'll hear back once it's reviewed.",
+                      title: "Changes sent to Accounting team",
+                      description: "We've emailed the Accounting team — they'll review your edits and push them to ITC.",
                     }, 5000);
                   }
                 }}
@@ -6006,7 +6037,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                       <p className="text-[13px] font-bold" style={{ ...font, color: c.text }}>
                         {pendingUpdates.length} pending {pendingUpdates.length === 1 ? "update" : "updates"} from recent edits
                       </p>
-                      <p className="text-[12px] mt-0.5" style={{ ...font, color: c.muted }}>
+                      <p className="text-[12px] mt-0.5" style={{ ...font, color: c.text }}>
                         The agency info was edited — the ITC record is now behind. Review the changes and push to ITC.
                       </p>
                     </div>
@@ -6119,7 +6150,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                     to ITC applies the agency values field-by-field. */}
                 {pendingItcOpen && record && (
                   <>
-                    <div className="fixed inset-0 z-40" style={{ background: "rgba(0,0,0,0.35)" }} onClick={() => setPendingItcOpen(false)} />
+                    <div className="fixed inset-0 z-40" style={{ background: "rgba(0,0,0,0.35)" }} onClick={closePendingItc} />
                     <div className="fixed left-1/2 top-1/2 z-50 rounded-2xl shadow-2xl overflow-hidden flex flex-col"
                       style={{ transform: "translate(-50%, -50%)", background: c.cardBg, border: `1px solid ${c.border}`, width: "min(560px, 92vw)", maxHeight: "82vh" }}>
                       <div className="p-6 pb-4">
@@ -6129,8 +6160,11 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                         </p>
                       </div>
                       <div className="overflow-y-auto px-6" style={{ flex: "1 1 auto" }}>
-                        {pendingUpdates.map(p => (
-                          <div key={p.key as string} className="py-4" style={{ borderTop: `1px solid ${c.border}` }}>
+                        {pendingUpdates.map(p => {
+                          const k = p.key as string;
+                          const editedValue = pendingOverrides[k] ?? p.agencyValue;
+                          return (
+                          <div key={k} className="py-4" style={{ borderTop: `1px solid ${c.border}` }}>
                             <p className="text-[13px] font-semibold mb-2" style={{ ...font, color: c.text }}>{p.label}</p>
                             <div className="grid grid-cols-2 gap-4">
                               <div>
@@ -6139,14 +6173,20 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                               </div>
                               <div>
                                 <p className="text-[11px] uppercase tracking-wider mb-1" style={{ ...font, color: c.muted, letterSpacing: "0.06em" }}>New value (from Agency Info)</p>
-                                <p className="text-[13px] font-semibold" style={{ ...font, color: c.text }}>{p.agencyValue || "—"}</p>
+                                <input
+                                  value={editedValue}
+                                  onChange={e => setPendingOverrides(prev => ({ ...prev, [k]: e.target.value }))}
+                                  className="w-full text-[13px] font-semibold"
+                                  style={{ ...font, color: c.text, background: c.cardBg, border: `1px solid ${c.border}`, borderRadius: 6, padding: "5px 8px", outline: "none" }}
+                                />
                               </div>
                             </div>
                           </div>
-                        ))}
+                          );
+                        })}
                       </div>
                       <div className="p-6 pt-4 flex items-center justify-between gap-2" style={{ borderTop: `1px solid ${c.border}` }}>
-                        <button onClick={() => { setPendingItcOpen(false); setItcDraft(record); setItcEditing(true); }}
+                        <button onClick={() => { closePendingItc(); setItcDraft(record); setItcEditing(true); }}
                           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-colors"
                           style={{ ...font, border: `1px solid ${isDark ? "rgba(255,255,255,0.10)" : "#E5E7EB"}`, color: c.text }}
                           onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
@@ -6160,12 +6200,14 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                               if (!cur) return prev;
                               const next = { ...cur };
                               pendingUpdates.forEach(p => {
-                                (next as unknown as Record<string, string>)[p.key as string] = p.agencyValue;
+                                const k = p.key as string;
+                                (next as unknown as Record<string, string>)[k] = pendingOverrides[k] ?? p.agencyValue;
                               });
                               return { ...prev, [agency.code]: next };
                             });
-                            setPendingItcOpen(false);
-                            showToast({ title: "ITC updated", description: `${pendingUpdates.length} ${pendingUpdates.length === 1 ? "change" : "changes"} pushed to ITC for ${agency.name}.` });
+                            const count = pendingUpdates.length;
+                            closePendingItc();
+                            showToast({ title: "ITC updated", description: `${count} ${count === 1 ? "change" : "changes"} pushed to ITC for ${agency.name}.` });
                           }}
                           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold text-white transition-colors"
                           style={{ ...font, background: btnGrad }}>
@@ -9947,6 +9989,7 @@ export default function Agencies({ isDark, clientMode = false }: { isDark: boole
     if (filterStatus === "Starred")     return a.isStarred;
     if (filterStatus === "Appointed")   return a.status === "Appointed";
     if (filterStatus === "Unappointed") return a.status === "Unappointed";
+    if (filterStatus === "NeedsAction") return countPendingItcUpdates(getDetail(a), itcRecords[a.code] ?? null) > 0;
     return true;
   }).filter(a => {
     if (locationFilter.size === 0) return true;
@@ -11036,14 +11079,31 @@ export default function Agencies({ isDark, clientMode = false }: { isDark: boole
               { key: "Appointed",   label: "Appointed",          value: appointedAffiliations,   hint: "Members appointed today" },
               { key: "Unappointed", label: "Unappointed",        value: unappointedAffiliations, hint: "Members not yet appointed" },
             ]
-          : [
-              { key: "All",         label: "Total Agencies", value: totalCount,       hint: "All in book" },
-              { key: "New",         label: "New",            value: newCount,         hint: "Onboarded in last 12 months" },
-              { key: "Appointed",   label: "Appointed",      value: appointedCount,   hint: "Currently appointed" },
-              { key: "Unappointed", label: "Unappointed",    value: unappointedCount, hint: "Not yet appointed" },
-            ];
+          : (() => {
+              // Base 4 stat cards, plus a razz-tinted "Needs Action" card
+              // that appears only when at least one agency has pending
+              // ITC updates (internal + super-admin only). Grid grows to
+              // 5 columns for that state so the new card fits inline.
+              const base: { key: FilterStatus | "New" | "Active" | "Inactive" | "Admins"; label: string; value: number; hint: string }[] = [
+                { key: "All",         label: "Total Agencies", value: totalCount,       hint: "All in book" },
+                { key: "New",         label: "New",            value: newCount,         hint: "Onboarded in last 12 months" },
+                { key: "Appointed",   label: "Appointed",      value: appointedCount,   hint: "Currently appointed" },
+                { key: "Unappointed", label: "Unappointed",    value: unappointedCount, hint: "Not yet appointed" },
+              ];
+              if (!clientMode) {
+                const needsActionCount = allAgencies.reduce(
+                  (n, a) => n + (countPendingItcUpdates(getDetail(a), itcRecords[a.code] ?? null) > 0 ? 1 : 0),
+                  0,
+                );
+                // Slot right after Total Agencies so the action-required
+                // signal is the first thing next to the top-line total.
+                base.splice(1, 0, { key: "NeedsAction", label: "Needs Action", value: needsActionCount, hint: "Pending ITC updates" });
+              }
+              return base;
+            })();
+        const cardCount = cards.length;
         return (
-          <div className="grid gap-3 mb-6" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
+          <div className="grid gap-3 mb-6" style={{ gridTemplateColumns: `repeat(${cardCount}, minmax(0, 1fr))` }}>
             {cards.map(card => {
               // All three tabs are clickable now. `activeKey` reads whichever
               // per-tab state is holding the current selection, and the click
@@ -11058,6 +11118,13 @@ export default function Agencies({ isDark, clientMode = false }: { isDark: boole
               // "All" acts as a neutral "reset" — clickable, but never shows
               // the active gradient border regardless of which tab.
               const active = clickable && card.key !== "All" && activeKey === card.key;
+              // Needs Action stays visible even when idle — filled razz
+              // tint when there's work, outlined-only (border stroke, no
+              // fill) with a small stroke-only pill in the top-right when
+              // everything is synced.
+              const isNeedsAction = card.key === "NeedsAction";
+              const needsActionEmpty = isNeedsAction && card.value === 0;
+              const needsActionFilled = isNeedsAction && card.value > 0;
               return (
                 <button
                   key={card.label}
@@ -11079,6 +11146,17 @@ export default function Agencies({ isDark, clientMode = false }: { isDark: boole
                     boxShadow: "none",
                     cursor: "pointer",
                     fontFamily: FONT,
+                  } : isNeedsAction ? {
+                    // Non-active state matches the other cards: plain
+                    // neutral card + standard border stroke. Attention
+                    // comes from the small razz dot in the top-right
+                    // (populated) or an outlined "0" bubble (empty).
+                    background: c.cardBg,
+                    border: `1px solid ${c.border}`,
+                    boxShadow: "none",
+                    cursor: "pointer",
+                    fontFamily: FONT,
+                    position: "relative",
                   } : {
                     background: c.cardBg,
                     border: `1px solid ${c.border}`,
@@ -11097,9 +11175,25 @@ export default function Agencies({ isDark, clientMode = false }: { isDark: boole
                     <div className="text-[13px] font-semibold" style={{ color: c.text }}>{card.label}</div>
                     <div className="text-[11px] mt-0.5 truncate" style={{ color: c.muted }}>{card.hint}</div>
                   </div>
-                  <span className="text-[24px] font-bold leading-none flex-shrink-0" style={{ color: c.text }}>
-                    {card.value}
-                  </span>
+                  {needsActionFilled && !active && (
+                    <span
+                      aria-hidden
+                      className="absolute rounded-full"
+                      style={{ top: -4, right: -4, width: 10, height: 10, background: "#A614C3", border: `2px solid ${c.cardBg}`, boxSizing: "content-box" }}
+                    />
+                  )}
+                  {needsActionEmpty ? (
+                    <span
+                      className="absolute inline-flex items-center justify-center text-[10.5px] font-bold rounded-full"
+                      style={{ top: -9, right: -9, minWidth: 18, height: 18, padding: "0 6px", background: c.cardBg, border: "1px solid rgba(166,20,195,0.55)", color: "#A614C3" }}
+                    >
+                      0
+                    </span>
+                  ) : (
+                    <span className="text-[24px] font-bold leading-none flex-shrink-0" style={{ color: isNeedsAction ? "#A614C3" : c.text }}>
+                      {card.value}
+                    </span>
+                  )}
                 </button>
               );
             })}

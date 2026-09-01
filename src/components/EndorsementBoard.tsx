@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Check, ChevronDown, ChevronRight, FileEdit, HelpCircle, Layers, Plus, Printer, Send, Shield, X } from "lucide-react";
+import { ArrowLeft, Check, ChevronDown, ChevronRight, FileEdit, HelpCircle, Info, Layers, Plus, Printer, Send, Shield, X } from "lucide-react";
 import { AddressAutocomplete } from "./AddressAutocomplete";
 import { DatePicker } from "./DatePicker";
 import { StyledSelect } from "./StyledSelect";
@@ -64,8 +64,10 @@ function constraintFor(label: string): FieldConstraint | null {
       },
     };
   }
-  // Zip — 5 numerals
-  if (l === "zip" || l === "zip code") {
+  // Zip — 5 numerals. Covers plain "Zip" plus prefixed variants like
+  // "Holder Zip" and "Jobsite Zip" that show up in the Waiver of
+  // Subrogation nested address blocks.
+  if (l === "zip" || l === "zip code" || l.endsWith(" zip")) {
     return { maxLength: 5, inputMode: "numeric", format: raw => raw.replace(/\D/g, "").slice(0, 5) };
   }
   // Payroll — open numeric with auto-comma formatting (spec: "Open Numeric Box").
@@ -82,7 +84,7 @@ function constraintFor(label: string): FieldConstraint | null {
   return null;
 }
 
-type EndorsementKey =
+export type EndorsementKey =
   | "contact" | "namedinsured" | "mailing" | "effdate"
   | "classcode" | "limits" | "waiver" | "officer"
   | "mcp65" | "puc" | "thirdpartynoc" | "altemp" | "fein" | "xmod"
@@ -135,6 +137,12 @@ const NAV: { label: string; items: { key: EndorsementKey; label: string }[] }[] 
     ],
   },
 ];
+
+// Flat list of every human-readable endorsement type label. Exported so
+// upstream consumers (e.g. the Endorsements All Requests type filter)
+// can show the full catalog even when the visible data only spans a
+// subset of the types.
+export const ALL_ENDORSEMENT_TYPE_LABELS: string[] = NAV.flatMap(g => g.items.map(it => it.label));
 
 type FieldType = "date" | "text" | "select" | "textarea" | "file";
 type Field = { label: string; type: FieldType; placeholder?: string; options?: string[]; span?: 1 | 2; optional?: boolean };
@@ -211,8 +219,7 @@ const CARD_META: Record<EndorsementKey, { blurb: string; footNote?: string; fiel
                   fields: [
                     { label: "Effective date",       type: "date", span: 1 },
                     { label: "Waiver of Subrogation", type: "select", options: ["Blanket", "Specific"], span: 1 },
-                    { label: "Holder First Name",    type: "text", placeholder: "Jane", span: 1, optional: true },
-                    { label: "Holder Last Name",     type: "text", placeholder: "Doe",  span: 1, optional: true },
+                    { label: "Waiver Holder's Name", type: "text", placeholder: "Name on certificate", span: 2, optional: true },
                     { label: "Holder Address",       type: "text", placeholder: "Street", span: 2, optional: true },
                     { label: "Holder City",          type: "text", placeholder: "City", span: 1, optional: true },
                     { label: "Holder State",         type: "select", options: US_STATES, span: 1, optional: true },
@@ -343,9 +350,19 @@ interface Props {
   // to remount the board in fresh-intake mode with the same policy still
   // selected — instead of falling back to onBack which returns to search.
   onNewRequest?: () => void;
+  // Per-request seed used when opening the recap for a specific past
+  // submission (e.g. clicking a row in "Recent endorsement requests").
+  // When set, overrides the built-in demo batch so each row lands on
+  // its own cards + values + submitted date. Only read when
+  // `initialSubmitted` is true.
+  submittedSeed?: {
+    selected: EndorsementKey[];
+    values: Record<string, Record<number, string>>;
+    submittedOn?: string;
+  };
 }
 
-export default function EndorsementBoard({ isDark, onBack, initialSubmitted = false, onNewRequest }: Props) {
+export default function EndorsementBoard({ isDark, onBack, initialSubmitted = false, onNewRequest, submittedSeed }: Props) {
   const c = {
     text: isDark ? "#F9FAFB" : "#1F2937",
     muted: isDark ? "#8B8FA8" : "#6B7280",
@@ -370,11 +387,11 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
   // replace this with the actual submission's data.
   const [selected, setSelected] = useState<Set<EndorsementKey>>(
     initialSubmitted
-      ? new Set<EndorsementKey>(["contact", "mailing", "officer", "classcode"])
+      ? new Set<EndorsementKey>(submittedSeed?.selected ?? ["contact", "mailing", "officer", "classcode"])
       : new Set<EndorsementKey>()
   );
   const [activeKey, setActiveKey] = useState<EndorsementKey | null>(
-    initialSubmitted ? "contact" : null
+    initialSubmitted ? (submittedSeed?.selected?.[0] ?? "contact") : null
   );
   // Refs to each section card so sidebar clicks can smooth-scroll to them.
   const sectionRefs = useRef<Partial<Record<EndorsementKey, HTMLElement | null>>>({});
@@ -382,40 +399,45 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
     setActiveKey(k);
     sectionRefs.current[k]?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
+  // Default recap seed (used by the "View Existing" chooser). Hoisted out
+  // of the useState initializer so the SWC parser doesn't mis-read the
+  // `??` fallback's multi-property object literal as a destructuring
+  // pattern.
+  const defaultSubmittedValues: Record<string, Record<number, string>> = {
+    contact: {
+      0: "08/07/2026",         // Effective date
+      1: "Insured",            // Contact
+      2: "Sean",               // First Name
+      3: "Byrne",              // Last Name
+      4: "(916) 772-9200",     // Phone Number
+      5: "sbyrne@btisinc.com", // Email Address
+    },
+    mailing: {
+      0: "08/07/2026",         // Effective date
+      1: "587 Test St.",       // Street
+      2: "Sacramento",         // City
+      3: "CA",                 // State
+      4: "95814",              // ZIP
+    },
+    officer: {
+      0: "08/07/2026",         // Effective date
+      1: "Jordan",             // First Name
+      2: "Reeves",             // Last Name
+      3: "President",          // Title
+      4: "Excluded",           // Included / Excluded
+    },
+    classcode: {
+      0: "08/07/2026",         // Effective date
+      1: "Adding a new low-wage electrical worker; office role removed after Q2 restructuring.", // Reason
+      2: "587 Test St.",       // Location address
+      3: "Sacramento",         // City
+      4: "CA",                 // State
+      5: "95814",              // Zip
+    },
+  };
   const [values, setValues] = useState<Record<string, Record<number, string>>>(
     initialSubmitted
-      ? {
-          contact: {
-            0: "08/07/2026",         // Effective date
-            1: "Insured",            // Contact
-            2: "Sean",               // First Name
-            3: "Byrne",              // Last Name
-            4: "(916) 772-9200",     // Phone Number
-            5: "sbyrne@btisinc.com", // Email Address
-          },
-          mailing: {
-            0: "08/07/2026",         // Effective date
-            1: "587 Test St.",       // Street
-            2: "Sacramento",         // City
-            3: "CA",                 // State
-            4: "95814",              // ZIP
-          },
-          officer: {
-            0: "08/07/2026",         // Effective date
-            1: "Jordan",             // First Name
-            2: "Reeves",             // Last Name
-            3: "President",          // Title
-            4: "Excluded",           // Included / Excluded
-          },
-          classcode: {
-            0: "08/07/2026",         // Effective date
-            1: "Adding a new low-wage electrical worker; office role removed after Q2 restructuring.", // Reason
-            2: "587 Test St.",       // Location address
-            3: "Sacramento",         // City
-            4: "CA",                 // State
-            5: "95814",              // Zip
-          },
-        }
+      ? (submittedSeed?.values ?? defaultSubmittedValues)
       : {}
   );
   const [addOpen, setAddOpen] = useState(false);
@@ -511,7 +533,7 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
   // waivers don't need them, so we hide the whole block. When Specific
   // is chosen, the same fields become required (Excel spec).
   const waiverType = () => values["waiver"]?.[1] ?? "";
-  const isWaiverExtra = (i: number) => i >= 2 && i <= 15;
+  const isWaiverExtra = (i: number) => i >= 2 && i <= 14;
   const isHiddenField = (k: EndorsementKey, i: number) => {
     if (k === "location" && locationRemoveMode() && (i === 6 || i === 7 || i === 8)) return true;
     if (k === "waiver" && waiverType() === "Blanket" && isWaiverExtra(i)) return true;
@@ -952,7 +974,7 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
                       </h3>
                       <p className="text-[12.5px] mt-1" style={{ fontFamily: FONT, color: c.muted, lineHeight: 1.5 }}>
                         {initialSubmitted
-                          ? "Submitted Jul 24, 2026. Print a copy for your records or start a new request below."
+                          ? `Submitted ${submittedSeed?.submittedOn ?? "Jul 24, 2026"}. Print a copy for your records or start a new request below.`
                           : "A copy has been emailed to your inbox. Our team will follow up if anything else is needed."}
                       </p>
                     </div>
@@ -1315,7 +1337,7 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
                           const ADDR_BLOCKS: Partial<Record<EndorsementKey, number[]>> = {
                             mailing:       [1],  // Street/City/State/ZIP
                             classcode:     [2],
-                            waiver:        [4, 8], // Holder block + Jobsite block
+                            waiver:        [3, 7], // Holder block + Jobsite block
                             thirdpartynoc: [2],
                             location:      [2],
                             entity:        [7],
@@ -1331,7 +1353,7 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
                           // Waiver of Subrogation: hide the holder / jobsite /
                           // class-code block when Blanket is selected — those
                           // fields only apply to Specific waivers.
-                          if (k === "waiver" && waiverType() === "Blanket" && i >= 2 && i <= 15) return null;
+                          if (k === "waiver" && waiverType() === "Blanket" && i >= 2 && i <= 14) return null;
                           // Entity: "Other Entity Type" (idx 3) only
                           // renders when Entity Type (idx 2) is "Other".
                           if (k === "entity" && i === 3 && (values["entity"]?.[2] ?? "") !== "Other") return null;
@@ -1342,7 +1364,7 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
                           // treatment as City/State/Zip in the address
                           // block). Render at Class Code (11); hide the
                           // next two so they don't lay out separately.
-                          const ccTripleStart = k === "waiver" ? 12 : -1;
+                          const ccTripleStart = k === "waiver" ? 11 : -1;
                           if (k === "waiver" && (i === ccTripleStart + 1 || i === ccTripleStart + 2)) return null;
                           const showCcPayrollTriple = k === "waiver" && i === ccTripleStart;
                           return (
@@ -1358,6 +1380,32 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
                                 <p className="text-[12px]" style={{ gridColumn: "span 2", fontFamily: FONT, color: c.muted, margin: "4px 0 -4px", lineHeight: 1.5 }}>
                                   A carrier specific no loss statement may be required. If needed, we will reach out.
                                 </p>
+                              )}
+                              {/* Waiver Specific — inline helper before the
+                                  Holder name fields: only one holder entity
+                                  is allowed per waiver request. Hidden on
+                                  Blanket (whole block is hidden anyway). */}
+                              {k === "waiver" && i === 2 && waiverType() === "Specific" && (
+                                <div className="flex items-start gap-2"
+                                  style={{ gridColumn: "span 2", padding: "10px 12px", background: c.helperBg, border: `1px solid ${c.border}`, borderRadius: 8 }}>
+                                  <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: c.razz }} />
+                                  <p className="text-[12px]" style={{ fontFamily: FONT, color: c.text, lineHeight: 1.5, margin: 0 }}>
+                                    Only one entity per waiver request allowed.
+                                  </p>
+                                </div>
+                              )}
+                              {/* Waiver Specific — section header directly
+                                  above the Class Code / Payroll / Employees
+                                  triple so the fields read as one group
+                                  tied to the jobsite. */}
+                              {k === "waiver" && i === 11 && waiverType() === "Specific" && (
+                                <div className="flex items-start gap-2"
+                                  style={{ gridColumn: "span 2", padding: "10px 12px", background: c.helperBg, border: `1px solid ${c.border}`, borderRadius: 8, marginTop: 4 }}>
+                                  <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: c.razz }} />
+                                  <p className="text-[12.5px]" style={{ fontFamily: FONT, color: c.text, lineHeight: 1.5, margin: 0, fontWeight: 600 }}>
+                                    Class Code / Payroll associated with job
+                                  </p>
+                                </div>
                               )}
                               {showCcPayrollTriple && (
                                 <div style={{ gridColumn: "span 2", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>

@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
-import { Search, ChevronDown, X, Send, ClipboardList, Clock, CheckCircle2, Check } from "lucide-react";
-import EndorsementBoard from "./EndorsementBoard";
+import { useState, useEffect, useRef } from "react";
+import { Search, ChevronDown, ChevronLeft, ChevronRight, ArrowUpRight, X, XCircle, Send, ClipboardList, Clock, CheckCircle2, Check } from "lucide-react";
+import EndorsementBoard, { type EndorsementKey, ALL_ENDORSEMENT_TYPE_LABELS } from "./EndorsementBoard";
 
 const FONT = "var(--font-montserrat), Montserrat, sans-serif";
 
 type SearchBy = "Select" | "Policy Number" | "DBA" | "Applicant Name" | "Bond Number";
-type View = "search" | "results" | "form" | "success";
+type View = "search" | "results" | "all-requests" | "form" | "success";
 
 // Mock results table returned after a "find a policy" search. Static list so
 // every search resolves to the same set — this is a design mock, not a real
@@ -56,6 +56,130 @@ const SEARCH_RESULTS: SearchResult[] = [
 
 const SEARCH_OPTIONS: SearchBy[] = ["Select", "Policy Number", "DBA", "Applicant Name", "Bond Number"];
 
+// Mock feed for the search-view "Recent endorsement requests" card. Flip
+// to [] (or filter down) to preview the empty state. Real data would come
+// from the requests API keyed to the current agency. The `seed` on each
+// row feeds EndorsementBoard's submitted-recap view so clicking a row
+// lands the user on the actual cards + values that were submitted, not
+// on a shared demo batch.
+type RecentSeed = {
+  selected: EndorsementKey[];
+  values: Record<string, Record<number, string>>;
+  submittedOn?: string;
+};
+type RecentRequest = { id: string; insured: string; type: string; date: string; status: string; seed: RecentSeed };
+const recentRequests: RecentRequest[] = [
+  {
+    id: "VIC00004421", insured: "Acme Logistics", type: "Class Code / Payroll", date: "Apr 18, 2026", status: "Processing",
+    seed: {
+      submittedOn: "Apr 18, 2026",
+      selected: ["classcode"],
+      values: {
+        classcode: {
+          0: "04/18/2026",
+          1: "Added Class Code 5474 (Painting NOC) for a new interior-painting crew starting Q2.",
+          2: "1220 W Fulton Market", 3: "Chicago", 4: "IL", 5: "60607",
+        },
+      },
+    },
+  },
+  {
+    id: "VIC00004387", insured: "Sunrise Bakery", type: "Change Address", date: "Apr 12, 2026", status: "Completed",
+    seed: {
+      submittedOn: "Apr 12, 2026",
+      selected: ["mailing"],
+      values: {
+        mailing: { 0: "04/12/2026", 1: "412 Baker St", 2: "Portland", 3: "OR", 4: "97205" },
+      },
+    },
+  },
+  {
+    id: "VIC00004356", insured: "Metro Construction", type: "Named Insured / DBA", date: "Apr 08, 2026", status: "Completed",
+    seed: {
+      submittedOn: "Apr 08, 2026",
+      selected: ["namedinsured"],
+      values: {
+        namedinsured: {
+          0: "04/08/2026",
+          1: "Metro Construction LLC", 2: "Metro Construction",
+          3: "Metro Construction & Design LLC", 4: "Metro C&D",
+          5: "Rebranded after Q1 acquisition; both legal name and DBA updated.",
+        },
+      },
+    },
+  },
+  {
+    id: "VIC00004329", insured: "Harbor Marine Co.", type: "Update Limits", date: "Mar 30, 2026", status: "Completed",
+    seed: {
+      submittedOn: "Mar 30, 2026",
+      selected: ["limits"],
+      values: {
+        limits: { 0: "03/30/2026", 1: "$1,000,000 / $1,000,000 / $1,000,000" },
+      },
+    },
+  },
+  {
+    id: "VIC00004298", insured: "Cedar Ridge Roofing", type: "Waiver of Subrogation", date: "Mar 22, 2026", status: "Processing",
+    seed: {
+      submittedOn: "Mar 22, 2026",
+      selected: ["waiver"],
+      values: {
+        waiver: { 0: "03/22/2026", 1: "Blanket" },
+      },
+    },
+  },
+  {
+    id: "VIC00004271", insured: "Northwind Electric", type: "Officer Exclusion / Inclusion", date: "Mar 15, 2026", status: "Completed",
+    seed: {
+      submittedOn: "Mar 15, 2026",
+      selected: ["officer"],
+      values: {
+        officer: { 0: "03/15/2026", 1: "Jordan", 2: "Reeves", 3: "President", 4: "Excluded" },
+      },
+    },
+  },
+  {
+    id: "VIC00004244", insured: "Peak Landscaping", type: "Cancellation Request", date: "Mar 08, 2026", status: "Cancelled",
+    seed: {
+      submittedOn: "Mar 08, 2026",
+      selected: ["cancel"],
+      values: {
+        cancel: { 0: "03/08/2026", 1: "Business closing at end of season; agent will hand-deliver Acord 35." },
+      },
+    },
+  },
+  {
+    id: "VIC00004219", insured: "Skyline Freight", type: "FEIN", date: "Feb 28, 2026", status: "Completed",
+    seed: {
+      submittedOn: "Feb 28, 2026",
+      selected: ["fein"],
+      values: {
+        fein: { 0: "02/28/2026", 1: "12-3456789", 2: "Skyline Freight Holdings LLC", 3: "Skyline Freight" },
+      },
+    },
+  },
+  {
+    id: "VIC00004202", insured: "Blue Harbor Diner", type: "Reinstatement Request", date: "Feb 20, 2026", status: "Completed",
+    seed: {
+      submittedOn: "Feb 20, 2026",
+      selected: ["reinstate"],
+      values: {
+        reinstate: { 0: "02/20/2026", 1: "Premium paid in full; reinstate effective today." },
+      },
+    },
+  },
+  {
+    id: "VIC00004187", insured: "Ironclad Fabrication", type: "XMOD", date: "Feb 12, 2026", status: "Completed",
+    seed: {
+      submittedOn: "Feb 12, 2026",
+      selected: ["xmod"],
+      values: {
+        xmod: { 0: "02/12/2026", 1: "0.87", 2: "Ironclad Fabrication Inc", 3: "Ironclad Fab" },
+      },
+    },
+  },
+];
+
 export default function Endorsements({ isDark, layout = "3col", skipSearch = false }: { isDark: boolean; layout?: "3col" | "2col"; skipSearch?: boolean }) {
   // When `skipSearch` is on, land directly on the intake with the first
   // sample policy pre-selected. Used by the Design Option variants so
@@ -78,6 +202,62 @@ export default function Endorsements({ isDark, layout = "3col", skipSearch = fal
   // When true, EndorsementBoard opens directly in its submitted recap state —
   // used by "View Existing" so users see the review page for a prior request.
   const [viewingExisting, setViewingExisting] = useState(false);
+  // Seed used when the user clicks a specific row in the Recent card. Null
+  // falls back to EndorsementBoard's built-in demo batch (used by the
+  // generic "View Existing" chooser from the search results).
+  const [submittedSeed, setSubmittedSeed] = useState<RecentSeed | null>(null);
+  // All Requests view — status chip filter + in-page search over Request
+  // ID / Insured. Kept flat here (not URL-synced) since the view is
+  // ephemeral and users hop back to the Recent card frequently.
+  const [reqStatusFilter, setReqStatusFilter] = useState<"All" | "Processing" | "Completed" | "Cancelled">("All");
+  const [reqSearch, setReqSearch] = useState("");
+  // Column sort for the All Requests table. Clicking a header cycles
+  // asc → desc → cleared so users can quickly reorder by any column.
+  type ReqSortKey = "id" | "insured" | "type" | "date" | "status";
+  const [reqSort, setReqSort] = useState<{ key: ReqSortKey | null; dir: "asc" | "desc" }>({ key: "date", dir: "desc" });
+  const cycleReqSort = (key: ReqSortKey) => {
+    setReqSort(cur => {
+      if (cur.key !== key) return { key, dir: "asc" };
+      if (cur.dir === "asc") return { key, dir: "desc" };
+      return { key: null, dir: "asc" };
+    });
+  };
+  // Pagination for the All Requests table. Kept separate from the
+  // search-results pagination so paging in one doesn't reset the other.
+  const [reqPage, setReqPage] = useState(1);
+  const [reqPerPage, setReqPerPage] = useState(10);
+  const [reqPageSizeOpen, setReqPageSizeOpen] = useState(false);
+  // TYPE column filter dropdown on the All Requests table. Empty set =
+  // no filter (show all types). Checkboxes across the distinct types
+  // present in the visible 12-month window.
+  const [reqTypeFilter, setReqTypeFilter] = useState<Set<string>>(new Set());
+  const [reqTypeOpen, setReqTypeOpen] = useState(false);
+  const [reqTypeSearch, setReqTypeSearch] = useState("");
+  const reqTypeRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!reqTypeOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (reqTypeRef.current && !reqTypeRef.current.contains(e.target as Node)) setReqTypeOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [reqTypeOpen]);
+  // Search-results STATUS column filter. Empty set = show all. Options are
+  // limited to the six statuses the platform surfaces for policy submissions
+  // (per the Policies filter shown to the user).
+  const [resultsStatusFilter, setResultsStatusFilter] = useState<Set<string>>(new Set());
+  const [resultsStatusOpen, setResultsStatusOpen] = useState(false);
+  const [resultsStatusSearch, setResultsStatusSearch] = useState("");
+  const RESULTS_STATUS_OPTIONS = ["File Closed", "Cancelled", "Renewal Created", "Bound", "Paid-Bind Incomplete", "Issued"];
+  const resultsStatusRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!resultsStatusOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (resultsStatusRef.current && !resultsStatusRef.current.contains(e.target as Node)) setResultsStatusOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [resultsStatusOpen]);
 
   // Pagination — matches the Policies table footer (10 / 20 / 50 per page).
   const [page, setPage] = useState(1);
@@ -134,14 +314,33 @@ export default function Endorsements({ isDark, layout = "3col", skipSearch = fal
   // the previously-submitted request's data.
   const handleChooseExisting = () => {
     if (pendingResult) setIntakePolicy(pendingResult);
+    // Chooser path uses the built-in demo batch, not a per-row seed.
+    setSubmittedSeed(null);
     setViewingExisting(true);
     setChooseOpen(false);
+    setView("form");
+  };
+
+  // Row click on the Recent card: same landing as View Existing but the
+  // recap is seeded from the specific row so users see the cards + values
+  // they actually submitted for that request.
+  const handleChooseRecent = (r: RecentRequest) => {
+    // Ensure the board has a policy anchor even if the user never picked
+    // one from a search — recent rows can be clicked from the empty
+    // search-view landing page.
+    if (!intakePolicy) setIntakePolicy(SEARCH_RESULTS[0]);
+    setSubmittedSeed(r.seed);
+    setViewingExisting(true);
     setView("form");
   };
 
   const handleSubmit = () => setView("success");
 
   const handleBack = () => {
+    // If the form was opened from a Recent-card row (submittedSeed set),
+    // return to the All Requests view instead of the policy search — the
+    // user is browsing their own submissions, not searching for a policy.
+    if (submittedSeed) { setView("all-requests"); return; }
     // Drop back on the results table so the user can pick another policy
     // without re-typing their search.
     setView(searchValue.trim() ? "results" : "search");
@@ -181,41 +380,64 @@ export default function Endorsements({ isDark, layout = "3col", skipSearch = fal
 
       {view === "form" && intakePolicy && (
         <EndorsementBoard
-          key={viewingExisting ? "existing" : "new"}
+          key={viewingExisting ? `existing-${submittedSeed ? recentRequests.findIndex(x => x.seed === submittedSeed) : "chooser"}` : "new"}
           isDark={isDark}
           onBack={handleBack}
           initialSubmitted={viewingExisting}
-          onNewRequest={() => setViewingExisting(false)}
+          submittedSeed={viewingExisting && submittedSeed ? submittedSeed : undefined}
+          onNewRequest={() => { setViewingExisting(false); setSubmittedSeed(null); }}
         />
       )}
 
       {view !== "form" && (
       <div
-        className={view === "results" ? "flex-1 min-h-0 flex flex-col" : "flex-1 min-h-0 overflow-y-auto"}
-        style={view === "results" ? undefined : { paddingBottom: 48 }}
+        className={view === "results" || view === "all-requests" ? "flex-1 min-h-0 flex flex-col" : "flex-1 min-h-0 overflow-y-auto"}
+        style={view === "results" || view === "all-requests" ? undefined : { paddingBottom: 48 }}
       >
         {(view === "search" || view === "results") && (
           <div className={view === "results" ? "flex flex-col gap-3 flex-1 min-h-0" : "flex flex-col gap-6"}>
-          {/* Top stroke is painted as a 4px-tall background-image at the top of the card
-              instead of a child div. The card's rounded-2xl naturally clips the gradient
-              to a real 16px corner — a child div with border-radius would get clamped to
-              ~2px because the browser caps corner radius at half the element's height. */}
-          <div className="rounded-2xl flex-shrink-0"
+          {view === "results" && (
+            <div className="flex-shrink-0">
+              <button onClick={() => setView("search")}
+                className="inline-flex items-center gap-1.5 text-[12.5px] font-medium transition-colors"
+                style={{ fontFamily: FONT, color: c.muted }}
+                onMouseEnter={e => (e.currentTarget.style.color = c.text)}
+                onMouseLeave={e => (e.currentTarget.style.color = c.muted)}>
+                <ChevronLeft className="w-3.5 h-3.5" /> Back
+              </button>
+            </div>
+          )}
+          {/* Card keeps `overflow: visible` so the Search By dropdown can
+              spill past the card's bottom edge. The razz stroke lives in
+              its own absolute wrapper below, which carries the overflow-
+              hidden + rounded corners it needs to clip the stroke into a
+              rounded top-corner shape. */}
+          <div className="rounded-2xl flex-shrink-0 relative"
             style={{
-              backgroundColor: c.cardBg,
-              backgroundImage: "linear-gradient(90deg,#5C2ED4 0%,#A614C3 65%)",
-              backgroundRepeat: "no-repeat",
-              backgroundSize: "100% 4px",
-              backgroundPosition: "top",
-              borderLeft: `1px solid ${c.border}`,
-              borderRight: `1px solid ${c.border}`,
-              borderBottom: `1px solid ${c.border}`,
+              background: c.cardBg,
+              border: `1px solid ${c.border}`,
               boxShadow: isDark ? "none" : "0 1px 3px rgba(15,23,42,0.04)",
             }}>
+            <div
+              aria-hidden
+              className="rounded-2xl overflow-hidden pointer-events-none"
+              style={{ position: "absolute", top: -1, left: -1, right: -1, bottom: -1 }}
+            >
+              <div
+                style={{
+                  // Negative offsets pull the overlay out into the border
+                  // area so the razz fill reaches the outermost edge of the
+                  // card; the wrapper's overflow-hidden + rounded-2xl then
+                  // clips it into the rounded top corners.
+                  position: "absolute", top: 0, left: 0, right: 0, height: 4,
+                  background: "linear-gradient(90deg,#5C2ED4 0%,#A614C3 65%)",
+                }}
+              />
+            </div>
             <div className={view === "results" ? "px-6 py-4" : "px-8 py-8"}>
               {view !== "results" && (
                 <>
-                  <div className="text-[15px] font-semibold mb-1" style={{ color: c.text }}>Find a policy to endorse</div>
+                  <div className="text-[15px] font-semibold mb-1" style={{ color: c.text }}>Find a Policy to Endorse</div>
                   <div className="text-[13px] mb-6" style={{ color: c.muted }}>Search by policy number, submission ID, or insured name.</div>
                 </>
               )}
@@ -311,44 +533,65 @@ export default function Endorsements({ isDark, layout = "3col", skipSearch = fal
                 <Clock className="w-4 h-4" style={{ color: c.muted }} />
                 <span className="text-[14px] font-semibold" style={{ fontFamily: FONT, color: c.text }}>Recent endorsement requests</span>
               </div>
-              <button className="text-[12px] font-semibold transition-opacity hover:opacity-70"
+              <button
+                onClick={() => setView("all-requests")}
+                className="text-[12px] font-semibold transition-opacity hover:opacity-70"
                 style={{ fontFamily: FONT, color: "#A614C3" }}>View all</button>
             </div>
-            <div className="grid px-6 py-3 gap-4"
-              style={{ gridTemplateColumns: "1.2fr 1.6fr 1.4fr 1fr 1fr", borderBottom: `1px solid ${c.border}`, background: c.mutedBg }}>
-              {["Request ID", "Insured", "Type", "Submitted", "Status"].map(h => (
-                <div key={h} className="text-[11px] font-bold uppercase tracking-wider"
-                  style={{ fontFamily: FONT, color: c.muted }}>{h}</div>
-              ))}
-            </div>
-            {[
-              { id: "REQ-2026-0421", insured: "Acme Logistics",       type: "Add Vehicle",       date: "Apr 18, 2026", status: "Processing" },
-              { id: "REQ-2026-0387", insured: "Sunrise Bakery",       type: "Change Address",    date: "Apr 12, 2026", status: "Completed"  },
-              { id: "REQ-2026-0356", insured: "Metro Construction",   type: "Add Insured",       date: "Apr 08, 2026", status: "Completed"  },
-              { id: "REQ-2026-0329", insured: "Harbor Marine Co.",    type: "Update Limits",     date: "Mar 30, 2026", status: "Completed"  },
-            ].map((r, i, arr) => {
-              const statusColor = r.status === "Processing"
-                ? { color: "#B45309", bg: isDark ? "rgba(245,158,11,0.15)" : "rgba(245,158,11,0.12)" }
-                : { color: "#0F7A63", bg: isDark ? "rgba(115,201,183,0.15)" : "rgba(115,201,183,0.12)" };
-              return (
-                <div key={r.id} className="grid px-6 py-3.5 items-center gap-4 transition-colors"
-                  style={{ gridTemplateColumns: "1.2fr 1.6fr 1.4fr 1fr 1fr", borderBottom: i !== arr.length - 1 ? `1px solid ${c.border}` : "none" }}
-                  onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
-                  onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-                  <div className="text-[12px] font-semibold" style={{ fontFamily: FONT, color: c.text }}>{r.id}</div>
-                  <div className="text-[12px]" style={{ fontFamily: FONT, color: c.text }}>{r.insured}</div>
-                  <div className="text-[12px]" style={{ fontFamily: FONT, color: c.muted }}>{r.type}</div>
-                  <div className="text-[12px]" style={{ fontFamily: FONT, color: c.muted }}>{r.date}</div>
-                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full w-fit"
-                    style={{ background: statusColor.bg }}>
-                    {r.status === "Processing"
-                      ? <Clock className="w-3 h-3" style={{ color: statusColor.color }} />
-                      : <CheckCircle2 className="w-3 h-3" style={{ color: statusColor.color }} />}
-                    <span className="text-[11px] font-semibold" style={{ fontFamily: FONT, color: statusColor.color }}>{r.status}</span>
-                  </div>
+            {recentRequests.length === 0 ? (
+              <div className="flex flex-col items-center justify-center px-6 py-14 text-center">
+                <span className="inline-flex items-center justify-center mb-3"
+                  style={{ width: 44, height: 44, borderRadius: 9999, background: c.mutedBg, border: `1px solid ${c.border}` }}>
+                  <Clock className="w-5 h-5" style={{ color: c.muted }} />
+                </span>
+                <div className="text-[14px] font-semibold mb-1" style={{ fontFamily: FONT, color: c.text }}>No recent endorsement requests</div>
+                <div className="text-[12px] max-w-[360px]" style={{ fontFamily: FONT, color: c.muted }}>
+                  Requests you submit will show up here so you can track their status at a glance.
                 </div>
-              );
-            })}
+              </div>
+            ) : (
+              <div>
+                <div className="grid px-6 py-3 gap-4"
+                  style={{ gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", borderBottom: `1px solid ${c.border}`, background: c.mutedBg }}>
+                  {["Submission ID", "Insured", "Type", "Submitted", "Status"].map(h => (
+                    <div key={h} className="text-[11px] font-bold uppercase tracking-wider"
+                      style={{ fontFamily: FONT, color: c.muted }}>{h}</div>
+                  ))}
+                </div>
+                {recentRequests.slice(0, 5).map((r, i, arr) => {
+                  const statusColor = r.status === "Processing"
+                    ? { color: "#B45309", bg: isDark ? "rgba(245,158,11,0.15)" : "rgba(245,158,11,0.12)" }
+                    : { color: "#0F7A63", bg: isDark ? "rgba(115,201,183,0.15)" : "rgba(115,201,183,0.12)" };
+                  return (
+                    <button key={r.id} onClick={() => handleChooseRecent(r)}
+                      className="grid px-6 py-3.5 items-center gap-4 transition-colors w-full text-left"
+                      style={{ gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", borderBottom: i !== arr.length - 1 ? `1px solid ${c.border}` : "none", background: "transparent", fontFamily: FONT, cursor: "pointer" }}
+                      onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+                      onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                      <div className="text-[12px] font-semibold" style={{ color: c.text }}>{r.id}</div>
+                      <div className="text-[12px]" style={{ color: c.text }}>{r.insured}</div>
+                      <div className="text-[12px] truncate" style={{ color: c.muted }}>
+                        {r.type}
+                        {r.seed.selected.length === 2 && (
+                          <span style={{ color: c.sub }}> + 1 more</span>
+                        )}
+                        {r.seed.selected.length > 2 && (
+                          <span style={{ color: c.sub }}> /...</span>
+                        )}
+                      </div>
+                      <div className="text-[12px]" style={{ color: c.muted }}>{r.date}</div>
+                      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full w-fit"
+                        style={{ background: statusColor.bg }}>
+                        {r.status === "Processing"
+                          ? <Clock className="w-3 h-3" style={{ color: statusColor.color }} />
+                          : <CheckCircle2 className="w-3 h-3" style={{ color: statusColor.color }} />}
+                        <span className="text-[11px] font-semibold" style={{ color: statusColor.color }}>{r.status}</span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
           </>)}
 
@@ -609,6 +852,385 @@ export default function Endorsements({ isDark, layout = "3col", skipSearch = fal
             </div>
           </div>
         )}
+
+        {view === "all-requests" && (() => {
+          // Rolling 12-month window — anything older is hidden. Uses a
+          // fixed reference date (today) so the demo is deterministic;
+          // real data would call `new Date()` here.
+          const now = new Date();
+          const cutoff = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate()).getTime();
+          const within12mo = recentRequests.filter(r => Date.parse(r.date) >= cutoff);
+          // Filter + search over the full requests feed. Status "All"
+          // short-circuits the status test; empty search keeps everyone.
+          const filteredUnsorted = within12mo.filter(r => {
+            if (reqStatusFilter !== "All" && r.status !== reqStatusFilter) return false;
+            if (reqTypeFilter.size > 0 && !reqTypeFilter.has(r.type)) return false;
+            const q = reqSearch.trim().toLowerCase();
+            if (!q) return true;
+            return r.id.toLowerCase().includes(q) || r.insured.toLowerCase().includes(q);
+          });
+          // Full catalog for the filter dropdown so users can pick any
+          // endorsement type — not just the ones present in the current
+          // 12-month window (avoids the dropdown silently omitting rare
+          // types with no recent activity).
+          const uniqueTypes = ALL_ENDORSEMENT_TYPE_LABELS;
+          // Copy before sort so we don't mutate the mock feed's order.
+          const filtered = reqSort.key === null ? filteredUnsorted : [...filteredUnsorted].sort((a, b) => {
+            const k = reqSort.key!;
+            const av = k === "date" ? Date.parse(a.date) : String(a[k] ?? "").toLowerCase();
+            const bv = k === "date" ? Date.parse(b.date) : String(b[k] ?? "").toLowerCase();
+            if (av < bv) return reqSort.dir === "asc" ? -1 : 1;
+            if (av > bv) return reqSort.dir === "asc" ? 1 : -1;
+            return 0;
+          });
+          const HEADER_KEYS: { label: string; key: ReqSortKey }[] = [
+            { label: "Submission ID", key: "id" },
+            { label: "Insured",       key: "insured" },
+            { label: "Type",          key: "type" },
+            { label: "Submitted",     key: "date" },
+            { label: "Status",        key: "status" },
+          ];
+          const chips: ("All" | "Processing" | "Completed" | "Cancelled")[] = ["All", "Processing", "Completed", "Cancelled"];
+          const countFor = (k: "All" | "Processing" | "Completed" | "Cancelled") =>
+            k === "All" ? within12mo.length : within12mo.filter(r => r.status === k).length;
+          return (
+            <div className="flex flex-col gap-3 flex-1 min-h-0">
+              {/* Back to search sits as a slim row above the card. */}
+              <div className="flex-shrink-0">
+                <button onClick={() => setView("search")}
+                  className="inline-flex items-center gap-1.5 text-[12.5px] font-medium transition-colors"
+                  style={{ fontFamily: FONT, color: c.muted }}
+                  onMouseEnter={e => (e.currentTarget.style.color = c.text)}
+                  onMouseLeave={e => (e.currentTarget.style.color = c.muted)}>
+                  <ChevronLeft className="w-3.5 h-3.5" /> Back
+                </button>
+              </div>
+
+              {/* Header card: title + status chips + search. Razz gradient
+                  stroke overlay at the top matches the search card. The
+                  outer card stays overflow-visible so the TYPE filter
+                  dropdown can spill past its bottom edge; the stroke
+                  wrapper below owns the overflow-hidden + rounded corners
+                  it needs to clip the strip. */}
+              <div className="rounded-2xl flex-shrink-0 relative"
+                style={{ background: c.cardBg, border: `1px solid ${c.border}`, boxShadow: isDark ? "none" : "0 1px 3px rgba(15,23,42,0.04)" }}>
+                <div
+                  aria-hidden
+                  className="rounded-2xl overflow-hidden pointer-events-none"
+                  style={{ position: "absolute", top: -1, left: -1, right: -1, bottom: -1 }}
+                >
+                  <div
+                    style={{
+                      position: "absolute", top: 0, left: 0, right: 0, height: 4,
+                      background: "linear-gradient(90deg,#5C2ED4 0%,#A614C3 65%)",
+                    }}
+                  />
+                </div>
+                <div className="px-6 pt-5 pb-3 flex items-start justify-between gap-4">
+                  <div>
+                    <div className="text-[15px] font-semibold" style={{ color: c.text }}>All Endorsement Requests</div>
+                    <div className="text-[12.5px] mt-0.5" style={{ color: c.muted }}>Review the status of every request you&apos;ve submitted.</div>
+                  </div>
+                  <button onClick={() => setView("results")}
+                    className="flex-shrink-0 inline-flex items-center gap-1 text-[12px] font-semibold transition-opacity hover:opacity-70"
+                    style={{ fontFamily: FONT, color: "#A614C3" }}>
+                    View All Policies
+                    <ArrowUpRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                <div className="px-6 pb-4 flex items-center justify-between gap-4 flex-wrap" style={{ borderTop: `1px solid ${c.border}`, paddingTop: 12 }}>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {chips.map(k => {
+                      const active = reqStatusFilter === k;
+                      return (
+                        <button key={k} onClick={() => setReqStatusFilter(k)}
+                          className="inline-flex items-center gap-1.5 text-[12px] font-medium transition-colors"
+                          style={{
+                            fontFamily: FONT,
+                            padding: "6px 12px",
+                            borderRadius: 999,
+                            border: active ? "1px solid transparent" : `1px solid ${c.border}`,
+                            background: active
+                              ? `linear-gradient(${c.cardBg}, ${c.cardBg}) padding-box, linear-gradient(to right, #5C2ED4 0%, #A614C3 65%) border-box`
+                              : "transparent",
+                            color: active ? "#A614C3" : c.muted,
+                          }}
+                          onMouseEnter={e => { if (!active) e.currentTarget.style.background = c.hoverBg; }}
+                          onMouseLeave={e => { if (!active) e.currentTarget.style.background = "transparent"; }}>
+                          {k}
+                          <span className="text-[11px]" style={{ color: active ? "#A614C3" : c.sub }}>{countFor(k)}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="relative flex" style={{ minWidth: 280 }}>
+                    <Search className="w-3.5 h-3.5 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: c.muted }} />
+                    <input
+                      value={reqSearch}
+                      onChange={e => setReqSearch(e.target.value)}
+                      placeholder="Search Submission ID or Insured..."
+                      className="flex-1 outline-none w-full"
+                      style={{ fontFamily: FONT, background: c.inputBg, border: `1px solid ${c.border}`, borderRadius: 10, color: c.text, padding: "8px 14px 8px 34px", fontSize: 13 }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Results table */}
+              <div className="rounded-2xl overflow-hidden flex flex-col flex-1 min-h-0"
+                style={{ background: c.cardBg, border: `1px solid ${c.border}`, boxShadow: isDark ? "none" : "0 1px 3px rgba(15,23,42,0.04)" }}>
+                <div className="flex-1 min-h-0 overflow-y-auto">
+                  <div className="grid px-6 py-3 gap-4 sticky top-0 z-10"
+                    style={{ gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", borderBottom: `1px solid ${c.border}`, background: c.mutedBg }}>
+                    {HEADER_KEYS.map(h => {
+                      const isActive = reqSort.key === h.key;
+                      const isTypeCol = h.key === "type";
+                      // TYPE column matches the Policies table pattern:
+                      // single button + tiny down caret, dropdown with
+                      // search + Select All + checkbox list + Reset. No
+                      // separate sort arrows on this column.
+                      if (isTypeCol) {
+                        const filteredTypes = uniqueTypes.filter(t => !reqTypeSearch || t.toLowerCase().includes(reqTypeSearch.toLowerCase()));
+                        const allChecked = reqTypeFilter.size === uniqueTypes.length && uniqueTypes.length > 0;
+                        return (
+                          <div key={h.key} className="relative" ref={reqTypeRef} onClick={e => e.stopPropagation()}>
+                            <button onClick={() => setReqTypeOpen(o => !o)}
+                              className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider cursor-pointer select-none"
+                              style={{ fontFamily: FONT, color: reqTypeFilter.size > 0 ? "#A614C3" : c.muted }}>
+                              {h.label}
+                              <span className="inline-flex ml-1">
+                                <svg width="7" height="5" viewBox="0 0 7 5" fill="none">
+                                  <path d="M3.5 5L0.5 0H6.5L3.5 5Z" fill={reqTypeFilter.size > 0 ? "#A614C3" : c.sub} />
+                                </svg>
+                              </span>
+                            </button>
+                            {reqTypeOpen && (
+                              <div className="absolute top-full mt-1 z-30 rounded-xl shadow-lg overflow-hidden min-w-[240px]"
+                                style={{ background: c.cardBg, border: `1px solid ${c.border}`, left: 0, textTransform: "none", letterSpacing: "normal" }}>
+                                <div className="p-2" style={{ borderBottom: `1px solid ${c.border}` }}>
+                                  <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg"
+                                    style={{ background: isDark ? "rgba(255,255,255,0.05)" : "#F9FAFB", border: `1px solid ${c.border}` }}>
+                                    <Search className="w-3.5 h-3.5 flex-shrink-0" style={{ color: c.muted }} />
+                                    <input value={reqTypeSearch} onChange={e => setReqTypeSearch(e.target.value)} placeholder="Search type"
+                                      className="outline-none text-[12px] flex-1 bg-transparent" style={{ fontFamily: FONT, color: c.text }} />
+                                  </div>
+                                </div>
+                                <div className="px-3 py-2" style={{ borderBottom: `1px solid ${c.border}` }}>
+                                  <button className="flex items-center gap-2 text-[12px] w-full text-left" style={{ fontFamily: FONT, color: c.text }}
+                                    onClick={() => setReqTypeFilter(allChecked ? new Set() : new Set(uniqueTypes))}>
+                                    <div className="flex items-center justify-center w-4 h-4 rounded flex-shrink-0"
+                                      style={{ border: `1.5px solid ${c.border}`, background: c.cardBg }}>
+                                      {allChecked && (
+                                        <svg width="9" height="7" viewBox="0 0 9 7" fill="none"><path d="M1 3.5L3.5 6L8 1" stroke="#A614C3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                      )}
+                                    </div>
+                                    Select All
+                                  </button>
+                                </div>
+                                <div className="max-h-[180px] overflow-y-auto py-1">
+                                  {filteredTypes.map(t => {
+                                    const checked = reqTypeFilter.has(t);
+                                    return (
+                                      <button key={t} className="flex items-center gap-2 px-3 py-1.5 text-[12px] w-full text-left transition-colors"
+                                        style={{ fontFamily: FONT, color: c.text }}
+                                        onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+                                        onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                                        onClick={() => setReqTypeFilter(prev => { const next = new Set(prev); if (next.has(t)) next.delete(t); else next.add(t); return next; })}>
+                                        <div className="flex items-center justify-center w-4 h-4 rounded flex-shrink-0"
+                                          style={{ border: `1.5px solid ${c.border}`, background: c.cardBg }}>
+                                          {checked && (
+                                            <svg width="9" height="7" viewBox="0 0 9 7" fill="none"><path d="M1 3.5L3.5 6L8 1" stroke="#A614C3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                          )}
+                                        </div>
+                                        {t}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                                <button onClick={() => { setReqTypeFilter(new Set()); setReqTypeSearch(""); }}
+                                  className="w-full flex items-center justify-center gap-2 py-3 text-[12px] font-semibold transition-colors"
+                                  style={{ fontFamily: FONT, color: "#A614C3", background: "transparent", borderTop: `1px solid ${c.border}` }}
+                                  onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+                                  onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                                  Reset Filter
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      }
+                      return (
+                        <button key={h.key} onClick={() => cycleReqSort(h.key)}
+                          className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider cursor-pointer select-none text-left"
+                          style={{ fontFamily: FONT, color: c.muted, background: "transparent" }}>
+                          {h.label}
+                          <span className="inline-flex ml-0.5">
+                            <svg width="14" height="9" viewBox="0 0 14 9" fill="none" aria-hidden>
+                              <path d="M4 8V1M4 1L2 3M4 1L6 3" stroke={isActive && reqSort.dir === "asc" ? (isDark ? "#fff" : "#374151") : c.sub} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                              <path d="M10 1V8M10 8L8 6M10 8L12 6" stroke={isActive && reqSort.dir === "desc" ? (isDark ? "#fff" : "#374151") : c.sub} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {filtered.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
+                      <span className="inline-flex items-center justify-center mb-3"
+                        style={{ width: 44, height: 44, borderRadius: 9999, background: c.mutedBg, border: `1px solid ${c.border}` }}>
+                        <Clock className="w-5 h-5" style={{ color: c.muted }} />
+                      </span>
+                      <div className="text-[14px] font-semibold mb-1" style={{ fontFamily: FONT, color: c.text }}>
+                        {reqTypeFilter.size > 0
+                          ? (reqTypeFilter.size === 1
+                              ? `No ${Array.from(reqTypeFilter)[0]} requests`
+                              : "No requests match the selected types")
+                          : "No requests match"}
+                      </div>
+                      <div className="text-[12px] max-w-[360px]" style={{ fontFamily: FONT, color: c.muted }}>
+                        {reqTypeFilter.size > 0
+                          ? "None have been submitted in the last 12 months. Clear the filter to widen the view."
+                          : "Try clearing the search or switching the status filter."}
+                      </div>
+                      {(reqTypeFilter.size > 0 || reqSearch || reqStatusFilter !== "All") && (
+                        <button
+                          onClick={() => { setReqTypeFilter(new Set()); setReqSearch(""); setReqStatusFilter("All"); }}
+                          className="mt-4 inline-flex items-center gap-1.5 text-[12px] font-semibold px-3 py-1.5 rounded-lg transition-colors"
+                          style={{ fontFamily: FONT, color: "#A614C3", background: "transparent", border: `1px solid ${c.border}` }}
+                          onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+                          onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                          Clear all filters
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    filtered.slice((Math.min(reqPage, Math.max(1, Math.ceil(filtered.length / reqPerPage))) - 1) * reqPerPage, Math.min(reqPage, Math.max(1, Math.ceil(filtered.length / reqPerPage))) * reqPerPage).map((r, i, arr) => {
+                      const statusColor = r.status === "Processing"
+                        ? { color: "#B45309", bg: isDark ? "rgba(245,158,11,0.15)" : "rgba(245,158,11,0.12)" }
+                        : r.status === "Cancelled"
+                        ? { color: "#B91C1C", bg: isDark ? "rgba(239,68,68,0.15)" : "rgba(239,68,68,0.10)" }
+                        : { color: "#0F7A63", bg: isDark ? "rgba(115,201,183,0.15)" : "rgba(115,201,183,0.12)" };
+                      return (
+                        <button key={r.id} onClick={() => handleChooseRecent(r)}
+                          className="grid px-6 py-3.5 items-center gap-4 transition-colors w-full text-left"
+                          style={{ gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", borderBottom: i !== arr.length - 1 ? `1px solid ${c.border}` : "none", background: "transparent", fontFamily: FONT, cursor: "pointer" }}
+                          onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+                          onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                          <div className="text-[12px] font-semibold" style={{ color: c.text }}>{r.id}</div>
+                          <div className="text-[12px]" style={{ color: c.text }}>{r.insured}</div>
+                          <div className="text-[12px] truncate" style={{ color: c.muted }}>
+                        {r.type}
+                        {r.seed.selected.length === 2 && (
+                          <span style={{ color: c.sub }}> + 1 more</span>
+                        )}
+                        {r.seed.selected.length > 2 && (
+                          <span style={{ color: c.sub }}> /...</span>
+                        )}
+                      </div>
+                          <div className="text-[12px]" style={{ color: c.muted }}>{r.date}</div>
+                          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full w-fit"
+                            style={{ background: statusColor.bg }}>
+                            {r.status === "Processing"
+                              ? <Clock className="w-3 h-3" style={{ color: statusColor.color }} />
+                              : r.status === "Cancelled"
+                              ? <XCircle className="w-3 h-3" style={{ color: statusColor.color }} />
+                              : <CheckCircle2 className="w-3 h-3" style={{ color: statusColor.color }} />}
+                            <span className="text-[11px] font-semibold" style={{ color: statusColor.color }}>{r.status}</span>
+                          </div>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+
+                {/* Pagination footer — pinned at the bottom of the card,
+                    same shape as the search-results footer so both tables
+                    read as part of the same system. */}
+                {(() => {
+                  const totalReqPages = Math.max(1, Math.ceil(filtered.length / reqPerPage));
+                  const currentReqPage = Math.min(reqPage, totalReqPages);
+                  const reqRangeStart = filtered.length === 0 ? 0 : (currentReqPage - 1) * reqPerPage + 1;
+                  const reqRangeEnd = Math.min(currentReqPage * reqPerPage, filtered.length);
+                  const atFirst = currentReqPage === 1;
+                  const atLast = currentReqPage === totalReqPages;
+                  return (
+                    <div
+                      className="flex items-center justify-between gap-3 px-5 py-3 flex-wrap"
+                      style={{ borderTop: `1px solid ${c.border}` }}
+                      onClick={e => e.stopPropagation()}
+                    >
+                      <span className="text-[11.5px]" style={{ fontFamily: FONT, color: c.muted }}>
+                        {reqRangeStart} – {reqRangeEnd} of {filtered.length} {filtered.length === 1 ? "request" : "requests"}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <div className="relative">
+                          <button
+                            onClick={() => setReqPageSizeOpen(o => !o)}
+                            className="flex items-center gap-1.5 pl-2.5 pr-2 py-1.5 rounded-lg cursor-pointer transition-colors text-[11.5px] font-medium"
+                            style={{ fontFamily: FONT, background: c.cardBg, border: `1px solid ${c.border}`, color: c.text }}
+                            onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+                            onMouseLeave={e => (e.currentTarget.style.background = c.cardBg)}
+                          >
+                            1 – {reqPerPage}
+                            <ChevronDown className="w-3 h-3 transition-transform duration-200" style={{ opacity: 0.6, transform: reqPageSizeOpen ? "rotate(180deg)" : "rotate(0deg)" }} />
+                          </button>
+                          {reqPageSizeOpen && (
+                            <div
+                              className="absolute right-0 z-30 rounded-lg overflow-hidden py-1 min-w-[110px]"
+                              style={{
+                                bottom: "calc(100% + 6px)",
+                                background: c.cardBg,
+                                border: `1px solid ${c.border}`,
+                                boxShadow: "0 12px 28px rgba(15,23,42,0.10), 0 4px 8px rgba(15,23,42,0.04)",
+                              }}
+                            >
+                              {[10, 20, 50].map(n => {
+                                const active = reqPerPage === n;
+                                return (
+                                  <button
+                                    key={n}
+                                    onClick={() => { setReqPerPage(n); setReqPage(1); setReqPageSizeOpen(false); }}
+                                    className="w-full px-2.5 py-1.5 text-left text-[11.5px] flex items-center gap-2 cursor-pointer transition-colors"
+                                    style={{ fontFamily: FONT, color: active ? "#A614C3" : c.text, fontWeight: active ? 600 : 500, background: "transparent" }}
+                                    onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+                                    onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                                  >
+                                    <Check className="w-3 h-3 flex-shrink-0" style={{ opacity: active ? 1 : 0, color: "#A614C3" }} />
+                                    <span className="whitespace-nowrap">1 – {n}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => setReqPage(p => Math.max(1, p - 1))}
+                          disabled={atFirst}
+                          className="text-[11.5px] font-medium px-3 py-1.5 rounded-lg transition-colors"
+                          style={{ fontFamily: FONT, border: `1px solid ${c.border}`, color: c.text, background: c.cardBg, opacity: atFirst ? 0.5 : 1, cursor: atFirst ? "not-allowed" : "pointer" }}
+                          onMouseEnter={e => { if (!atFirst) e.currentTarget.style.background = c.hoverBg; }}
+                          onMouseLeave={e => (e.currentTarget.style.background = c.cardBg)}
+                        >
+                          Previous
+                        </button>
+                        <button
+                          onClick={() => setReqPage(p => Math.min(totalReqPages, p + 1))}
+                          disabled={atLast}
+                          className="text-[11.5px] font-medium px-3 py-1.5 rounded-lg transition-colors"
+                          style={{ fontFamily: FONT, border: `1px solid ${c.border}`, color: c.text, background: c.cardBg, opacity: atLast ? 0.5 : 1, cursor: atLast ? "not-allowed" : "pointer" }}
+                          onMouseEnter={e => { if (!atLast) e.currentTarget.style.background = c.hoverBg; }}
+                          onMouseLeave={e => (e.currentTarget.style.background = c.cardBg)}
+                        >
+                          Next
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          );
+        })()}
 
         {view === "success" && (
           <div className="rounded-2xl flex flex-col items-center justify-center text-center"
