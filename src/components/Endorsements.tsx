@@ -545,7 +545,7 @@ export default function Endorsements({ isDark, layout = "3col", skipSearch = fal
               // Match the Policies table exactly (px-5, plain-div headers,
               // truncating row cells, status pill flush with STATUS
               // header). Users see this as the same table shape.
-              const grid = "1.4fr 1.15fr 1.6fr 1.05fr 1.15fr 1.2fr 1.05fr";
+              const grid = "repeat(7, 1fr)";
               return (
                 <div>
                   <div className="grid px-5 py-3 gap-4"
@@ -577,9 +577,12 @@ export default function Endorsements({ isDark, layout = "3col", skipSearch = fal
                         <div className="text-[12px] truncate" style={{ fontFamily: FONT, color: c.text }}>{r.lob}</div>
                         <div className="text-[12px] truncate" style={{ fontFamily: FONT, color: c.text }} title={r.dba}>{r.dba}</div>
                         <div className="flex items-center">
+                          {/* Pull the pill left by border + horizontal
+                              padding + dot + gap so the status TEXT
+                              lines up with the STATUS header text. */}
                           <span
                             className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-[3px] rounded-md whitespace-nowrap"
-                            style={{ fontFamily: FONT, background: c.mutedBg, color: c.text, border: `1px solid ${c.border}` }}
+                            style={{ fontFamily: FONT, background: c.mutedBg, color: c.text, border: `1px solid ${c.border}`, marginLeft: -21 }}
                           >
                             <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: statusDot }} />
                             {r.status}
