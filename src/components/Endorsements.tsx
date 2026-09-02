@@ -545,7 +545,7 @@ export default function Endorsements({ isDark, layout = "3col", skipSearch = fal
               <div className="grid px-6 py-3 gap-4"
                 style={{ gridTemplateColumns: "1.3fr 1.2fr 1.6fr 1fr 1.4fr 0.9fr 0.9fr", borderBottom: `1px solid ${c.border}`, background: c.mutedBg }}>
                 {["Submission ID", "Policy Number", "Applicant", "LOB", "DBA", "Status", "Effective"].map(h => (
-                  <div key={h} className="text-[11px] font-bold uppercase tracking-wider"
+                  <div key={h} className="flex items-center text-[11px] font-bold uppercase tracking-wider text-left"
                     style={{ fontFamily: FONT, color: c.muted }}>{h}</div>
                 ))}
               </div>
@@ -572,9 +572,13 @@ export default function Endorsements({ isDark, layout = "3col", skipSearch = fal
                     <div className="text-[12px]" style={{ color: c.muted }}>{r.lob}</div>
                     <div className="text-[12px]" style={{ color: c.muted }}>{r.dba}</div>
                     <div className="flex items-center">
+                      {/* Pill is shifted left by border+padding+dot+gap
+                          so the STATUS text visually aligns with the
+                          left edge of the STATUS header cell. Matches
+                          the results-view table. */}
                       <span
                         className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-[3px] rounded-md whitespace-nowrap"
-                        style={{ fontFamily: FONT, background: c.mutedBg, color: c.text, border: `1px solid ${c.border}` }}
+                        style={{ fontFamily: FONT, background: c.mutedBg, color: c.text, border: `1px solid ${c.border}`, marginLeft: -21 }}
                       >
                         <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: statusDot }} />
                         {r.status}
