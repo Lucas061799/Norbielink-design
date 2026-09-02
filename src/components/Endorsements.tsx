@@ -555,7 +555,7 @@ export default function Endorsements({ isDark, layout = "3col", skipSearch = fal
                     style={{ gridTemplateColumns: grid, borderBottom: `1px solid ${c.border}`, background: c.mutedBg }}>
                     {["Submission ID", "Policy Number", "Applicant", "LOB", "DBA", "Status", "Effective"].map(h => (
                       <div key={h} className="text-[11px] font-bold uppercase tracking-wider"
-                        style={{ fontFamily: FONT, color: c.muted, textAlign: h === "Effective" ? "right" : "left" }}>{h}</div>
+                        style={{ fontFamily: FONT, color: c.muted, textAlign: h === "Effective" ? "right" : "left", paddingLeft: h === "Status" ? 10 : 0 }}>{h}</div>
                     ))}
                   </div>
                   {SEARCH_RESULTS.slice(0, 5).map((r, i, arr) => {
@@ -579,13 +579,14 @@ export default function Endorsements({ isDark, layout = "3col", skipSearch = fal
                         <div className="text-[12px] truncate" style={{ fontFamily: FONT, color: c.text }} title={r.applicant}>{r.applicant}</div>
                         <div className="text-[12px] truncate" style={{ fontFamily: FONT, color: c.text }}>{r.lob}</div>
                         <div className="text-[12px] truncate" style={{ fontFamily: FONT, color: c.text }} title={r.dba}>{r.dba}</div>
-                        <div className="flex items-center">
+                        <div className="flex items-center min-w-0" style={{ paddingLeft: 10 }}>
                           <span
-                            className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-[3px] rounded-md whitespace-nowrap"
+                            className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-[3px] rounded-md min-w-0 max-w-full"
                             style={{ fontFamily: FONT, background: c.mutedBg, color: c.text, border: `1px solid ${c.border}` }}
+                            title={r.status}
                           >
                             <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: statusDot }} />
-                            {r.status}
+                            <span className="truncate">{r.status}</span>
                           </span>
                         </div>
                         <div className="text-[12px] truncate text-right" style={{ fontFamily: FONT, color: c.text }}>{r.effective}</div>
@@ -610,14 +611,14 @@ export default function Endorsements({ isDark, layout = "3col", skipSearch = fal
               {/* Header + body share ONE scroll context so column widths stay
                   aligned when the body scrolls (Policies pattern). */}
               <div className="flex-1 min-h-0 overflow-y-auto">
-              <div className="grid px-6 py-3 gap-4 sticky top-0 z-10"
-                style={{ gridTemplateColumns: "1.3fr 1.2fr 1.6fr 1fr 1.4fr 0.9fr 0.9fr", borderBottom: `1px solid ${c.border}`, background: c.mutedBg }}>
+              <div className="grid px-5 py-3 gap-4 sticky top-0 z-10"
+                style={{ gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr 0.85fr 0.75fr", borderBottom: `1px solid ${c.border}`, background: c.mutedBg }}>
                 {["Submission ID", "Policy Number", "Applicant", "LOB", "DBA", "Status", "Effective"].map(h => {
                   const rightAlign = h === "Effective";
                   return (
                     <div key={h}
                       className={`flex items-center text-[11px] font-bold uppercase tracking-wider ${rightAlign ? "justify-end" : ""}`}
-                      style={{ fontFamily: FONT, color: c.muted }}
+                      style={{ fontFamily: FONT, color: c.muted, paddingLeft: h === "Status" ? 10 : 0 }}
                     >
                       {h}
                       <span className="inline-flex ml-0.5">
@@ -640,9 +641,9 @@ export default function Endorsements({ isDark, layout = "3col", skipSearch = fal
                                 :                                        "#EF4444"; // red — Cancelled
                 return (
                   <button key={r.submissionId + "-" + i} onClick={() => handleSelectResult(r)}
-                    className="grid px-6 py-3.5 items-center gap-4 transition-colors w-full text-left"
+                    className="grid px-5 py-3.5 items-center gap-4 transition-colors w-full text-left"
                     style={{
-                      gridTemplateColumns: "1.3fr 1.2fr 1.6fr 1fr 1.4fr 0.9fr 0.9fr",
+                      gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr 0.85fr 0.75fr",
                       borderBottom: i !== arr.length - 1 ? `1px solid ${c.border}` : "none",
                       background: "transparent",
                       fontFamily: FONT,
@@ -655,17 +656,19 @@ export default function Endorsements({ isDark, layout = "3col", skipSearch = fal
                     <div className="text-[12px]" style={{ color: c.text }}>{r.applicant}</div>
                     <div className="text-[12px]" style={{ color: c.muted }}>{r.lob}</div>
                     <div className="text-[12px]" style={{ color: c.muted }}>{r.dba}</div>
-                    <div className="flex items-center">
+                    <div className="flex items-center min-w-0" style={{ paddingLeft: 10 }}>
                       {/* Matches the Policies table status pill (neutral chip
-                          + border + colored dot + dark text). Pill sits flush
-                          with the STATUS column's left edge — same as
-                          Policies (no negative margin). */}
+                          + border + colored dot + dark text). Column has
+                          a small left inset so STATUS sits closer to the
+                          EFFECTIVE column; pill truncates with ... when
+                          the column is too narrow to fit. */}
                       <span
-                        className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-[3px] rounded-md whitespace-nowrap"
+                        className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-[3px] rounded-md min-w-0 max-w-full"
                         style={{ fontFamily: FONT, background: c.mutedBg, color: c.text, border: `1px solid ${c.border}` }}
+                        title={r.status}
                       >
                         <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: statusDot }} />
-                        {r.status}
+                        <span className="truncate">{r.status}</span>
                       </span>
                     </div>
                     <div className="text-[12px] text-right" style={{ color: c.muted }}>{r.effective}</div>
