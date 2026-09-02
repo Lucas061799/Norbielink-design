@@ -545,7 +545,10 @@ export default function Endorsements({ isDark, layout = "3col", skipSearch = fal
               // Match the Policies table exactly (px-5, plain-div headers,
               // truncating row cells, status pill flush with STATUS
               // header). Users see this as the same table shape.
-              const grid = "repeat(7, 1fr)";
+              // Status + Effective are narrower than the text columns
+              // so the pill and date sit close together instead of
+              // leaving a wide gap between them.
+              const grid = "1fr 1fr 1fr 1fr 1fr 0.85fr 0.75fr";
               return (
                 <div>
                   <div className="grid px-5 py-3 gap-4"
