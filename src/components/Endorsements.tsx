@@ -501,9 +501,9 @@ export default function Endorsements({ isDark, layout = "3col", skipSearch = fal
           {/* How it works */}
           <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
             {[
-              { icon: Search,        title: "1. Find your policy",   body: "Search by policy number, submission ID, or insured name — we'll pull it up instantly." },
-              { icon: ClipboardList, title: "2. Tell us what changed", body: "Add coverage, update limits, swap a vehicle — just describe the change and attach docs." },
-              { icon: Send,          title: "3. We route it",         body: "Once you submit, our team reviews your request and routes it to the right carrier team." },
+              { icon: Search,        title: "1. Find Your Policy",     body: "Search by policy number, submission ID, or insured name — we'll pull it up instantly." },
+              { icon: ClipboardList, title: "2. Tell Us What Changed", body: "Add coverage, update limits, swap a vehicle — just describe the change and attach docs." },
+              { icon: Send,          title: "3. We Route It",          body: "Once you submit, our team reviews your request and routes it to the right carrier team." },
             ].map(step => {
               const Icon = step.icon;
               return (
@@ -524,74 +524,67 @@ export default function Endorsements({ isDark, layout = "3col", skipSearch = fal
             })}
           </div>
 
-          {/* Recent endorsement requests */}
-          <div className="rounded-2xl"
+          {/* Recent Policies — a small preview of the same policies table that
+              appears on the results view. Clicking a row opens the chooser
+              modal (New Request / View Existing). Recent Endorsement
+              Requests feed is deferred to Phase 2. */}
+          <div className="rounded-2xl overflow-hidden"
             style={{ background: c.cardBg, border: `1px solid ${c.border}`, boxShadow: isDark ? "none" : "0 1px 3px rgba(15,23,42,0.04)" }}>
             <div className="flex items-center justify-between px-6 py-4"
               style={{ borderBottom: `1px solid ${c.border}` }}>
               <div className="flex items-center gap-2">
                 <Clock className="w-4 h-4" style={{ color: c.muted }} />
-                <span className="text-[14px] font-semibold" style={{ fontFamily: FONT, color: c.text }}>Recent endorsement requests</span>
+                <span className="text-[14px] font-semibold" style={{ fontFamily: FONT, color: c.text }}>Recent Policies</span>
               </div>
               <button
-                onClick={() => setView("all-requests")}
+                onClick={() => setView("results")}
                 className="text-[12px] font-semibold transition-opacity hover:opacity-70"
                 style={{ fontFamily: FONT, color: "#A614C3" }}>View all</button>
             </div>
-            {recentRequests.length === 0 ? (
-              <div className="flex flex-col items-center justify-center px-6 py-14 text-center">
-                <span className="inline-flex items-center justify-center mb-3"
-                  style={{ width: 44, height: 44, borderRadius: 9999, background: c.mutedBg, border: `1px solid ${c.border}` }}>
-                  <Clock className="w-5 h-5" style={{ color: c.muted }} />
-                </span>
-                <div className="text-[14px] font-semibold mb-1" style={{ fontFamily: FONT, color: c.text }}>No recent endorsement requests</div>
-                <div className="text-[12px] max-w-[360px]" style={{ fontFamily: FONT, color: c.muted }}>
-                  Requests you submit will show up here so you can track their status at a glance.
-                </div>
+            <div>
+              <div className="grid px-6 py-3 gap-4"
+                style={{ gridTemplateColumns: "1.3fr 1.2fr 1.6fr 1fr 1.4fr 0.9fr 0.9fr", borderBottom: `1px solid ${c.border}`, background: c.mutedBg }}>
+                {["Submission ID", "Policy Number", "Applicant", "LOB", "DBA", "Status", "Effective"].map(h => (
+                  <div key={h} className="text-[11px] font-bold uppercase tracking-wider"
+                    style={{ fontFamily: FONT, color: c.muted }}>{h}</div>
+                ))}
               </div>
-            ) : (
-              <div>
-                <div className="grid px-6 py-3 gap-4"
-                  style={{ gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", borderBottom: `1px solid ${c.border}`, background: c.mutedBg }}>
-                  {["Submission ID", "Line of Business", "Type", "Submitted", "Status"].map(h => (
-                    <div key={h} className="text-[11px] font-bold uppercase tracking-wider"
-                      style={{ fontFamily: FONT, color: c.muted }}>{h}</div>
-                  ))}
-                </div>
-                {recentRequests.slice(0, 5).map((r, i, arr) => {
-                  const statusColor = r.status === "Processing"
-                    ? { color: "#B45309", bg: isDark ? "rgba(245,158,11,0.15)" : "rgba(245,158,11,0.12)" }
-                    : { color: "#0F7A63", bg: isDark ? "rgba(115,201,183,0.15)" : "rgba(115,201,183,0.12)" };
-                  return (
-                    <button key={r.id} onClick={() => handleChooseRecent(r)}
-                      className="grid px-6 py-3.5 items-center gap-4 transition-colors w-full text-left"
-                      style={{ gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", borderBottom: i !== arr.length - 1 ? `1px solid ${c.border}` : "none", background: "transparent", fontFamily: FONT, cursor: "pointer" }}
-                      onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
-                      onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-                      <div className="text-[12px] font-semibold" style={{ color: c.text }}>{r.id}</div>
-                      <div className="text-[12px]" style={{ color: c.text }}>{r.lob}</div>
-                      <div className="text-[12px] truncate" style={{ color: c.muted }}>
-                        {r.type}
-                        {r.seed.selected.length === 2 && (
-                          <span style={{ color: c.sub }}> + 1 more</span>
-                        )}
-                        {r.seed.selected.length > 2 && (
-                          <span style={{ color: c.sub }}> /...</span>
-                        )}
-                      </div>
-                      <div className="text-[12px]" style={{ color: c.muted }}>{r.date}</div>
-                      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full w-fit"
-                        style={{ background: statusColor.bg }}>
-                        {r.status === "Processing"
-                          ? <Clock className="w-3 h-3" style={{ color: statusColor.color }} />
-                          : <CheckCircle2 className="w-3 h-3" style={{ color: statusColor.color }} />}
-                        <span className="text-[11px] font-semibold" style={{ color: statusColor.color }}>{r.status}</span>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+              {SEARCH_RESULTS.slice(0, 5).map((r, i, arr) => {
+                const statusDot = r.status === "Bound"                 ? "#73C9B7"
+                                : r.status === "Incomplete"            ? "#F59E0B"
+                                : r.status === "Submission Incomplete" ? "#F59E0B"
+                                :                                        "#EF4444";
+                return (
+                  <button key={r.submissionId + "-" + i} onClick={() => handleSelectResult(r)}
+                    className="grid px-6 py-3.5 items-center gap-4 transition-colors w-full text-left"
+                    style={{
+                      gridTemplateColumns: "1.3fr 1.2fr 1.6fr 1fr 1.4fr 0.9fr 0.9fr",
+                      borderBottom: i !== arr.length - 1 ? `1px solid ${c.border}` : "none",
+                      background: "transparent",
+                      fontFamily: FONT,
+                      cursor: "pointer",
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+                    onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                    <div className="text-[12px] font-semibold" style={{ color: c.text }}>{r.submissionId}</div>
+                    <div className="text-[12px]" style={{ color: c.text }}>{r.policyNumber}</div>
+                    <div className="text-[12px]" style={{ color: c.text }}>{r.applicant}</div>
+                    <div className="text-[12px]" style={{ color: c.muted }}>{r.lob}</div>
+                    <div className="text-[12px]" style={{ color: c.muted }}>{r.dba}</div>
+                    <div className="flex items-center">
+                      <span
+                        className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-[3px] rounded-md whitespace-nowrap"
+                        style={{ fontFamily: FONT, background: c.mutedBg, color: c.text, border: `1px solid ${c.border}` }}
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: statusDot }} />
+                        {r.status}
+                      </span>
+                    </div>
+                    <div className="text-[12px]" style={{ color: c.muted }}>{r.effective}</div>
+                  </button>
+                );
+              })}
+            </div>
           </div>
           </>)}
 
