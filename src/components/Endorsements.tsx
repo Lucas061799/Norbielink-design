@@ -67,10 +67,10 @@ type RecentSeed = {
   values: Record<string, Record<number, string>>;
   submittedOn?: string;
 };
-type RecentRequest = { id: string; insured: string; type: string; date: string; status: string; seed: RecentSeed };
+type RecentRequest = { id: string; insured: string; lob: string; type: string; date: string; status: string; seed: RecentSeed };
 const recentRequests: RecentRequest[] = [
   {
-    id: "VIC00004421", insured: "Acme Logistics", type: "Class Code / Payroll", date: "Apr 18, 2026", status: "Processing",
+    id: "VIC00004421", insured: "Acme Logistics", lob: "Worker's Comp", type: "Class Code / Payroll", date: "Apr 18, 2026", status: "Processing",
     seed: {
       submittedOn: "Apr 18, 2026",
       selected: ["classcode"],
@@ -84,7 +84,7 @@ const recentRequests: RecentRequest[] = [
     },
   },
   {
-    id: "VIC00004387", insured: "Sunrise Bakery", type: "Change Address", date: "Apr 12, 2026", status: "Completed",
+    id: "VIC00004387", insured: "Sunrise Bakery", lob: "General Liability", type: "Change Address", date: "Apr 12, 2026", status: "Completed",
     seed: {
       submittedOn: "Apr 12, 2026",
       selected: ["mailing"],
@@ -94,7 +94,7 @@ const recentRequests: RecentRequest[] = [
     },
   },
   {
-    id: "VIC00004356", insured: "Metro Construction", type: "Named Insured / DBA", date: "Apr 08, 2026", status: "Completed",
+    id: "VIC00004356", insured: "Metro Construction", lob: "Worker's Comp", type: "Named Insured / DBA", date: "Apr 08, 2026", status: "Completed",
     seed: {
       submittedOn: "Apr 08, 2026",
       selected: ["namedinsured"],
@@ -109,7 +109,7 @@ const recentRequests: RecentRequest[] = [
     },
   },
   {
-    id: "VIC00004329", insured: "Harbor Marine Co.", type: "Update Limits", date: "Mar 30, 2026", status: "Completed",
+    id: "VIC00004329", insured: "Harbor Marine Co.", lob: "Commercial Auto", type: "Update Limits", date: "Mar 30, 2026", status: "Completed",
     seed: {
       submittedOn: "Mar 30, 2026",
       selected: ["limits"],
@@ -119,7 +119,7 @@ const recentRequests: RecentRequest[] = [
     },
   },
   {
-    id: "VIC00004298", insured: "Cedar Ridge Roofing", type: "Waiver of Subrogation", date: "Mar 22, 2026", status: "Processing",
+    id: "VIC00004298", insured: "Cedar Ridge Roofing", lob: "Worker's Comp", type: "Waiver of Subrogation", date: "Mar 22, 2026", status: "Processing",
     seed: {
       submittedOn: "Mar 22, 2026",
       selected: ["waiver"],
@@ -129,7 +129,7 @@ const recentRequests: RecentRequest[] = [
     },
   },
   {
-    id: "VIC00004271", insured: "Northwind Electric", type: "Officer Exclusion / Inclusion", date: "Mar 15, 2026", status: "Completed",
+    id: "VIC00004271", insured: "Northwind Electric", lob: "Worker's Comp", type: "Officer Exclusion / Inclusion", date: "Mar 15, 2026", status: "Completed",
     seed: {
       submittedOn: "Mar 15, 2026",
       selected: ["officer"],
@@ -139,7 +139,7 @@ const recentRequests: RecentRequest[] = [
     },
   },
   {
-    id: "VIC00004244", insured: "Peak Landscaping", type: "Cancellation Request", date: "Mar 08, 2026", status: "Cancelled",
+    id: "VIC00004244", insured: "Peak Landscaping", lob: "General Liability", type: "Cancellation Request", date: "Mar 08, 2026", status: "Cancelled",
     seed: {
       submittedOn: "Mar 08, 2026",
       selected: ["cancel"],
@@ -149,7 +149,7 @@ const recentRequests: RecentRequest[] = [
     },
   },
   {
-    id: "VIC00004219", insured: "Skyline Freight", type: "FEIN", date: "Feb 28, 2026", status: "Completed",
+    id: "VIC00004219", insured: "Skyline Freight", lob: "Commercial Auto", type: "FEIN", date: "Feb 28, 2026", status: "Completed",
     seed: {
       submittedOn: "Feb 28, 2026",
       selected: ["fein"],
@@ -159,7 +159,7 @@ const recentRequests: RecentRequest[] = [
     },
   },
   {
-    id: "VIC00004202", insured: "Blue Harbor Diner", type: "Reinstatement Request", date: "Feb 20, 2026", status: "Completed",
+    id: "VIC00004202", insured: "Blue Harbor Diner", lob: "General Liability", type: "Reinstatement Request", date: "Feb 20, 2026", status: "Completed",
     seed: {
       submittedOn: "Feb 20, 2026",
       selected: ["reinstate"],
@@ -169,7 +169,7 @@ const recentRequests: RecentRequest[] = [
     },
   },
   {
-    id: "VIC00004187", insured: "Ironclad Fabrication", type: "XMOD", date: "Feb 12, 2026", status: "Completed",
+    id: "VIC00004187", insured: "Ironclad Fabrication", lob: "Worker's Comp", type: "XMOD", date: "Feb 12, 2026", status: "Completed",
     seed: {
       submittedOn: "Feb 12, 2026",
       selected: ["xmod"],
@@ -213,7 +213,7 @@ export default function Endorsements({ isDark, layout = "3col", skipSearch = fal
   const [reqSearch, setReqSearch] = useState("");
   // Column sort for the All Requests table. Clicking a header cycles
   // asc → desc → cleared so users can quickly reorder by any column.
-  type ReqSortKey = "id" | "insured" | "type" | "date" | "status";
+  type ReqSortKey = "id" | "lob" | "type" | "date" | "status";
   const [reqSort, setReqSort] = useState<{ key: ReqSortKey | null; dir: "asc" | "desc" }>({ key: "date", dir: "desc" });
   const cycleReqSort = (key: ReqSortKey) => {
     setReqSort(cur => {
@@ -553,7 +553,7 @@ export default function Endorsements({ isDark, layout = "3col", skipSearch = fal
               <div>
                 <div className="grid px-6 py-3 gap-4"
                   style={{ gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", borderBottom: `1px solid ${c.border}`, background: c.mutedBg }}>
-                  {["Submission ID", "Insured", "Type", "Submitted", "Status"].map(h => (
+                  {["Submission ID", "Line of Business", "Type", "Submitted", "Status"].map(h => (
                     <div key={h} className="text-[11px] font-bold uppercase tracking-wider"
                       style={{ fontFamily: FONT, color: c.muted }}>{h}</div>
                   ))}
@@ -569,7 +569,7 @@ export default function Endorsements({ isDark, layout = "3col", skipSearch = fal
                       onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
                       onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
                       <div className="text-[12px] font-semibold" style={{ color: c.text }}>{r.id}</div>
-                      <div className="text-[12px]" style={{ color: c.text }}>{r.insured}</div>
+                      <div className="text-[12px]" style={{ color: c.text }}>{r.lob}</div>
                       <div className="text-[12px] truncate" style={{ color: c.muted }}>
                         {r.type}
                         {r.seed.selected.length === 2 && (
@@ -867,7 +867,7 @@ export default function Endorsements({ isDark, layout = "3col", skipSearch = fal
             if (reqTypeFilter.size > 0 && !reqTypeFilter.has(r.type)) return false;
             const q = reqSearch.trim().toLowerCase();
             if (!q) return true;
-            return r.id.toLowerCase().includes(q) || r.insured.toLowerCase().includes(q);
+            return r.id.toLowerCase().includes(q) || r.lob.toLowerCase().includes(q);
           });
           // Full catalog for the filter dropdown so users can pick any
           // endorsement type — not just the ones present in the current
@@ -885,7 +885,7 @@ export default function Endorsements({ isDark, layout = "3col", skipSearch = fal
           });
           const HEADER_KEYS: { label: string; key: ReqSortKey }[] = [
             { label: "Submission ID", key: "id" },
-            { label: "Insured",       key: "insured" },
+            { label: "Line of Business", key: "lob" },
             { label: "Type",          key: "type" },
             { label: "Submitted",     key: "date" },
             { label: "Status",        key: "status" },
@@ -968,7 +968,7 @@ export default function Endorsements({ isDark, layout = "3col", skipSearch = fal
                     <input
                       value={reqSearch}
                       onChange={e => setReqSearch(e.target.value)}
-                      placeholder="Search Submission ID or Insured..."
+                      placeholder="Search Submission ID or Line of Business..."
                       className="flex-1 outline-none w-full"
                       style={{ fontFamily: FONT, background: c.inputBg, border: `1px solid ${c.border}`, borderRadius: 10, color: c.text, padding: "8px 14px 8px 34px", fontSize: 13 }}
                     />
@@ -1117,7 +1117,7 @@ export default function Endorsements({ isDark, layout = "3col", skipSearch = fal
                           onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
                           onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
                           <div className="text-[12px] font-semibold" style={{ color: c.text }}>{r.id}</div>
-                          <div className="text-[12px]" style={{ color: c.text }}>{r.insured}</div>
+                          <div className="text-[12px]" style={{ color: c.text }}>{r.lob}</div>
                           <div className="text-[12px] truncate" style={{ color: c.muted }}>
                         {r.type}
                         {r.seed.selected.length === 2 && (

@@ -6191,7 +6191,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                           style={{ ...font, border: `1px solid ${isDark ? "rgba(255,255,255,0.10)" : "#E5E7EB"}`, color: c.text }}
                           onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
                           onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-                          Edit ITC Instead
+                          Edit Record Instead
                         </button>
                         <button
                           onClick={() => {
