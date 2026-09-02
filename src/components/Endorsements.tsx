@@ -580,12 +580,9 @@ export default function Endorsements({ isDark, layout = "3col", skipSearch = fal
                         <div className="text-[12px] truncate" style={{ fontFamily: FONT, color: c.text }}>{r.lob}</div>
                         <div className="text-[12px] truncate" style={{ fontFamily: FONT, color: c.text }} title={r.dba}>{r.dba}</div>
                         <div className="flex items-center">
-                          {/* Pull the pill left by border + horizontal
-                              padding + dot + gap so the status TEXT
-                              lines up with the STATUS header text. */}
                           <span
                             className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-[3px] rounded-md whitespace-nowrap"
-                            style={{ fontFamily: FONT, background: c.mutedBg, color: c.text, border: `1px solid ${c.border}`, marginLeft: -21 }}
+                            style={{ fontFamily: FONT, background: c.mutedBg, color: c.text, border: `1px solid ${c.border}` }}
                           >
                             <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: statusDot }} />
                             {r.status}
@@ -616,9 +613,10 @@ export default function Endorsements({ isDark, layout = "3col", skipSearch = fal
               <div className="grid px-6 py-3 gap-4 sticky top-0 z-10"
                 style={{ gridTemplateColumns: "1.3fr 1.2fr 1.6fr 1fr 1.4fr 0.9fr 0.9fr", borderBottom: `1px solid ${c.border}`, background: c.mutedBg }}>
                 {["Submission ID", "Policy Number", "Applicant", "LOB", "DBA", "Status", "Effective"].map(h => {
+                  const rightAlign = h === "Effective";
                   return (
                     <div key={h}
-                      className="flex items-center text-[11px] font-bold uppercase tracking-wider"
+                      className={`flex items-center text-[11px] font-bold uppercase tracking-wider ${rightAlign ? "justify-end" : ""}`}
                       style={{ fontFamily: FONT, color: c.muted }}
                     >
                       {h}
@@ -659,18 +657,18 @@ export default function Endorsements({ isDark, layout = "3col", skipSearch = fal
                     <div className="text-[12px]" style={{ color: c.muted }}>{r.dba}</div>
                     <div className="flex items-center">
                       {/* Matches the Policies table status pill (neutral chip
-                          + border + colored dot + dark text). Shifted -21px
-                          so the STATUS text sits flush with the header text,
-                          not offset by the pill's border+padding+dot+gap. */}
+                          + border + colored dot + dark text). Pill sits flush
+                          with the STATUS column's left edge — same as
+                          Policies (no negative margin). */}
                       <span
                         className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-[3px] rounded-md whitespace-nowrap"
-                        style={{ fontFamily: FONT, background: c.mutedBg, color: c.text, border: `1px solid ${c.border}`, marginLeft: -21 }}
+                        style={{ fontFamily: FONT, background: c.mutedBg, color: c.text, border: `1px solid ${c.border}` }}
                       >
                         <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: statusDot }} />
                         {r.status}
                       </span>
                     </div>
-                    <div className="text-[12px]" style={{ color: c.muted }}>{r.effective}</div>
+                    <div className="text-[12px] text-right" style={{ color: c.muted }}>{r.effective}</div>
                   </button>
                 );
               })}
