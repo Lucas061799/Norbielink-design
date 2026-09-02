@@ -552,7 +552,7 @@ export default function Endorsements({ isDark, layout = "3col", skipSearch = fal
                     style={{ gridTemplateColumns: grid, borderBottom: `1px solid ${c.border}`, background: c.mutedBg }}>
                     {["Submission ID", "Policy Number", "Applicant", "LOB", "DBA", "Status", "Effective"].map(h => (
                       <div key={h} className="text-[11px] font-bold uppercase tracking-wider"
-                        style={{ fontFamily: FONT, color: c.muted }}>{h}</div>
+                        style={{ fontFamily: FONT, color: c.muted, textAlign: h === "Effective" ? "right" : "left" }}>{h}</div>
                     ))}
                   </div>
                   {SEARCH_RESULTS.slice(0, 5).map((r, i, arr) => {
@@ -585,7 +585,7 @@ export default function Endorsements({ isDark, layout = "3col", skipSearch = fal
                             {r.status}
                           </span>
                         </div>
-                        <div className="text-[12px] truncate" style={{ fontFamily: FONT, color: c.text }}>{r.effective}</div>
+                        <div className="text-[12px] truncate text-right" style={{ fontFamily: FONT, color: c.text }}>{r.effective}</div>
                       </button>
                     );
                   })}
