@@ -7,7 +7,7 @@ import EndorsementBoard, { type EndorsementKey, ALL_ENDORSEMENT_TYPE_LABELS } fr
 const FONT = "var(--font-montserrat), Montserrat, sans-serif";
 
 type SearchBy = "Select" | "Policy Number" | "DBA" | "Applicant Name" | "Bond Number";
-type View = "search" | "results" | "all-requests" | "form" | "success";
+type View = "search" | "results" | "all-requests" | "existing" | "form" | "success";
 
 // Mock results table returned after a "find a policy" search. Static list so
 // every search resolves to the same set — this is a design mock, not a real
@@ -180,6 +180,19 @@ const recentRequests: RecentRequest[] = [
   },
 ];
 
+// Existing endorsement requests scoped to a specific policy. Mock uses
+// a hand-picked mapping so a few of the highly visible top-of-list
+// policies actually surface prior requests; every other policy falls
+// through to the "No Data Found" empty state (matches production).
+const EXISTING_BY_SUBMISSION: Record<string, string[]> = {
+  "VIC00003362":     ["VIC00004421", "VIC00004387"],       // Byrne Insurance Group
+  "QMWC0750104-E47": ["VIC00004356", "VIC00004329"],       // SB DE Production Test 2 LLC
+  "QMWC0754121-E48": ["VIC00004298"],                       // SB Test 2 LLC
+  "QMWC0620011-E1":  ["VIC00004202"],                       // Sunrise Bakery LLC
+  "QMWC0612344-E1":  ["VIC00004329", "VIC00004244"],       // Harbor Marine Co.
+  "VIC00003401":     ["VIC00004421", "VIC00004271", "VIC00004187"], // Acme Logistics LLC
+};
+
 export default function Endorsements({ isDark, layout = "3col", skipSearch = false }: { isDark: boolean; layout?: "3col" | "2col"; skipSearch?: boolean }) {
   // When `skipSearch` is on, land directly on the intake with the first
   // sample policy pre-selected. Used by the Design Option variants so
@@ -308,17 +321,22 @@ export default function Endorsements({ isDark, layout = "3col", skipSearch = fal
     setView("form");
   };
 
-  // "View Existing" — open the intake surface but jump straight to its
-  // submitted-recap view. Mock seeds a sample Contact Info change so the
-  // recap has something to show; a real backend hookup would hydrate with
-  // the previously-submitted request's data.
+  // "View Existing" — if the policy has any prior submitted requests
+  // on file, jump straight into the submitted-recap view (seeded
+  // with the most recent request). Otherwise land on the "existing"
+  // surface which shows the "No Data Found" empty state.
   const handleChooseExisting = () => {
     if (pendingResult) setIntakePolicy(pendingResult);
-    // Chooser path uses the built-in demo batch, not a per-row seed.
-    setSubmittedSeed(null);
-    setViewingExisting(true);
     setChooseOpen(false);
-    setView("form");
+    const ids = EXISTING_BY_SUBMISSION[pendingResult?.submissionId ?? ""] ?? [];
+    const first = ids.map(id => recentRequests.find(r => r.id === id)).find(Boolean);
+    if (first) {
+      setSubmittedSeed(first.seed);
+      setViewingExisting(true);
+      setView("form");
+    } else {
+      setView("existing");
+    }
   };
 
   // Row click on the Recent card: same landing as View Existing but the
@@ -340,7 +358,7 @@ export default function Endorsements({ isDark, layout = "3col", skipSearch = fal
     // If the form was opened from a Recent-card row (submittedSeed set),
     // return to the All Requests view instead of the policy search — the
     // user is browsing their own submissions, not searching for a policy.
-    if (submittedSeed) { setView("all-requests"); return; }
+    if (submittedSeed) { setView("results"); return; }
     // Drop back on the results table so the user can pick another policy
     // without re-typing their search.
     setView(searchValue.trim() ? "results" : "search");
@@ -391,14 +409,14 @@ export default function Endorsements({ isDark, layout = "3col", skipSearch = fal
 
       {view !== "form" && (
       <div
-        className={view === "results" || view === "all-requests" ? "flex-1 min-h-0 flex flex-col" : "flex-1 min-h-0 overflow-y-auto"}
-        style={view === "results" || view === "all-requests" ? undefined : { paddingBottom: 48 }}
+        className={view === "results" || view === "all-requests" || view === "existing" ? "flex-1 min-h-0 flex flex-col" : "flex-1 min-h-0 overflow-y-auto"}
+        style={view === "results" || view === "all-requests" || view === "existing" ? undefined : { paddingBottom: 48 }}
       >
-        {(view === "search" || view === "results") && (
-          <div className={view === "results" ? "flex flex-col gap-3 flex-1 min-h-0" : "flex flex-col gap-6"}>
-          {view === "results" && (
+        {(view === "search" || view === "results" || view === "existing") && (
+          <div className={(view === "results" || view === "existing") ? "flex flex-col gap-3 flex-1 min-h-0" : "flex flex-col gap-6"}>
+          {(view === "results" || view === "existing") && (
             <div className="flex-shrink-0">
-              <button onClick={() => setView("search")}
+              <button onClick={() => setView(view === "existing" ? "results" : "search")}
                 className="inline-flex items-center gap-1.5 text-[12.5px] font-medium transition-colors"
                 style={{ fontFamily: FONT, color: c.muted }}
                 onMouseEnter={e => (e.currentTarget.style.color = c.text)}
@@ -434,8 +452,8 @@ export default function Endorsements({ isDark, layout = "3col", skipSearch = fal
                 }}
               />
             </div>
-            <div className={view === "results" ? "px-6 py-4" : "px-8 py-8"}>
-              {view !== "results" && (
+            <div className={(view === "results" || view === "existing") ? "px-6 py-4" : "px-8 py-8"}>
+              {view === "search" && (
                 <>
                   <div className="text-[15px] font-semibold mb-1" style={{ color: c.text }}>Find a Policy to Endorse</div>
                   <div className="text-[13px] mb-6" style={{ color: c.muted }}>Search by policy number, submission ID, or insured name.</div>
@@ -776,6 +794,40 @@ export default function Endorsements({ isDark, layout = "3col", skipSearch = fal
               })()}
             </div>
           </>)}
+          {view === "existing" && intakePolicy && (
+            // Landed on the existing surface with no prior requests
+            // for this policy — show the empty state. Policies that
+            // DO have prior requests jump straight to the seeded
+            // recap in handleChooseExisting, so we never render a
+            // list of them here.
+            <div className="rounded-2xl overflow-hidden flex flex-col flex-1 min-h-0"
+              style={{ background: c.cardBg, border: `1px solid ${c.border}`, boxShadow: isDark ? "none" : "0 1px 3px rgba(15,23,42,0.04)" }}>
+              <div className="flex-1 min-h-0 overflow-y-auto">
+                <div className="grid px-5 py-3 gap-4 sticky top-0 z-10"
+                  style={{ gridTemplateColumns: "1fr 1fr 1.2fr 1fr 0.9fr 0.7fr", borderBottom: `1px solid ${c.border}`, background: c.mutedBg }}>
+                  {["Request Record #", "Endorsement Request #", "Endorsement Type", "Date Submitted", "Status", "Actions"].map(h => (
+                    <div key={h} className="text-[11px] font-bold uppercase tracking-wider"
+                      style={{ fontFamily: FONT, color: c.muted }}>{h}</div>
+                  ))}
+                </div>
+                <div className="flex flex-col items-center justify-center py-16 px-6 text-center gap-2">
+                  <span className="inline-flex items-center justify-center"
+                    style={{ width: 44, height: 44, borderRadius: 9999, background: c.mutedBg, border: `1px solid ${c.border}` }}>
+                    <Clock className="w-5 h-5" style={{ color: c.muted }} />
+                  </span>
+                  <div className="text-[13px] font-semibold" style={{ fontFamily: FONT, color: c.text }}>No Data Found</div>
+                  <div className="text-[12px] max-w-[380px]" style={{ fontFamily: FONT, color: c.muted, lineHeight: 1.5 }}>
+                    There are no endorsement requests on file for this policy yet.
+                  </div>
+                  <button onClick={() => { setViewingExisting(false); setSubmittedSeed(null); setView("form"); }}
+                    className="mt-3 inline-flex items-center gap-1.5 rounded-lg text-[12px] font-semibold transition-opacity hover:opacity-90"
+                    style={{ fontFamily: FONT, color: "#fff", background: "linear-gradient(90deg,#5C2ED4 0%,#A614C3 65%)", border: "none", padding: "8px 14px", cursor: "pointer" }}>
+                    Start a new request
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
           </div>
         )}
 
