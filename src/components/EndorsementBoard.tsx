@@ -604,6 +604,15 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
   };
   const isForcedRequired = (k: EndorsementKey, i: number) =>
     k === "waiver" && waiverType() === "Specific" && isWaiverExtra(i);
+  // Whether the Entity / Location exposure section (Operations +
+  // class-code grid) is currently required. Add mode always requires
+  // it; Remove/Edit modes only require it when the user checks the
+  // "Any change in exposure or operations..." checkbox.
+  const entityExposureRequired   = () => (!isEntityRemove() && !isEntityEdit()) || entityExposureChange;
+  const locationExposureRequired = () => (!locationRemoveMode() && !isLocationEdit()) || locationExposureChange;
+  // Ownership grid is always required in Add mode; in Remove/Edit
+  // it only becomes required when "Is ownership changing?" is on.
+  const entityOwnershipRequired  = () => (!isEntityRemove() && !isEntityEdit()) || entityOwnershipChanging;
   const doneCount = (k: EndorsementKey) => {
     const base = CARD_META[k].fields.reduce((n, f, i) => {
       if (isHiddenField(k, i)) return n;
@@ -611,8 +620,17 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
       return n + (req && (values[k]?.[i] ?? "").trim() ? 1 : 0);
     }, 0);
     let extra = 0;
-    if (isCcCard(k) && !(k === "location" && locationRemoveMode()) && ccHasValidRow(k)) extra += 1;
-    if (k === "entity" && entityHasValidOwner()) extra += 1;
+    // Entity: Operations (idx 11) is manually rendered outside the
+    // flat map, so credit it here instead of in `base` when the
+    // exposure section is required and the textarea is filled.
+    if (k === "entity" && entityExposureRequired() && (values.entity?.[11] ?? "").trim()) extra += 1;
+    if (isCcCard(k)) {
+      const ccRequired = k === "entity"   ? entityExposureRequired()
+                       : k === "location" ? locationExposureRequired()
+                       :                    true;
+      if (ccRequired && ccHasValidRow(k)) extra += 1;
+    }
+    if (k === "entity" && entityOwnershipRequired() && entityHasValidOwner()) extra += 1;
     const oneOf = AT_LEAST_ONE[k];
     if (oneOf && hasAnyOf(k, oneOf)) extra += 1;
     return base + extra;
@@ -620,8 +638,16 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
   const requiredCount = (k: EndorsementKey) => {
     const base = CARD_META[k].fields.filter((f, i) => (!f.optional || isForcedRequired(k, i)) && !isHiddenField(k, i)).length;
     let extra = 0;
-    if (isCcCard(k) && !(k === "location" && locationRemoveMode())) extra += 1;  // class-code grid
-    if (k === "entity") extra += 1;      // ownership grid
+    // Entity Operations (idx 11) is hidden from the flat map but is
+    // required whenever the exposure section is opened.
+    if (k === "entity" && entityExposureRequired()) extra += 1;
+    if (isCcCard(k)) {
+      const ccRequired = k === "entity"   ? entityExposureRequired()
+                       : k === "location" ? locationExposureRequired()
+                       :                    true;
+      if (ccRequired) extra += 1; // class-code grid
+    }
+    if (k === "entity" && entityOwnershipRequired()) extra += 1;      // ownership grid
     if (AT_LEAST_ONE[k]) extra += 1;     // at-least-one-of guardrail
     return base + extra;
   };
@@ -1424,9 +1450,11 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
                           // it. Nested-address block (idx 2 + 3/4/5) still
                           // renders so the location can be identified.
                           if (k === "location" && (values["location"]?.[1] ?? "") === "Remove" && i === 8) return null;
-                          // Location Edit — mirror the isHiddenField Operations
-                          // gate: hide idx 8 unless the exposure checkbox is on.
-                          if (k === "location" && isLocationEdit() && i === 8 && !locationExposureChange) return null;
+                          // Location Edit — Operations field (idx 8) is
+                          // hidden via display:none below so the
+                          // "New location info" injection at i === 8
+                          // still renders when the exposure checkbox is
+                          // unchecked.
                           // Waiver of Subrogation: hide the holder / jobsite /
                           // class-code block unless Specific is picked. Blanket
                           // and the pre-selection default both skip this block.
@@ -1446,6 +1474,7 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
                           // via display:none below so the ownership /
                           // location injections at i === 7 still render.
                           const hideEntityAddress = k === "entity" && i === 7 && isEntityEdit() && !entityLocationChanging;
+                          const hideLocationOps   = k === "location" && i === 8 && isLocationEdit() && !locationExposureChange;
                           const currentAddrIdx = addrIdxs.find(a => a === i);
                           const showCcAddressExtras = currentAddrIdx !== undefined;
                           // Waiver Specific: Class Code / Payroll /
@@ -1478,7 +1507,9 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
                               {/* Location Edit — "New location info" header
                                   + duplicate Address / City / State / Zip /
                                   Legal Name / DBA block bound to a separate
-                                  state. Renders after DBA (idx 7). */}
+                                  state. Always shows in Edit mode; only the
+                                  Operations field + class-code grid below
+                                  are gated by the exposure checkbox. */}
                               {k === "location" && i === 8 && isLocationEdit() && (
                                 <>
                                   <p className="text-[12px]" style={{ gridColumn: "span 2", fontFamily: FONT, color: c.text, margin: "12px 0 -4px", fontWeight: 600 }}>
@@ -1668,38 +1699,87 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
                                   </p>
                                 </div>
                               )}
-                              {showCcPayrollTriple && (
-                                <div style={{ gridColumn: "span 2", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
-                                  {[ccTripleStart, ccTripleStart + 1, ccTripleStart + 2].map(subI => {
-                                    const subF = cm.fields[subI];
-                                    const subVal = values[k]?.[subI] ?? "";
-                                    const subCons = constraintFor(subF.label);
-                                    const subInputStyle: React.CSSProperties = {
-                                      fontFamily: FONT, fontSize: 13, color: c.text,
-                                      background: c.cardBg, border: `1px solid ${c.border}`,
-                                      borderRadius: 8, padding: "9px 12px", outline: "none", width: "100%",
-                                    };
-                                    return (
-                                      <div key={subI} className="flex flex-col gap-1.5">
-                                        <label className="text-[11.5px] font-semibold flex items-center gap-1" style={{ fontFamily: FONT, color: c.text }}>
-                                          {subF.label}
-                                          {(!subF.optional || isForcedRequired(k, subI)) && <span style={{ color: c.razz }}>*</span>}
-                                        </label>
-                                        <input
-                                          type="text"
-                                          value={subVal}
-                                          inputMode={subCons?.inputMode}
-                                          maxLength={subCons?.maxLength}
-                                          onChange={e => setValue(k, subI, subCons ? subCons.format(e.target.value) : e.target.value)}
-                                          placeholder={subF.placeholder}
-                                          style={subInputStyle}
-                                        />
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              )}
-                            <div className="flex flex-col gap-1.5" style={{ gridColumn: `span ${f.span ?? 2}`, display: (showCcPayrollTriple || hideEntityAddress) ? "none" : "flex" }}>
+                              {showCcPayrollTriple && (() => {
+                                // Waiver of Subrogation - Specific: render the
+                                // Class Code / Payroll / Employees fields as a
+                                // table (matches the Class Code / Payroll grid
+                                // pattern used elsewhere) with the primary
+                                // row from values[waiver][11..13] plus every
+                                // waiverClassExtras row underneath. No Action
+                                // dropdown, no FT/PT split.
+                                const cols = "1.2fr 1fr 1fr 40px";
+                                const cellStyle: React.CSSProperties = {
+                                  padding: 0,
+                                  borderRight: `1px solid ${c.softDivider}`,
+                                  display: "flex", alignItems: "stretch", minHeight: 44,
+                                };
+                                const rowInputStyle: React.CSSProperties = {
+                                  fontFamily: FONT, fontSize: 13, color: c.text,
+                                  background: "transparent", border: "none", padding: "10px 12px",
+                                  width: "100%", outline: "none",
+                                };
+                                const primaryCode = values[k]?.[ccTripleStart]     ?? "";
+                                const primaryPay  = values[k]?.[ccTripleStart + 1] ?? "";
+                                const primaryEmp  = values[k]?.[ccTripleStart + 2] ?? "";
+                                const totalRows = 1 + waiverClassExtras.length;
+                                const patchWC = (idx: number, p: Partial<WaiverClassExtra>) =>
+                                  setWaiverClassExtras(rs => rs.map((r, j) => j === idx ? { ...r, ...p } : r));
+                                return (
+                                  <div style={{ gridColumn: "span 2", border: `1px solid ${c.border}`, borderRadius: 10 }}>
+                                    <div style={{ display: "grid", gridTemplateColumns: cols, background: c.helperBg, borderTopLeftRadius: 10, borderTopRightRadius: 10 }}>
+                                      {["Class Code", "Payroll", "Employees at Jobsite", ""].map((h, hi) => (
+                                        <div key={hi} style={{ padding: "8px 12px", borderBottom: `1px solid ${c.border}`, fontFamily: FONT, fontSize: 10.5, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", color: c.muted }}>{h}</div>
+                                      ))}
+                                    </div>
+                                    {/* Primary row — bound to values[waiver][11..13] */}
+                                    {(() => {
+                                      const isLast = totalRows === 1;
+                                      const withBottom: React.CSSProperties = { ...cellStyle, borderBottom: isLast ? "none" : `1px solid ${c.softDivider}` };
+                                      return (
+                                        <div style={{ display: "grid", gridTemplateColumns: cols }}>
+                                          <div style={withBottom}>
+                                            <input value={primaryCode} onChange={e => setValue(k, ccTripleStart, e.target.value.replace(/\D/g, "").slice(0, 4))} placeholder="e.g. 5190" inputMode="numeric" maxLength={4} style={rowInputStyle} />
+                                          </div>
+                                          <div style={withBottom}>
+                                            <input value={primaryPay} onChange={e => { const d = e.target.value.replace(/\D/g, "").slice(0, 10); setValue(k, ccTripleStart + 1, d ? Number(d).toLocaleString("en-US") : ""); }} placeholder="e.g. 50,000" inputMode="numeric" style={rowInputStyle} />
+                                          </div>
+                                          <div style={withBottom}>
+                                            <input value={primaryEmp} onChange={e => setValue(k, ccTripleStart + 2, e.target.value.replace(/\D/g, "").slice(0, 3))} placeholder="e.g. 3" inputMode="numeric" maxLength={3} style={rowInputStyle} />
+                                          </div>
+                                          <div style={{ ...withBottom, borderRight: "none", justifyContent: "center", alignItems: "center" }} />
+                                        </div>
+                                      );
+                                    })()}
+                                    {/* Extras rows */}
+                                    {waiverClassExtras.map((row, ei) => {
+                                      const isLast = ei === waiverClassExtras.length - 1;
+                                      const withBottom: React.CSSProperties = { ...cellStyle, borderBottom: isLast ? "none" : `1px solid ${c.softDivider}` };
+                                      return (
+                                        <div key={ei} style={{ display: "grid", gridTemplateColumns: cols }}>
+                                          <div style={withBottom}>
+                                            <input value={row.code} onChange={e => patchWC(ei, { code: e.target.value.replace(/\D/g, "").slice(0, 4) })} placeholder="e.g. 5190" inputMode="numeric" maxLength={4} style={rowInputStyle} />
+                                          </div>
+                                          <div style={withBottom}>
+                                            <input value={row.payroll} onChange={e => { const d = e.target.value.replace(/\D/g, "").slice(0, 10); patchWC(ei, { payroll: d ? Number(d).toLocaleString("en-US") : "" }); }} placeholder="e.g. 50,000" inputMode="numeric" style={rowInputStyle} />
+                                          </div>
+                                          <div style={withBottom}>
+                                            <input value={row.employees} onChange={e => patchWC(ei, { employees: e.target.value.replace(/\D/g, "").slice(0, 3) })} placeholder="e.g. 3" inputMode="numeric" maxLength={3} style={rowInputStyle} />
+                                          </div>
+                                          <div style={{ ...withBottom, borderRight: "none", justifyContent: "center", alignItems: "center" }}>
+                                            <button type="button" onClick={() => setWaiverClassExtras(rs => rs.filter((_, j) => j !== ei))} title="Remove class code"
+                                              style={{ background: "transparent", border: "none", color: c.muted, cursor: "pointer", padding: 6, display: "flex", alignItems: "center", justifyContent: "center" }}
+                                              onMouseEnter={e => (e.currentTarget.style.color = "#EF4444")}
+                                              onMouseLeave={e => (e.currentTarget.style.color = c.muted)}>
+                                              <X className="w-3.5 h-3.5" />
+                                            </button>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                );
+                              })()}
+                            <div className="flex flex-col gap-1.5" style={{ gridColumn: `span ${f.span ?? 2}`, display: (showCcPayrollTriple || hideEntityAddress || hideLocationOps) ? "none" : "flex" }}>
                               <label className="text-[11.5px] font-semibold flex items-center gap-1" style={{ fontFamily: FONT, color: c.text }}>
                                 {f.label}
                                 {(!f.optional || isForcedRequired(k, i)) && <span style={{ color: c.razz }}>*</span>}
@@ -1945,79 +2025,27 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
                           );
                         })()}
                         {k === "entity" && entityExposureChange && renderCcGrid(k)}
-                        {k === "waiver" && waiverType() === "Specific" && (() => {
-                          const inputStyleXtra: React.CSSProperties = {
-                            fontFamily: FONT, fontSize: 13, color: c.text,
-                            background: c.cardBg, border: `1px solid ${c.border}`,
-                            borderRadius: 8, padding: "9px 12px", outline: "none", width: "100%",
-                          };
-                          const patchWC = (idx: number, p: Partial<WaiverClassExtra>) =>
-                            setWaiverClassExtras(rs => rs.map((r, j) => j === idx ? { ...r, ...p } : r));
-                          return (
-                            <>
-                              {waiverClassExtras.map((row, idx) => (
-                                <div key={idx} style={{
-                                  gridColumn: "span 2", marginTop: 12, paddingTop: 12,
-                                  borderTop: `1px solid ${c.softDivider}`,
-                                }}>
-                                  <div className="flex items-center justify-between mb-3">
-                                    <div className="text-[11.5px] font-bold uppercase tracking-wider" style={{ fontFamily: FONT, color: c.muted, letterSpacing: "0.06em" }}>
-                                      Class code {idx + 2}
-                                    </div>
-                                    <button
-                                      type="button"
-                                      onClick={() => setWaiverClassExtras(rs => rs.filter((_, j) => j !== idx))}
-                                      title="Remove class code"
-                                      style={{ background: "transparent", border: "none", color: c.muted, cursor: "pointer", padding: 4, display: "flex", alignItems: "center", justifyContent: "center" }}
-                                      onMouseEnter={e => (e.currentTarget.style.color = "#EF4444")}
-                                      onMouseLeave={e => (e.currentTarget.style.color = c.muted)}
-                                    >
-                                      <X className="w-3.5 h-3.5" strokeWidth={2} />
-                                    </button>
-                                  </div>
-                                  <div className="grid grid-cols-3 gap-x-4 gap-y-4">
-                                    <div className="flex flex-col gap-1.5">
-                                      <label className="text-[11.5px] font-semibold flex items-center gap-1" style={{ fontFamily: FONT, color: c.text }}>
-                                        Class Code<span style={{ color: c.razz }}>*</span>
-                                      </label>
-                                      <input value={row.code} onChange={e => patchWC(idx, { code: e.target.value.replace(/\D/g, "").slice(0, 4) })} placeholder="e.g. 5190" inputMode="numeric" maxLength={4} style={inputStyleXtra} />
-                                    </div>
-                                    <div className="flex flex-col gap-1.5">
-                                      <label className="text-[11.5px] font-semibold flex items-center gap-1" style={{ fontFamily: FONT, color: c.text }}>
-                                        Payroll<span style={{ color: c.razz }}>*</span>
-                                      </label>
-                                      <input value={row.payroll} onChange={e => { const d = e.target.value.replace(/\D/g, "").slice(0, 10); patchWC(idx, { payroll: d ? Number(d).toLocaleString("en-US") : "" }); }} placeholder="e.g. 50,000" inputMode="numeric" style={inputStyleXtra} />
-                                    </div>
-                                    <div className="flex flex-col gap-1.5">
-                                      <label className="text-[11.5px] font-semibold flex items-center gap-1" style={{ fontFamily: FONT, color: c.text }}>
-                                        Employees at Jobsite<span style={{ color: c.razz }}>*</span>
-                                      </label>
-                                      <input value={row.employees} onChange={e => patchWC(idx, { employees: e.target.value.replace(/\D/g, "").slice(0, 3) })} placeholder="e.g. 3" inputMode="numeric" maxLength={3} style={inputStyleXtra} />
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-                              <button
-                                type="button"
-                                onClick={() => setWaiverClassExtras(rs => [...rs, emptyWaiverClassExtra()])}
-                                className="w-full inline-flex items-center justify-center gap-1.5 py-3 rounded-2xl text-[12.5px] font-semibold transition-colors"
-                                style={{
-                                  fontFamily: FONT,
-                                  color: c.razz,
-                                  background: "transparent",
-                                  border: `1px dashed ${c.border}`,
-                                  cursor: "pointer",
-                                  marginTop: 16,
-                                  gridColumn: "span 2",
-                                }}
-                                onMouseEnter={e => { e.currentTarget.style.background = c.razzTintBg; e.currentTarget.style.borderColor = c.razz; }}
-                                onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = c.border; }}
-                              >
-                                <Plus className="w-3.5 h-3.5" />Add another class code &amp; payroll
-                              </button>
-                            </>
-                          );
-                        })()}
+                        {k === "waiver" && waiverType() === "Specific" && (
+                          <button
+                            type="button"
+                            onClick={() => setWaiverClassExtras(rs => [...rs, emptyWaiverClassExtra()])}
+                            className="w-full inline-flex items-center justify-center gap-1.5 rounded-lg text-[12.5px] font-semibold transition-colors"
+                            style={{
+                              fontFamily: FONT,
+                              color: c.razz,
+                              background: "transparent",
+                              border: `1px dashed ${c.border}`,
+                              padding: "10px 14px",
+                              cursor: "pointer",
+                              marginTop: 4,
+                              gridColumn: "span 2",
+                            }}
+                            onMouseEnter={e => { e.currentTarget.style.background = c.razzTintBg; e.currentTarget.style.borderColor = c.razz; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = c.border; }}
+                          >
+                            <Plus className="w-3.5 h-3.5" />Add another class code &amp; payroll
+                          </button>
+                        )}
                         {k === "officer" && (() => {
                           const inputStyleXtra: React.CSSProperties = {
                             fontFamily: FONT, fontSize: 13, color: c.text,
