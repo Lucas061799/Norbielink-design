@@ -624,6 +624,26 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
     // flat map, so credit it here instead of in `base` when the
     // exposure section is required and the textarea is filled.
     if (k === "entity" && entityExposureRequired() && (values.entity?.[11] ?? "").trim()) extra += 1;
+    // Entity Edit — "New entity info" duplicate identifying block
+    // (Entity Type / Legal / DBA / FEIN, plus Other Entity Type only
+    // when Type === "Other"). Manually rendered so credit each
+    // filled required field here.
+    if (k === "entity" && isEntityEdit()) {
+      if (entityNewInfo.type.trim())  extra += 1;
+      if (entityNewInfo.legal.trim()) extra += 1;
+      if (entityNewInfo.fein.trim())  extra += 1;
+      if (entityNewInfo.type === "Other" && entityNewInfo.otherType.trim()) extra += 1;
+    }
+    // Location Edit — "New location info" duplicate block (Address /
+    // City / State / Zip / Legal Name; DBA optional). Manually
+    // rendered outside the flat map, so credit filled fields here.
+    if (k === "location" && isLocationEdit()) {
+      if (locationNewInfo.address.trim()) extra += 1;
+      if (locationNewInfo.city.trim())    extra += 1;
+      if (locationNewInfo.state.trim())   extra += 1;
+      if (locationNewInfo.zip.trim())     extra += 1;
+      if (locationNewInfo.legal.trim())   extra += 1;
+    }
     if (isCcCard(k)) {
       const ccRequired = k === "entity"   ? entityExposureRequired()
                        : k === "location" ? locationExposureRequired()
@@ -631,6 +651,32 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
       if (ccRequired && ccHasValidRow(k)) extra += 1;
     }
     if (k === "entity" && entityOwnershipRequired() && entityHasValidOwner()) extra += 1;
+    // Waiver of Subrogation - Specific: each additional class-code row
+    // (waiverClassExtras) adds 3 required cells — Class Code, Payroll,
+    // Employees at Jobsite. Credit filled cells so the counter tracks
+    // the whole table.
+    if (k === "waiver" && waiverType() === "Specific") {
+      for (const row of waiverClassExtras) {
+        if (row.code.trim())      extra += 1;
+        if (row.payroll.trim())   extra += 1;
+        if (row.employees.trim()) extra += 1;
+      }
+    }
+    // Location — each "+ Add another location" set adds its own
+    // required address / legal + (Operations when not Remove) +
+    // class-code row. Credit filled fields.
+    if (k === "location") {
+      for (const ex of locationExtras) {
+        if (ex.address.trim()) extra += 1;
+        if (ex.city.trim())    extra += 1;
+        if (ex.state.trim())   extra += 1;
+        if (ex.zip.trim())     extra += 1;
+        if (ex.legal.trim())   extra += 1;
+        if (!locationRemoveMode() && ex.operations.trim()) extra += 1;
+        const exposureOn = (!(locationRemoveMode() || isLocationEdit())) || ex.exposureChange;
+        if (exposureOn && ex.ccRows.some(r => r.code.trim() && r.payroll.trim())) extra += 1;
+      }
+    }
     const oneOf = AT_LEAST_ONE[k];
     if (oneOf && hasAnyOf(k, oneOf)) extra += 1;
     return base + extra;
@@ -641,6 +687,16 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
     // Entity Operations (idx 11) is hidden from the flat map but is
     // required whenever the exposure section is opened.
     if (k === "entity" && entityExposureRequired()) extra += 1;
+    // Entity Edit — the "New entity info" block adds 3 required fields
+    // (Type / Legal / FEIN; DBA optional), plus Other Entity Type when
+    // Type === "Other".
+    if (k === "entity" && isEntityEdit()) {
+      extra += 3;
+      if (entityNewInfo.type === "Other") extra += 1;
+    }
+    // Location Edit — the "New location info" block adds 5 required
+    // fields (Address / City / State / Zip / Legal Name; DBA optional).
+    if (k === "location" && isLocationEdit()) extra += 5;
     if (isCcCard(k)) {
       const ccRequired = k === "entity"   ? entityExposureRequired()
                        : k === "location" ? locationExposureRequired()
@@ -648,6 +704,21 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
       if (ccRequired) extra += 1; // class-code grid
     }
     if (k === "entity" && entityOwnershipRequired()) extra += 1;      // ownership grid
+    // Waiver of Subrogation - Specific: 3 required cells per extra
+    // class-code row appended to the table.
+    if (k === "waiver" && waiverType() === "Specific") extra += 3 * waiverClassExtras.length;
+    // Location — each "+ Add another location" set adds its own
+    // required base (Address / City / State / Zip / Legal, + Ops
+    // when not Remove) and a class-code grid when the exposure
+    // gate is open for that set.
+    if (k === "location") {
+      for (const ex of locationExtras) {
+        extra += 5; // Address, City, State, Zip, Legal
+        if (!locationRemoveMode()) extra += 1; // Operations
+        const exposureOn = (!(locationRemoveMode() || isLocationEdit())) || ex.exposureChange;
+        if (exposureOn) extra += 1; // class-code grid
+      }
+    }
     if (AT_LEAST_ONE[k]) extra += 1;     // at-least-one-of guardrail
     return base + extra;
   };
@@ -724,7 +795,36 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
   const setValue = (k: EndorsementKey, i: number, v: string) => {
     setValues(prev => ({ ...prev, [k]: { ...(prev[k] ?? {}), [i]: v } }));
   };
-  const removeCard = (k: EndorsementKey) => {
+  // Whether the user has typed / picked anything on a card yet.
+  // Used by the X-close button to decide whether to prompt for
+  // confirmation before dropping the card's data.
+  const hasCardData = (k: EndorsementKey) => {
+    const bucket = values[k];
+    if (bucket && Object.values(bucket).some(v => (v ?? "").trim().length > 0)) return true;
+    if (k === "entity") {
+      if (Object.values(entityNewInfo).some(v => v.trim().length > 0)) return true;
+      if (entityOwners.some(o => o.first.trim() || o.last.trim() || o.title.trim() || o.pct.trim())) return true;
+      if (entityExposureChange || entityOwnershipChanging || entityLocationChanging) return true;
+      const rows = getCcRows("entity");
+      if (rows.some(r => r.code.trim() || r.payroll.trim() || r.ft.trim() || r.pt.trim())) return true;
+    }
+    if (k === "location") {
+      if (Object.values(locationNewInfo).some(v => v.trim().length > 0)) return true;
+      if (locationExposureChange) return true;
+      if (locationExtras.length > 0) return true;
+      const rows = getCcRows("location");
+      if (rows.some(r => r.code.trim() || r.payroll.trim() || r.ft.trim() || r.pt.trim())) return true;
+    }
+    if (k === "classcode") {
+      const rows = getCcRows("classcode");
+      if (rows.some(r => r.code.trim() || r.payroll.trim() || r.ft.trim() || r.pt.trim())) return true;
+    }
+    if (k === "waiver" && waiverClassExtras.some(w => w.code.trim() || w.payroll.trim() || w.employees.trim())) return true;
+    if (k === "officer" && officerExtras.some(o => o.first.trim() || o.last.trim() || o.title.trim() || o.status.trim() || o.eff.trim())) return true;
+    return false;
+  };
+  const [pendingRemoveKey, setPendingRemoveKey] = useState<EndorsementKey | null>(null);
+  const doRemoveCard = (k: EndorsementKey) => {
     setSelected(prev => { const s = new Set(prev); s.delete(k); return s; });
     setValues(prev => { const v = { ...prev }; delete v[k]; return v; });
     setActiveKey(prev => {
@@ -732,6 +832,29 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
       const remaining = orderedSelected.filter(x => x !== k);
       return remaining[0] ?? prev;
     });
+    // Reset the per-card extras / checkbox state so the next time
+    // the user re-adds the same card it starts clean.
+    if (k === "entity") {
+      setEntityNewInfo({ type: "", otherType: "", legal: "", dba: "", fein: "" });
+      setEntityOwners([emptyOwnerRow()]);
+      setEntityExposureChange(false);
+      setEntityOwnershipChanging(false);
+      setEntityLocationChanging(false);
+      setCcRowsByCard(prev => ({ ...prev, entity: [emptyCcRow(), emptyCcRow()] }));
+    }
+    if (k === "location") {
+      setLocationNewInfo({ address: "", city: "", state: "", zip: "", legal: "", dba: "" });
+      setLocationExposureChange(false);
+      setLocationExtras([]);
+      setCcRowsByCard(prev => ({ ...prev, location: [emptyCcRow(), emptyCcRow()] }));
+    }
+    if (k === "classcode") setCcRowsByCard(prev => ({ ...prev, classcode: [emptyCcRow(), emptyCcRow()] }));
+    if (k === "waiver") setWaiverClassExtras([]);
+    if (k === "officer") setOfficerExtras([]);
+  };
+  const removeCard = (k: EndorsementKey) => {
+    if (hasCardData(k)) { setPendingRemoveKey(k); return; }
+    doRemoveCard(k);
   };
 
   const toggleSection = (id: string) =>
@@ -2555,16 +2678,15 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
                 surfaces read the same way. */}
             <div className="mx-6" style={{ height: 1, background: c.border }} />
             <div className="flex items-center justify-between px-6 py-3">
-              <span className="text-[12px]" style={{ color: c.muted }}>{addPicks.size} selected</span>
+              <button
+                type="button"
+                onClick={closeAdd}
+                className="px-3 py-1.5 rounded-md text-[12px] font-medium transition-colors"
+                style={{ color: c.text, background: c.cardBg, border: `1px solid ${c.border}`, cursor: "pointer" }}
+              >
+                Cancel
+              </button>
               <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={closeAdd}
-                  className="px-3 py-1.5 rounded-md text-[12px] font-medium transition-colors"
-                  style={{ color: c.text, background: c.cardBg, border: `1px solid ${c.border}`, cursor: "pointer" }}
-                >
-                  Cancel
-                </button>
                 <button
                   type="button"
                   disabled={addPicks.size === 0}
@@ -2585,6 +2707,55 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
           </div>
         </div>
       )}
+
+      {/* ── Confirm-remove-card modal ────────────────────────────────
+          Fires when the user clicks the X on a card that already
+          carries values (or extras / checkbox state). Guards against
+          accidentally dropping data. */}
+      {pendingRemoveKey && (() => {
+        const meta = findMeta(pendingRemoveKey);
+        return (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-6"
+            style={{ background: "rgba(0,0,0,0.45)" }}
+            onClick={() => setPendingRemoveKey(null)}
+          >
+            <div
+              className="rounded-2xl flex flex-col"
+              style={{ background: c.cardBg, border: `1px solid ${c.border}`, width: "min(440px, 94vw)", boxShadow: "0 20px 50px rgba(0,0,0,0.20)", fontFamily: FONT }}
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="px-6 pt-5 pb-2">
+                <h3 className="text-[16px] font-semibold" style={{ color: c.text, margin: 0 }}>Remove {meta.label}?</h3>
+                <p className="text-[13px] mt-2" style={{ color: c.muted, lineHeight: 1.5 }}>
+                  You&apos;ve started filling in this section. Removing it will discard the current information — this can&apos;t be undone.
+                </p>
+              </div>
+              <div className="mx-6 my-4" style={{ height: 1, background: c.border }} />
+              <div className="flex items-center justify-between px-6 pb-4">
+                <button
+                  type="button"
+                  onClick={() => setPendingRemoveKey(null)}
+                  className="px-3 py-1.5 rounded-md text-[12px] font-medium transition-colors"
+                  style={{ color: c.text, background: c.cardBg, border: `1px solid ${c.border}`, cursor: "pointer" }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { const k = pendingRemoveKey; setPendingRemoveKey(null); if (k) doRemoveCard(k); }}
+                  className="px-3.5 py-1.5 rounded-md text-[12px] font-semibold transition-colors"
+                  style={{ color: "#fff", background: "#EF4444", border: "none", cursor: "pointer" }}
+                  onMouseEnter={e => (e.currentTarget.style.background = "#DC2626")}
+                  onMouseLeave={e => (e.currentTarget.style.background = "#EF4444")}
+                >
+                  Remove
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── Preview-before-submit modal ─────────────────────────────────
           Summarises every selected change + filled value in one scroll,

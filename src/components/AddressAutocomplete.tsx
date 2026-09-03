@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
+import { MapPin, Search } from "lucide-react";
 
 export type SelectedAddress = {
   street: string;
@@ -143,6 +144,22 @@ export function AddressAutocomplete({
     else if (e.key === "Escape") setOpen(false);
   };
 
+  // Break each suggestion into a bold primary line (the street /
+  // named place) and a muted secondary line (city / state / zip),
+  // so results read the same way as the reference Mailing Address
+  // picker in the app: pin icon, name, locality underneath.
+  const formatSuggestion = (s: Suggestion) => {
+    const a = s.address || {};
+    const streetish = [a.house_number, a.road || a.pedestrian || a.footway].filter(Boolean).join(" ").trim();
+    const chunks = s.display_name.split(",").map(x => x.trim()).filter(Boolean);
+    const primary = streetish || chunks[0] || s.display_name;
+    const city = a.city || a.town || a.village || a.hamlet || "";
+    const stateAbbr = a.state ? (US_STATE_ABBR[a.state] ?? a.state) : "";
+    const zip = a.postcode || "";
+    const secondary = [city, stateAbbr, zip].filter(Boolean).join(", ");
+    return { primary, secondary };
+  };
+
   return (
     <div ref={wrapperRef} style={{ position: "relative", ...containerStyle }}>
       <input
@@ -153,41 +170,58 @@ export function AddressAutocomplete({
         placeholder={placeholder}
         disabled={disabled}
         autoComplete={autoComplete}
-        style={inputStyle}
+        style={{ ...inputStyle, paddingRight: 36 }}
         className={className}
+      />
+      <Search
+        aria-hidden
+        style={{
+          position: "absolute", top: "50%", right: 12, transform: "translateY(-50%)",
+          width: 14, height: 14, color: "#9CA3AF", pointerEvents: "none",
+        }}
       />
       {open && suggestions.length > 0 && (
         <div
           style={{
             position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0,
-            zIndex: 50, maxHeight: 260, overflowY: "auto",
+            zIndex: 50, maxHeight: 320, overflowY: "auto",
             background: dropdownBg, color: dropdownText,
-            border: `1px solid ${dropdownBorder}`, borderRadius: 10,
-            boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+            border: `1px solid ${dropdownBorder}`, borderRadius: 8,
+            boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
+            padding: "4px 0",
           }}
           onMouseDown={e => e.preventDefault()}
         >
-          {suggestions.map((s, idx) => (
-            <div
-              key={s.place_id}
-              onClick={() => pick(s)}
-              onMouseEnter={() => setActive(idx)}
-              style={{
-                padding: "9px 12px", fontSize: 12, cursor: "pointer", lineHeight: 1.4,
-                background: idx === active ? "rgba(166,20,195,0.08)" : "transparent",
-                color: idx === active ? "#A614C3" : dropdownText,
-                fontWeight: idx === active ? 600 : 400,
-                borderBottom: idx < suggestions.length - 1 ? `1px solid ${dropdownBorder}` : "none",
-              }}
-            >
-              {s.display_name}
-            </div>
-          ))}
+          {suggestions.map((s, idx) => {
+            const { primary, secondary } = formatSuggestion(s);
+            const isActive = idx === active;
+            return (
+              <div
+                key={s.place_id}
+                onClick={() => pick(s)}
+                onMouseEnter={() => setActive(idx)}
+                style={{
+                  display: "flex", alignItems: "flex-start", gap: 12,
+                  padding: "10px 16px", cursor: "pointer",
+                  background: isActive ? "#F9FAFB" : "transparent",
+                  transition: "background 0.15s ease",
+                }}
+              >
+                <MapPin style={{ width: 14, height: 14, color: "#9CA3AF", flexShrink: 0, marginTop: 2 }} strokeWidth={1.75} />
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: "#1F2937", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{primary}</div>
+                  {secondary && (
+                    <div style={{ fontSize: 10, color: "#9CA3AF", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{secondary}</div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
       {loading && !open && value.trim().length >= 3 && (
         <div style={{
-          position: "absolute", top: "50%", right: 12, transform: "translateY(-50%)",
+          position: "absolute", top: "50%", right: 32, transform: "translateY(-50%)",
           fontSize: 11, color: "#9CA3AF", pointerEvents: "none",
         }}>…</div>
       )}
