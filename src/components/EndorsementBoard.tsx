@@ -382,6 +382,23 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
   };
   const razzGrad = "linear-gradient(90deg,#5C2ED4 0%,#A614C3 65%)";
 
+  // Shared checkbox — replaces the browser-native `<input type=checkbox>`
+  // so the unchecked state reads correctly in dark mode (native
+  // checkboxes render a white/light box that clashes with the deep
+  // navy background). Matches the Agencies Checkbox pattern.
+  const CheckboxBox = ({ checked, onChange, style }: { checked: boolean; onChange: (v: boolean) => void; style?: React.CSSProperties }) => (
+    <button type="button" onClick={() => onChange(!checked)}
+      className="flex items-center justify-center w-4 h-4 rounded flex-shrink-0 transition-all"
+      style={{
+        border: checked ? "none" : `1.5px solid ${isDark ? "rgba(255,255,255,0.18)" : c.border}`,
+        background: checked ? razzGrad : c.cardBg,
+        cursor: "pointer", padding: 0,
+        ...style,
+      }}>
+      {checked && <svg width="9" height="7" viewBox="0 0 9 7" fill="none"><path d="M1 3.5L3.5 6L8 1" stroke="#FFFFFF" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+    </button>
+  );
+
   // When opening for a review of an existing request, seed a plausible sample
   // batch (Contact Info + Mailing Address + Officer + Class Code) so the recap
   // reads as a real multi-change submission. A real backend hook-up would
@@ -1802,12 +1819,7 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
                                 <label
                                   className="flex items-start gap-2 cursor-pointer"
                                   style={{ gridColumn: "span 2", padding: "10px 12px", background: c.helperBg, border: `1px solid ${c.border}`, borderRadius: 8, marginTop: 4 }}>
-                                  <input
-                                    type="checkbox"
-                                    checked={entityOwnershipChanging}
-                                    onChange={e => setEntityOwnershipChanging(e.target.checked)}
-                                    style={{ marginTop: 2, accentColor: c.razz }}
-                                  />
+                                  <CheckboxBox checked={entityOwnershipChanging} onChange={setEntityOwnershipChanging} style={{ marginTop: 2 }} />
                                   <span className="text-[12px]" style={{ fontFamily: FONT, color: c.text, lineHeight: 1.5 }}>
                                     Is ownership changing?
                                   </span>
@@ -1825,12 +1837,7 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
                                 <label
                                   className="flex items-start gap-2 cursor-pointer"
                                   style={{ gridColumn: "span 2", padding: "10px 12px", background: c.helperBg, border: `1px solid ${c.border}`, borderRadius: 8, marginTop: 4 }}>
-                                  <input
-                                    type="checkbox"
-                                    checked={entityLocationChanging}
-                                    onChange={e => setEntityLocationChanging(e.target.checked)}
-                                    style={{ marginTop: 2, accentColor: c.razz }}
-                                  />
+                                  <CheckboxBox checked={entityLocationChanging} onChange={setEntityLocationChanging} style={{ marginTop: 2 }} />
                                   <span className="text-[12px]" style={{ fontFamily: FONT, color: c.text, lineHeight: 1.5 }}>
                                     Is the entity location changing?
                                   </span>
@@ -2155,12 +2162,7 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
                           <label
                             className="flex items-start gap-2 cursor-pointer"
                             style={{ gridColumn: "span 2", padding: "10px 12px", background: c.helperBg, border: `1px solid ${c.border}`, borderRadius: 8, marginTop: 4 }}>
-                            <input
-                              type="checkbox"
-                              checked={entityExposureChange}
-                              onChange={e => setEntityExposureChange(e.target.checked)}
-                              style={{ marginTop: 2, accentColor: c.razz }}
-                            />
+                            <CheckboxBox checked={entityExposureChange} onChange={setEntityExposureChange} style={{ marginTop: 2 }} />
                             <span className="text-[12px]" style={{ fontFamily: FONT, color: c.text, lineHeight: 1.5 }}>
                               Any change in exposure or operations at this location?
                             </span>
@@ -2325,12 +2327,7 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
                           <label
                             className="flex items-start gap-2 cursor-pointer"
                             style={{ gridColumn: "span 2", padding: "10px 12px", background: c.helperBg, border: `1px solid ${c.border}`, borderRadius: 8, marginTop: 4 }}>
-                            <input
-                              type="checkbox"
-                              checked={locationExposureChange}
-                              onChange={e => setLocationExposureChange(e.target.checked)}
-                              style={{ marginTop: 2, accentColor: c.razz }}
-                            />
+                            <CheckboxBox checked={locationExposureChange} onChange={setLocationExposureChange} style={{ marginTop: 2 }} />
                             <span className="text-[12px]" style={{ fontFamily: FONT, color: c.text, lineHeight: 1.5 }}>
                               {locationRemoveMode()
                                 ? "Any change in exposure for remaining locations?"
@@ -2450,7 +2447,7 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
                               )}
                               {(isRemove || locAction === "Edit") && (
                                 <label className="flex items-start gap-2 cursor-pointer" style={{ gridColumn: "span 2", padding: "10px 12px", background: c.helperBg, border: `1px solid ${c.border}`, borderRadius: 8, marginTop: 4 }}>
-                                  <input type="checkbox" checked={ex.exposureChange} onChange={e => patch({ exposureChange: e.target.checked })} style={{ marginTop: 2, accentColor: c.razz }} />
+                                  <CheckboxBox checked={ex.exposureChange} onChange={v => patch({ exposureChange: v })} style={{ marginTop: 2 }} />
                                   <span className="text-[12px]" style={{ fontFamily: FONT, color: c.text, lineHeight: 1.5 }}>
                                     {isRemove ? "Any change in exposure for remaining locations?" : "Any change in exposure or operations at this location?"}
                                   </span>
@@ -2637,9 +2634,9 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
                 type="button"
                 onClick={openAdd}
                 className="w-full inline-flex items-center justify-center gap-1.5 py-3 rounded-2xl text-[12.5px] font-semibold transition-colors"
-                style={{ fontFamily: FONT, color: c.razz, background: "transparent", border: `1px dashed #D1D5DB`, cursor: "pointer" }}
+                style={{ fontFamily: FONT, color: c.razz, background: "transparent", border: `1px dashed ${c.border}`, cursor: "pointer" }}
                 onMouseEnter={e => { e.currentTarget.style.background = c.razzTintBg; e.currentTarget.style.borderColor = c.razz; }}
-                onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = "#D1D5DB"; }}
+                onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = c.border; }}
               >
                 <Plus className="w-3.5 h-3.5" />Add more Changes
               </button>
