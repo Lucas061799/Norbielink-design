@@ -657,9 +657,30 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
       const ccRequired = k === "entity"   ? entityExposureRequired()
                        : k === "location" ? locationExposureRequired()
                        :                    true;
-      if (ccRequired && ccHasValidRow(k)) extra += 1;
+      if (ccRequired) {
+        // Per-cell credit — every row contributes 4 required cells
+        // (Class Code / Payroll / FT / PT). Action has a default so
+        // it never counts. Matches the granular counting the user
+        // asked for.
+        for (const row of getCcRows(k)) {
+          if (row.code.trim())    extra += 1;
+          if (row.payroll.trim()) extra += 1;
+          if (row.ft.trim())      extra += 1;
+          if (row.pt.trim())      extra += 1;
+        }
+      }
     }
-    if (k === "entity" && entityOwnershipRequired() && entityHasValidOwner()) extra += 1;
+    if (k === "entity" && entityOwnershipRequired()) {
+      // Per-cell credit on the Ownership grid too — each row =
+      // 4 required cells (First / Last / Title / Ownership %).
+      // Status defaults to "Included" so it never counts.
+      for (const row of entityOwners) {
+        if (row.first.trim()) extra += 1;
+        if (row.last.trim())  extra += 1;
+        if (row.title.trim()) extra += 1;
+        if (row.pct.trim())   extra += 1;
+      }
+    }
     // Waiver of Subrogation - Specific: each additional class-code row
     // (waiverClassExtras) adds 3 required cells — Class Code, Payroll,
     // Employees at Jobsite. Credit filled cells so the counter tracks
@@ -710,9 +731,15 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
       const ccRequired = k === "entity"   ? entityExposureRequired()
                        : k === "location" ? locationExposureRequired()
                        :                    true;
-      if (ccRequired) extra += 1; // class-code grid
+      // Per-cell required — 4 cells per row (Class Code / Payroll /
+      // FT / PT). Action has a default so it never counts.
+      if (ccRequired) extra += 4 * getCcRows(k).length;
     }
-    if (k === "entity" && entityOwnershipRequired()) extra += 1;      // ownership grid
+    if (k === "entity" && entityOwnershipRequired()) {
+      // Per-cell required — 4 cells per row (First / Last / Title /
+      // Ownership %). Status has a default so it never counts.
+      extra += 4 * entityOwners.length;
+    }
     // Waiver of Subrogation - Specific: 3 required cells per extra
     // class-code row appended to the table.
     if (k === "waiver" && waiverType() === "Specific") extra += 3 * waiverClassExtras.length;
@@ -725,7 +752,7 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
         extra += 5; // Address, City, State, Zip, Legal
         if (!locationRemoveMode()) extra += 1; // Operations
         const exposureOn = (!(locationRemoveMode() || isLocationEdit())) || ex.exposureChange;
-        if (exposureOn) extra += 1; // class-code grid
+        if (exposureOn) extra += 4 * ex.ccRows.length; // 4 cells per cc row
       }
     }
     if (AT_LEAST_ONE[k]) extra += 1;     // at-least-one-of guardrail
