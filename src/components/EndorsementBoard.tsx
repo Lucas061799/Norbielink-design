@@ -550,6 +550,10 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
   // Location Remove/Edit — "Any change in exposure..." checkbox that
   // gates the exposure header + Class Code / Payroll / FT / PT grid.
   const [locationExposureChange, setLocationExposureChange] = useState(false);
+  // Flipped on when the user hits the disabled Preview & submit button
+  // — turns on red-outline error state on every required-but-empty
+  // field so the user can see what's missing.
+  const [showErrors, setShowErrors] = useState(false);
   // Location Edit — "New location info" duplicate address/legal/DBA
   // block bound to a separate state so the review recap can diff.
   const [locationNewInfo, setLocationNewInfo] = useState<{ address: string; city: string; state: string; zip: string; legal: string; dba: string }>({
@@ -586,11 +590,12 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
   const waiverType = () => values["waiver"]?.[1] ?? "";
   const isWaiverExtra = (i: number) => i >= 2 && i <= 14;
   const isHiddenField = (k: EndorsementKey, i: number) => {
-    if (k === "location" && locationRemoveMode() && i === 8) return true;
-    // Location Edit: Operations (idx 8) gates behind the exposure
-    // checkbox — same "operations may or may not have changed" flow
-    // used on Entity Edit.
-    if (k === "location" && isLocationEdit() && i === 8 && !locationExposureChange) return true;
+    // Location Operations (idx 8) is always hidden from the flat
+    // field map — for Add mode + Edit/Remove-with-checkbox it's
+    // rendered manually AFTER the "Any change in exposure or
+    // operations..." checkbox so the textarea appears below the
+    // gate (matches the Entity flow).
+    if (k === "location" && i === 8) return true;
     if (k === "waiver" && waiverType() !== "Specific" && isWaiverExtra(i)) return true;
     // Entity: "Other Entity Type" is a follow-up only meaningful when the
     // Entity Type dropdown (idx 2) is set to "Other" — hide otherwise.
@@ -604,11 +609,15 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
   };
   const isForcedRequired = (k: EndorsementKey, i: number) =>
     k === "waiver" && waiverType() === "Specific" && isWaiverExtra(i);
-  // Whether the Entity / Location exposure section (Operations +
-  // class-code grid) is currently required. Add mode always requires
-  // it; Remove/Edit modes only require it when the user checks the
-  // "Any change in exposure or operations..." checkbox.
-  const entityExposureRequired   = () => (!isEntityRemove() && !isEntityEdit()) || entityExposureChange;
+  // Whether the exposure section (Operations + class-code grid) is
+  // currently required.
+  // Entity: the "Any change in exposure or operations at this location?"
+  // checkbox is shown in every mode (Add / Edit / Remove), so the
+  // section is required iff that box is checked — matches what the
+  // user actually sees on-screen.
+  // Location: the checkbox only appears on Remove / Edit; Add always
+  // shows Operations + class-code grid, so those stay required in Add.
+  const entityExposureRequired   = () => entityExposureChange;
   const locationExposureRequired = () => (!locationRemoveMode() && !isLocationEdit()) || locationExposureChange;
   // Ownership grid is always required in Add mode; in Remove/Edit
   // it only becomes required when "Is ownership changing?" is on.
@@ -884,11 +893,11 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
       <div className="flex flex-col gap-2" style={{ gridColumn: "span 2" }}>
         <p className="text-[12px]" style={{ fontFamily: FONT, color: c.text, margin: 0, fontWeight: 500 }}>
           {isEntityRemove() ? (
-            "Revised Ownership Information"
+            <>Revised Ownership Information{entityOwnershipRequired() && <span style={{ color: c.razz }}> *</span>}</>
           ) : isEntityEdit() ? (
-            "New Entity Ownership"
+            <>New Entity Ownership{entityOwnershipRequired() && <span style={{ color: c.razz }}> *</span>}</>
           ) : (
-            <>Ownership Information <span style={{ color: c.muted, fontWeight: 400 }}>(if adding excluded owners, please attach a signed waiver form if required)</span></>
+            <>Ownership Information<span style={{ color: c.razz }}> *</span> <span style={{ color: c.muted, fontWeight: 400 }}>(if adding excluded owners, please attach a signed waiver form if required)</span></>
           )}
         </p>
         <div style={{ border: `1px solid ${c.border}`, borderRadius: 10, marginTop: 4 }}>
@@ -1007,11 +1016,18 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
     const hideAction = opts?.hideAction ?? false;
     const cols = hideAction ? "1.4fr 1fr .6fr .6fr 40px" : "180px 1.4fr 1fr .6fr .6fr 40px";
     const headers = hideAction ? ["Class code","Payroll","FT","PT",""] : ["Action","Class code","Payroll","FT","PT",""];
+    // Whether the class-code grid is currently required — mirrors
+    // the same checkbox-driven gating used by the counter so the
+    // "* required" marker on the header matches what actually
+    // blocks submit.
+    const ccRequired = card === "entity"   ? entityExposureRequired()
+                     : card === "location" ? locationExposureRequired()
+                     :                       true;
     return (
       <div className="flex flex-col gap-2" style={{ gridColumn: "span 2" }}>
         {header && (
           <p className="text-[12px]" style={{ fontFamily: FONT, color: c.text, margin: 0, fontWeight: 500 }}>
-            {header}
+            {header}{ccRequired && <span style={{ color: c.razz }}> *</span>}
           </p>
         )}
         <div style={{ border: `1px solid ${c.border}`, borderRadius: 10, marginTop: 4 }}>
@@ -1539,12 +1555,14 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
                       <div className="grid grid-cols-2 gap-x-4 gap-y-4">
                         {cm.fields.map((f, i) => {
                           const val = values[k]?.[i] ?? "";
+                          const isRequired = !f.optional || isForcedRequired(k, i);
+                          const isError = showErrors && isRequired && !val.trim() && !isHiddenField(k, i);
                           const inputStyle: React.CSSProperties = {
                             fontFamily: FONT,
                             fontSize: 13,
                             color: c.text,
                             background: c.cardBg,
-                            border: `1px solid ${c.border}`,
+                            border: `1px solid ${isError ? "#EF4444" : c.border}`,
                             borderRadius: 8,
                             padding: "9px 12px",
                             outline: "none",
@@ -1572,12 +1590,13 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
                           // identifying which location to drop, not editing
                           // it. Nested-address block (idx 2 + 3/4/5) still
                           // renders so the location can be identified.
-                          if (k === "location" && (values["location"]?.[1] ?? "") === "Remove" && i === 8) return null;
-                          // Location Edit — Operations field (idx 8) is
-                          // hidden via display:none below so the
-                          // "New location info" injection at i === 8
-                          // still renders when the exposure checkbox is
-                          // unchecked.
+                          // Location Operations (idx 8) — the actual
+                          // textarea is hidden via display:none below
+                          // (hideLocationOps) so it can be rendered
+                          // manually AFTER the "Any change in exposure
+                          // or operations..." checkbox. Injections that
+                          // anchor at i === 8 (e.g. "New location info")
+                          // still render.
                           // Waiver of Subrogation: hide the holder / jobsite /
                           // class-code block unless Specific is picked. Blanket
                           // and the pre-selection default both skip this block.
@@ -1597,7 +1616,11 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
                           // via display:none below so the ownership /
                           // location injections at i === 7 still render.
                           const hideEntityAddress = k === "entity" && i === 7 && isEntityEdit() && !entityLocationChanging;
-                          const hideLocationOps   = k === "location" && i === 8 && isLocationEdit() && !locationExposureChange;
+                          // Always hide the flat-map render of the
+                          // Location Operations textarea; the manual
+                          // render below the exposure checkbox owns
+                          // its display gating.
+                          const hideLocationOps   = k === "location" && i === 8;
                           const currentAddrIdx = addrIdxs.find(a => a === i);
                           const showCcAddressExtras = currentAddrIdx !== undefined;
                           // Waiver Specific: Class Code / Payroll /
@@ -1902,7 +1925,7 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
                                   </div>
                                 );
                               })()}
-                            <div className="flex flex-col gap-1.5" style={{ gridColumn: `span ${f.span ?? 2}`, display: (showCcPayrollTriple || hideEntityAddress || hideLocationOps) ? "none" : "flex" }}>
+                            <div data-field-error={isError ? "true" : undefined} className="flex flex-col gap-1.5" style={{ gridColumn: `span ${f.span ?? 2}`, display: (showCcPayrollTriple || hideEntityAddress || hideLocationOps) ? "none" : "flex" }}>
                               <label className="text-[11.5px] font-semibold flex items-center gap-1" style={{ fontFamily: FONT, color: c.text }}>
                                 {f.label}
                                 {(!f.optional || isForcedRequired(k, i)) && <span style={{ color: c.razz }}>*</span>}
@@ -2288,6 +2311,37 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
                             </span>
                           </label>
                         )}
+                        {/* Location Operations textarea — manually
+                            rendered below the exposure checkbox so it
+                            sits under the gate (matches the Entity
+                            flow). Add mode always shows it; Edit shows
+                            it once the checkbox is on; Remove never
+                            shows it. */}
+                        {k === "location" && !locationRemoveMode() && ((!isLocationEdit()) || locationExposureChange) && (() => {
+                          const opsIdx = 8;
+                          const opsF = cm.fields[opsIdx];
+                          const opsVal = values["location"]?.[opsIdx] ?? "";
+                          const opsInputStyle: React.CSSProperties = {
+                            fontFamily: FONT, fontSize: 13, color: c.text,
+                            background: c.cardBg, border: `1px solid ${c.border}`,
+                            borderRadius: 8, padding: "9px 12px", outline: "none", width: "100%",
+                            resize: "vertical", minHeight: 96,
+                          };
+                          return (
+                            <div className="flex flex-col gap-1.5" style={{ gridColumn: "span 2" }}>
+                              <label className="text-[11.5px] font-semibold flex items-center gap-1" style={{ fontFamily: FONT, color: c.text }}>
+                                {opsF.label}
+                                <span style={{ color: c.razz }}>*</span>
+                              </label>
+                              <textarea
+                                value={opsVal}
+                                onChange={e => setValue("location", opsIdx, e.target.value)}
+                                placeholder={opsF.placeholder}
+                                style={opsInputStyle}
+                              />
+                            </div>
+                          );
+                        })()}
                         {k === "location" && (() => {
                           const locAction = values["location"]?.[1] ?? "";
                           // Remove / Edit mode: exposure section is gated
@@ -2568,13 +2622,26 @@ export default function EndorsementBoard({ isDark, onBack, initialSubmitted = fa
                   panel that isn't there anymore. */}
               <button
                 type="button"
-                disabled={!submitReady}
-                onClick={() => setPreviewOpen(true)}
+                onClick={() => {
+                  if (submitReady) { setPreviewOpen(true); return; }
+                  // Flip on error highlights, then jump to the first
+                  // required-but-empty field so the user knows where
+                  // to look.
+                  setShowErrors(true);
+                  setTimeout(() => {
+                    const target = document.querySelector('[data-field-error="true"]');
+                    if (target) {
+                      target.scrollIntoView({ behavior: "smooth", block: "center" });
+                      const input = target.querySelector("input, textarea, button, select") as HTMLElement | null;
+                      input?.focus?.();
+                    }
+                  }, 0);
+                }}
                 className="w-full inline-flex items-center justify-center gap-1.5 py-3 rounded-xl text-[13px] font-semibold transition-all"
                 style={submitReady ? {
                   fontFamily: FONT, color: "#fff", background: razzGrad, border: "none", cursor: "pointer", boxShadow: "0 4px 14px rgba(166,20,195,0.25)",
                 } : {
-                  fontFamily: FONT, color: c.muted, background: c.helperBg, border: `1px solid ${c.border}`, cursor: "not-allowed",
+                  fontFamily: FONT, color: c.muted, background: c.helperBg, border: `1px solid ${c.border}`, cursor: "pointer",
                 }}
                 onMouseEnter={e => { if (submitReady) e.currentTarget.style.filter = "brightness(1.08)"; }}
                 onMouseLeave={e => { e.currentTarget.style.filter = "none"; }}

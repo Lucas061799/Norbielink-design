@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Search, ChevronDown, ChevronLeft, ChevronRight, ArrowUpRight, X, XCircle, Send, ClipboardList, Clock, CheckCircle2, Check } from "lucide-react";
+import { Search, ChevronDown, ChevronLeft, ChevronRight, ArrowUpRight, X, XCircle, Send, ClipboardList, Clock, CheckCircle2, Check, Info } from "lucide-react";
 import EndorsementBoard, { type EndorsementKey, ALL_ENDORSEMENT_TYPE_LABELS } from "./EndorsementBoard";
 
 const FONT = "var(--font-montserrat), Montserrat, sans-serif";
@@ -802,28 +802,34 @@ export default function Endorsements({ isDark, layout = "3col", skipSearch = fal
             // list of them here.
             <div className="rounded-2xl overflow-hidden flex flex-col flex-1 min-h-0"
               style={{ background: c.cardBg, border: `1px solid ${c.border}`, boxShadow: isDark ? "none" : "0 1px 3px rgba(15,23,42,0.04)" }}>
-              <div className="flex-1 min-h-0 overflow-y-auto">
-                <div className="grid px-5 py-3 gap-4 sticky top-0 z-10"
-                  style={{ gridTemplateColumns: "1fr 1fr 1.2fr 1fr 0.9fr 0.7fr", borderBottom: `1px solid ${c.border}`, background: c.mutedBg }}>
-                  {["Request Record #", "Endorsement Request #", "Endorsement Type", "Date Submitted", "Status", "Actions"].map(h => (
-                    <div key={h} className="text-[11px] font-bold uppercase tracking-wider"
-                      style={{ fontFamily: FONT, color: c.muted }}>{h}</div>
-                  ))}
+              <div className="grid px-5 py-3 gap-4 flex-shrink-0"
+                style={{ gridTemplateColumns: "1fr 1fr 1.2fr 1fr 0.9fr 0.7fr", borderBottom: `1px solid ${c.border}`, background: c.mutedBg }}>
+                {["Request Record #", "Endorsement Request #", "Endorsement Type", "Date Submitted", "Status", "Actions"].map(h => (
+                  <div key={h} className="text-[11px] font-bold uppercase tracking-wider"
+                    style={{ fontFamily: FONT, color: c.muted }}>{h}</div>
+                ))}
+              </div>
+              {/* Empty state — vertically centered in whatever height
+                  the card has after the sticky header. Mirrors the
+                  Policies list "Can't find it?" carrier hint. */}
+              <div className="flex-1 flex flex-col items-center justify-center px-6 text-center gap-2">
+                <span className="inline-flex items-center justify-center"
+                  style={{ width: 44, height: 44, borderRadius: 9999, background: c.mutedBg, border: `1px solid ${c.border}` }}>
+                  <Clock className="w-5 h-5" style={{ color: c.muted }} />
+                </span>
+                <div className="text-[13px] font-semibold" style={{ fontFamily: FONT, color: c.text }}>No Data Found</div>
+                <div className="text-[12px] max-w-[380px]" style={{ fontFamily: FONT, color: c.muted, lineHeight: 1.5 }}>
+                  There are no endorsement requests on file for this policy yet.
                 </div>
-                <div className="flex flex-col items-center justify-center py-16 px-6 text-center gap-2">
-                  <span className="inline-flex items-center justify-center"
-                    style={{ width: 44, height: 44, borderRadius: 9999, background: c.mutedBg, border: `1px solid ${c.border}` }}>
-                    <Clock className="w-5 h-5" style={{ color: c.muted }} />
-                  </span>
-                  <div className="text-[13px] font-semibold" style={{ fontFamily: FONT, color: c.text }}>No Data Found</div>
-                  <div className="text-[12px] max-w-[380px]" style={{ fontFamily: FONT, color: c.muted, lineHeight: 1.5 }}>
-                    There are no endorsement requests on file for this policy yet.
-                  </div>
-                  <button onClick={() => { setViewingExisting(false); setSubmittedSeed(null); setView("form"); }}
-                    className="mt-3 inline-flex items-center gap-1.5 rounded-lg text-[12px] font-semibold transition-opacity hover:opacity-90"
-                    style={{ fontFamily: FONT, color: "#fff", background: "linear-gradient(90deg,#5C2ED4 0%,#A614C3 65%)", border: "none", padding: "8px 14px", cursor: "pointer" }}>
-                    Start a new request
-                  </button>
+                <button onClick={() => { setViewingExisting(false); setSubmittedSeed(null); setView("form"); }}
+                  className="mt-3 inline-flex items-center gap-1.5 rounded-lg text-[12px] font-semibold transition-opacity hover:opacity-90"
+                  style={{ fontFamily: FONT, color: "#fff", background: "linear-gradient(90deg,#5C2ED4 0%,#A614C3 65%)", border: "none", padding: "8px 14px", cursor: "pointer" }}>
+                  Start a new request
+                </button>
+                <div className="flex items-center gap-1.5 mt-6 text-[13px]"
+                  style={{ fontFamily: FONT, color: c.muted }}>
+                  <Info className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#A614C3" }} />
+                  <span>Can&apos;t find it? Some policies are hosted on the carrier&apos;s site. Please try checking there.</span>
                 </div>
               </div>
             </div>
