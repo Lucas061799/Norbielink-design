@@ -2824,7 +2824,17 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                           }
                           return next;
                         });
-                        showToast({ title: "Changes saved", description: "Updated documents uploaded successfully." });
+                        if (clientLocked) {
+                          // Client (Admin view) upload flow — mirrors the plain
+                          // Save toast so the client knows their change + doc is
+                          // in the review queue rather than pushed live.
+                          showToast({
+                            title: "Changes submitted for review",
+                            description: "We'll review your edits and update the agency record shortly.",
+                          }, 5000);
+                        } else {
+                          showToast({ title: "Changes saved", description: "Updated documents uploaded successfully." });
+                        }
                         setBadgesOverride(Array.from(eBadges));
                         setAffilOverride(Array.from(eAffil));
                         setWcOverride(Array.from(eWC));
@@ -3841,26 +3851,23 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                 Cancel
               </button>
               <button onClick={() => {
-                  // Doc-refresh gate is internal-staff only. External (client) principals go
-                  // straight through — their edits are forwarded to the Accounting team for
-                  // review instead of forcing a W-9 / license upload here.
-                  if (!clientLocked) {
-                    const w9Changed = (
-                      eName !== agency.name
-                      || eType !== agency.agencyType
-                      || eStreet !== agency.street || eCity !== agency.city || eState !== agency.state || eZip !== agency.zip
-                      || eTaxId !== agency.taxId
-                    );
-                    const licChanged = eLicNo !== agency.licenseNo;
-                    if (w9Changed || licChanged) {
-                      // Block save — modal will require new docs to be uploaded before allowing it.
-                      // The uploaded W-9 lands in agencyDocs with category "w9", but because that
-                      // category is in HIDDEN_AGENCY_DOC_CATEGORIES it never surfaces in the agency
-                      // docs UI — kept in mock data only, per the soft-hide product decision.
-                      setDocModalUploads({});
-                      setDocUpdateModal({ w9: w9Changed, license: licChanged });
-                      return;
-                    }
+                  // Doc-refresh gate runs for both internal staff AND external
+                  // (client / Admin) principals. Client-locked fields (Name /
+                  // Type / Address) can't be changed from the Admin view, so
+                  // in practice only Tax ID and License # trigger it there.
+                  // The uploaded W-9 / License lands in agencyDocs as w9 /
+                  // license (soft-hidden) either way.
+                  const w9Changed = (
+                    eName !== agency.name
+                    || eType !== agency.agencyType
+                    || eStreet !== agency.street || eCity !== agency.city || eState !== agency.state || eZip !== agency.zip
+                    || eTaxId !== agency.taxId
+                  );
+                  const licChanged = eLicNo !== agency.licenseNo;
+                  if (w9Changed || licChanged) {
+                    setDocModalUploads({});
+                    setDocUpdateModal({ w9: w9Changed, license: licChanged });
+                    return;
                   }
                   setBadgesOverride(Array.from(eBadges));
                   setAffilOverride(Array.from(eAffil));
@@ -3868,13 +3875,12 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                   setIsEditing(false);
                   if (clientLocked) {
                     // Principal (external admin) submitted their editable-tier changes.
-                    // Show a top-right toast so they know we've emailed the Accounting
-                    // team; the diff also lights up the ITC Record via the pending-
-                    // updates alert on the internal super-admin view. Generic stable
-                    // copy — no echoing of user-entered values into transient UI.
+                    // Toast is neutral — the diff also lights up the ITC Record via
+                    // the pending-updates alert on the internal super-admin view,
+                    // which everyone can see.
                     showToast({
-                      title: "Changes sent to Accounting team",
-                      description: "We've emailed the Accounting team — they'll review your edits and push them to ITC.",
+                      title: "Changes submitted for review",
+                      description: "We'll review your edits and update the agency record shortly.",
                     }, 5000);
                   }
                 }}
