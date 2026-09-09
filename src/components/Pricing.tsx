@@ -66,11 +66,12 @@ const TIERS: Tier[] = [
       "Enhanced security with MFA",
       "Faster than the legacy view",
       "One place for Endorsement Requests",
+      "Self-service Accounting Statements",
     ],
   },
   {
     key: "pro",
-    name: "Pro",
+    name: "Pro Plus",
     monthly: "$8.25",
     annual:  "$99",
     priceSubtext: "per agency/month · Billed annually ($99/year)",
