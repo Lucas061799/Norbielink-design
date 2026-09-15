@@ -51,7 +51,7 @@ interface Tier {
 const TIERS: Tier[] = [
   {
     key: "free",
-    name: "Free",
+    name: "NorbieLink Free",
     monthly: "$0",
     annual:  "$0",
     priceSubtext: "For individuals/agencies",
@@ -71,7 +71,7 @@ const TIERS: Tier[] = [
   },
   {
     key: "pro",
-    name: "Pro Plus",
+    name: "NorbieLink + ProSuite",
     monthly: "$8.25",
     annual:  "$99",
     priceSubtext: "per agency/month · Billed annually ($99/year)",
