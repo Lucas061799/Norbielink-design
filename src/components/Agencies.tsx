@@ -476,7 +476,7 @@ interface AgencyDetail extends Agency {
 }
 
 const mockDetails: Record<string, Partial<AgencyDetail>> = {
-  "1": { website: "www.acmeins.com",      street: "1111 6th Ave",   zip: "50314", apptDate: "03/24/2026", contact: "Jason Smith",      contactPhone: "650-768-0850", contactEmail: "jason@acmeins.com",     bizType: "LLC",            taxId: "121222334455", phone: "515-222-1000", tollFree: "",             npn: "17482910", licenseNo: "LC-88210", licenseExp: "03/24/2026", eoPolicyNo: "EO-4421", eoExp: "03/24/2026", agencyBill: true,  directBill: true,  premiumFin: true,  agencyType: "Retail",     affiliations: ["AAA/ACG (AC364)", "Acrisure"], workersComp: ["AIG", "AmTrust"], badges: ["Strategic Partner", "VIP"] },
+  "1": { website: "www.acmeins.com",      street: "1111 6th Ave",   zip: "50314", apptDate: "03/24/2026", contact: "Jason Smith",      contactPhone: "650-768-0850", contactEmail: "jason@acmeins.com",     bizType: "LLC",            taxId: "121222334455", phone: "515-222-1000", tollFree: "",             npn: "17482910", licenseNo: "LC-88210", licenseExp: "12/24/2027", eoPolicyNo: "EO-4421", eoExp: "03/24/2026", agencyBill: true,  directBill: true,  premiumFin: true,  agencyType: "Retail",     affiliations: ["AAA/ACG (AC364)", "Acrisure"], workersComp: ["AIG", "AmTrust"], badges: ["Strategic Partner", "VIP"] },
   "2": { website: "www.summitsol.com",    street: "200 N Michigan",  zip: "60601", apptDate: "01/15/2025", contact: "Maria Chen",       contactPhone: "312-555-0190", contactEmail: "m.chen@summitsol.com",  bizType: "Corporation",    taxId: "930011223",   phone: "312-555-0100", tollFree: "800-555-0100", npn: "20911345", licenseNo: "LC-22110", licenseExp: "01/15/2027", eoPolicyNo: "EO-1120", eoExp: "01/15/2027", agencyBill: true,  directBill: false, premiumFin: true,  agencyType: "Wholesale",  affiliations: ["Acrisure", "Acceptance"], workersComp: ["CNA"], badges: ["DreamTeam"] },
   "3": { website: "",                     street: "",                zip: "",      apptDate: "06/01/2024", contact: "Tom Lawson",       contactPhone: "",             contactEmail: "",                      bizType: "Sole Proprietor",taxId: "456789012",   phone: "",             tollFree: "",             npn: "",         licenseNo: "LC-77001", licenseExp: "06/01/2026", eoPolicyNo: "EO-7701", eoExp: "06/01/2026", agencyBill: false, directBill: true,  premiumFin: false, agencyType: "Retail",     affiliations: ["Farmers", "ISU"], workersComp: ["GUARD", "Zenith"], badges: [] },
 };
@@ -2786,6 +2786,16 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
               const allUploaded = required.every(r => docModalUploads[r.key]);
               const onPickFile = (key: "w9" | "license", file: File | null | undefined) => {
                 if (!file) return;
+                // W-9 restricted to PDF (Accounting requirement); catches
+                // the drag-and-drop case where the input `accept` attribute
+                // is not enforced by the browser.
+                if (key === "w9") {
+                  const isPdf = /\.pdf$/i.test(file.name) || file.type === "application/pdf";
+                  if (!isPdf) {
+                    showToast({ title: "PDF required", description: `W-9 must be a PDF. "${file.name}" was not attached.` }, 5000);
+                    return;
+                  }
+                }
                 setDocModalUploads(p => ({ ...p, [key]: file.name }));
               };
               return (
@@ -2821,11 +2831,15 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                               onDragOver={e => { e.preventDefault(); setDocModalDragOver(r.key); }}
                               onDragLeave={() => setDocModalDragOver(null)}
                               onDrop={e => { e.preventDefault(); setDocModalDragOver(null); onPickFile(r.key, e.dataTransfer.files?.[0]); }}>
-                              <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png"
+                              {/* W-9 must be a PDF (Accounting requirement — searchable
+                                  taxpayer data, digital signatures). License copies
+                                  still allow images since scans are common. */}
+                              <input type="file" className="hidden"
+                                accept={r.key === "w9" ? ".pdf,application/pdf" : ".pdf,.jpg,.jpeg,.png"}
                                 onChange={e => onPickFile(r.key, e.target.files?.[0])} />
                               <Paperclip className="w-5 h-5 mb-1.5" style={{ color: "#A614C3" }} />
                               <span className="text-[12px] font-medium" style={{ color: c.text }}>Drag &amp; Drop or Click to Browse</span>
-                              <span className="text-[11px] mt-0.5" style={{ color: c.muted }}>PDF, JPG, PNG · Max 10MB</span>
+                              <span className="text-[11px] mt-0.5" style={{ color: c.muted }}>{r.key === "w9" ? "PDF only · Max 10MB" : "PDF, JPG, PNG · Max 10MB"}</span>
                             </label>
                           )}
                         </div>
@@ -3395,13 +3409,12 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                 {label}
                 {pendingItc > 0 && (
                   <span
-                    title={`${pendingItc} pending ${pendingItc === 1 ? "update" : "updates"} to push to ITC`}
-                    className="text-[11px] font-bold px-1.5 py-0.5 rounded-full"
-                    style={{ background: "rgba(166, 20, 195, 0.1)" }}
+                    title="Pending updates to push to ITC"
+                    aria-label="Pending updates"
+                    className="inline-flex items-center justify-center rounded-full flex-shrink-0"
+                    style={{ width: 16, height: 16, background: "rgba(166, 20, 195, 0.12)" }}
                   >
-                    <span style={{ backgroundImage: "linear-gradient(88.54deg, #5C2ED4 0%, #A614C3 100%)", backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-                      {pendingItc}
-                    </span>
+                    <Bell className="w-3 h-3" style={{ color: "#A614C3" }} strokeWidth={2.25} />
                   </span>
                 )}
                 {active && <div className="absolute bottom-0 left-0 right-0 h-[2px]" style={{ background: activeUnderline }} />}
@@ -3418,7 +3431,17 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
         {licenseExpiredInfo && (
           <div className="rounded-xl p-4 mb-6 flex items-start gap-3"
             style={{ background: isDark ? "rgba(255,255,255,0.04)" : "#F9FAFB", border: `1px solid ${c.border}` }}>
-            <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: "#A614C3" }} strokeWidth={2} />
+            <svg className="w-5 h-5 flex-shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <defs>
+                <linearGradient id="alert-razz-license" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="24" y2="0">
+                  <stop offset="0%" stopColor="#5C2ED4" />
+                  <stop offset="100%" stopColor="#A614C3" />
+                </linearGradient>
+              </defs>
+              <circle cx="12" cy="12" r="10" stroke="url(#alert-razz-license)" />
+              <line x1="12" x2="12" y1="8" y2="12" stroke="url(#alert-razz-license)" />
+              <line x1="12" x2="12.01" y1="16" y2="16" stroke="url(#alert-razz-license)" />
+            </svg>
             <div className="flex-1 min-w-0">
               <div className="text-[13px] font-semibold" style={{
                 ...font,
@@ -3673,13 +3696,32 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
             </div>
 
             {/* Agency Address */}
+            {(() => {
+              // StyledSelect palette — matches the popover language used in
+              // ITC editing so Country / State pickers here look identical
+              // to the ones on the Accounting → ITC Record surface.
+              const selectC = {
+                text: c.text, muted: c.muted, border: c.border, cardBg: c.cardBg, hoverBg: c.hoverBg,
+                razz: "#A614C3", razzTintBg: isDark ? "rgba(168,85,247,0.14)" : "rgba(168,85,247,0.08)",
+              };
+              const COUNTRIES = ["United States of America", "Canada", "Mexico"] as const;
+              const STATES = ["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"] as const;
+              type Country = typeof COUNTRIES[number];
+              type StateCode = typeof STATES[number];
+              return (
+            <>
             <div className="mb-4">
               <label style={{ ...labelStyle, marginBottom: 12 }}>Agency Address:</label>
               <div className="space-y-3">
                 <div className="grid grid-cols-3 gap-6">
-                  <select value={eCountry} onChange={e => setECountry(e.target.value)} style={selectStyle}>
-                    <option>United States of America</option><option>Canada</option><option>Mexico</option>
-                  </select>
+                  <StyledSelect<Country>
+                    value={(COUNTRIES as readonly string[]).includes(eCountry) ? (eCountry as Country) : "United States of America"}
+                    onChange={v => setECountry(v)}
+                    options={COUNTRIES}
+                    triggerStyle={selectStyle}
+                    c={selectC}
+                    font={font}
+                  />
                   <AddressAutocomplete
                     value={eStreet}
                     onChange={setEStreet}
@@ -3700,9 +3742,16 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                 <div className="grid grid-cols-3 gap-6">
                   <input value={eCity} onChange={e => setECity(e.target.value)} placeholder="City" style={inputStyle} />
                   <div className="flex gap-4">
-                    <select value={eState} onChange={e => setEState(e.target.value)} style={{ ...selectStyle, flex: 1 }}>
-                      {["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"].map(s => <option key={s}>{s}</option>)}
-                    </select>
+                    <div style={{ flex: 1 }}>
+                      <StyledSelect<StateCode>
+                        value={(STATES as readonly string[]).includes(eState) ? (eState as StateCode) : "IA"}
+                        onChange={v => setEState(v)}
+                        options={STATES}
+                        triggerStyle={{ ...selectStyle, width: "100%" }}
+                        c={selectC}
+                        font={font}
+                      />
+                    </div>
                     <input value={eZip} onChange={e => setEZip(e.target.value)} placeholder="ZIP" style={{ ...inputStyle, flex: 1 }} />
                   </div>
                   <div />
@@ -3719,10 +3768,16 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
               </div>
               <div className="space-y-3">
                 <div className="grid grid-cols-3 gap-6">
-                  <select value={eSameAddr ? eCountry : eMCountry} onChange={e => setEMCountry(e.target.value)}
-                    style={{ ...selectStyle, opacity: eSameAddr ? 0.5 : 1 }} disabled={eSameAddr}>
-                    <option>United States of America</option><option>Canada</option><option>Mexico</option>
-                  </select>
+                  <div style={{ opacity: eSameAddr ? 0.5 : 1, pointerEvents: eSameAddr ? "none" : "auto" }}>
+                    <StyledSelect<Country>
+                      value={(COUNTRIES as readonly string[]).includes(eSameAddr ? eCountry : eMCountry) ? ((eSameAddr ? eCountry : eMCountry) as Country) : "United States of America"}
+                      onChange={v => setEMCountry(v)}
+                      options={COUNTRIES}
+                      triggerStyle={selectStyle}
+                      c={selectC}
+                      font={font}
+                    />
+                  </div>
                   <AddressAutocomplete
                     value={eSameAddr ? eStreet : eMStreet}
                     onChange={setEMStreet}
@@ -3745,10 +3800,16 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                   <input value={eSameAddr ? eCity : eMCity} onChange={e => setEMCity(e.target.value)}
                     placeholder="City" style={{ ...inputStyle, opacity: eSameAddr ? 0.5 : 1 }} disabled={eSameAddr} />
                   <div className="flex gap-4">
-                    <select value={eSameAddr ? eState : eMState} onChange={e => setEMState(e.target.value)}
-                      style={{ ...selectStyle, flex: 1, opacity: eSameAddr ? 0.5 : 1 }} disabled={eSameAddr}>
-                      {["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"].map(s => <option key={s}>{s}</option>)}
-                    </select>
+                    <div style={{ flex: 1, opacity: eSameAddr ? 0.5 : 1, pointerEvents: eSameAddr ? "none" : "auto" }}>
+                      <StyledSelect<StateCode>
+                        value={(STATES as readonly string[]).includes(eSameAddr ? eState : eMState) ? ((eSameAddr ? eState : eMState) as StateCode) : "IA"}
+                        onChange={v => setEMState(v)}
+                        options={STATES}
+                        triggerStyle={{ ...selectStyle, width: "100%" }}
+                        c={selectC}
+                        font={font}
+                      />
+                    </div>
                     <input value={eSameAddr ? eZip : eMZip} onChange={e => setEMZip(e.target.value)}
                       placeholder="ZIP" style={{ ...inputStyle, flex: 1, opacity: eSameAddr ? 0.5 : 1 }} disabled={eSameAddr} />
                   </div>
@@ -3756,6 +3817,9 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                 </div>
               </div>
             </div>
+            </>
+              );
+            })()}
 
             {/* Status | Appt Date */}
             <div className="grid grid-cols-3 gap-6 mb-6">
@@ -6230,7 +6294,17 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                 {viewMode === "internal" && isSuperAdmin && record && accountingView === "record" && pendingUpdates.length > 0 && (
                   <div className="rounded-xl p-4 mb-6 flex items-start gap-3"
                     style={{ background: isDark ? "rgba(255,255,255,0.04)" : "#F9FAFB", border: `1px solid ${c.border}` }}>
-                    <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: "#A614C3" }} strokeWidth={2} />
+                    <svg className="w-5 h-5 flex-shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <defs>
+                        <linearGradient id="alert-razz-pending" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="24" y2="0">
+                          <stop offset="0%" stopColor="#5C2ED4" />
+                          <stop offset="100%" stopColor="#A614C3" />
+                        </linearGradient>
+                      </defs>
+                      <circle cx="12" cy="12" r="10" stroke="url(#alert-razz-pending)" />
+                      <line x1="12" x2="12" y1="8" y2="12" stroke="url(#alert-razz-pending)" />
+                      <line x1="12" x2="12.01" y1="16" y2="16" stroke="url(#alert-razz-pending)" />
+                    </svg>
                     <div className="flex-1 min-w-0">
                       <div className="text-[13px] font-semibold" style={{
                         ...font,
@@ -6239,7 +6313,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                         WebkitBackgroundClip: "text",
                         WebkitTextFillColor: "transparent",
                       }}>
-                        {pendingUpdates.length} pending {pendingUpdates.length === 1 ? "update" : "updates"} from recent edits
+                        Pending updates from recent edits
                       </div>
                       <div className="text-[12px] mt-0.5" style={{ ...font, color: c.muted }}>
                         The agency info was edited — the ITC record is now behind. Review the changes and push to ITC.
@@ -6381,7 +6455,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                         <div className="min-w-0">
                           <h3 className="text-[17px] font-bold mb-1" style={{ ...font, color: c.text }}>Pending Updates from Agency Info</h3>
                           <p className="text-[12.5px]" style={{ ...font, color: c.muted }}>
-                            {pendingUpdates.length} {pendingUpdates.length === 1 ? "field is" : "fields are"} out of sync with ITC. Review and push.
+                            Fields out of sync with ITC. Review and push.
                           </p>
                         </div>
                         <button
@@ -6396,67 +6470,86 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                         </button>
                       </div>
                       <div className="overflow-y-auto px-6" style={{ flex: "1 1 auto" }}>
-                        {pendingUpdates.map(p => {
-                          const k = p.key as string;
-                          const editedValue = pendingOverrides[k] ?? p.agencyValue;
-                          // Docs backing this pending change, so the reviewer
-                          // can verify a new expiry/license # against the
-                          // uploaded W-9 or License copy before pushing.
-                          const supportingDocCat: AgencyDocCategory | null =
+                        {(() => {
+                          // Fields sharing a supporting doc (W-9 or License)
+                          // get merged into one bucket so the doc card only
+                          // renders once per group — no more four "Supporting
+                          // W-9" strips for Address/City/State/Zip.
+                          const docFor = (k: string): AgencyDocCategory | null =>
                             k === "licenseNo" || k === "licenseExpires" ? "license"
                             : (k === "name" || k === "address" || k === "city" || k === "state" || k === "zip" || k === "taxId") ? "w9"
                             : null;
-                          const supportingDoc = supportingDocCat
-                            ? agencyDocs.find(d => d.category === supportingDocCat && !d.archived && !d.trashed) ?? null
-                            : null;
-                          return (
-                          <div key={k} className="py-4" style={{ borderTop: `1px solid ${c.border}` }}>
-                            <p className="text-[13px] font-semibold mb-2" style={{ ...font, color: c.text }}>{p.label}</p>
-                            <div className="flex items-center gap-3">
-                              <div className="flex-1 min-w-0">
-                                <p className="text-[10px] uppercase tracking-wider mb-1" style={{ ...font, color: c.muted, letterSpacing: "0.06em" }}>Current</p>
-                                <p className="text-[13px] truncate" style={{ ...font, color: c.muted, textDecoration: "line-through" }}>{p.itcValue || "—"}</p>
+                          type Bucket = { cat: AgencyDocCategory | null; items: typeof pendingUpdates };
+                          const buckets: Bucket[] = [];
+                          for (const p of pendingUpdates) {
+                            const cat = docFor(p.key as string);
+                            const last = buckets[buckets.length - 1];
+                            if (last && last.cat === cat) last.items.push(p);
+                            else buckets.push({ cat, items: [p] });
+                          }
+                          return buckets.map((bucket, bIdx) => {
+                            const supportingDoc = bucket.cat
+                              ? agencyDocs.find(d => d.category === bucket.cat && !d.archived && !d.trashed) ?? null
+                              : null;
+                            return (
+                              <div key={bIdx} className="py-4" style={{ borderTop: `1px solid ${c.border}` }}>
+                                {bucket.items.map((p, iIdx) => {
+                                  const k = p.key as string;
+                                  const editedValue = pendingOverrides[k] ?? p.agencyValue;
+                                  return (
+                                    <div key={k} style={{ marginTop: iIdx === 0 ? 0 : 16 }}>
+                                      <p className="text-[13px] font-semibold mb-2" style={{ ...font, color: c.text }}>{p.label}</p>
+                                      <div className="flex items-center gap-3">
+                                        <div className="flex-1 min-w-0">
+                                          <p className="text-[10px] uppercase tracking-wider mb-1" style={{ ...font, color: c.muted, letterSpacing: "0.06em" }}>Current</p>
+                                          <p className="text-[13px] truncate" style={{ ...font, color: c.muted, textDecoration: "line-through" }}>{p.itcValue || "—"}</p>
+                                        </div>
+                                        <ArrowRight className="w-3.5 h-3.5 flex-shrink-0 mt-4" style={{ color: c.muted }} />
+                                        <div className="flex-1 min-w-0">
+                                          <p className="text-[10px] uppercase tracking-wider mb-1" style={{ ...font, color: c.muted, letterSpacing: "0.06em" }}>New</p>
+                                          <input
+                                            value={editedValue}
+                                            onChange={e => setPendingOverrides(prev => ({ ...prev, [k]: e.target.value }))}
+                                            className="w-full text-[13px] font-semibold"
+                                            style={{ ...font, color: c.text, background: c.cardBg, border: `1px solid ${c.border}`, borderRadius: 6, padding: "5px 8px", outline: "none" }}
+                                          />
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                                {supportingDoc && (
+                                  <div className="mt-3 flex items-center gap-2 px-3 py-2 rounded-lg"
+                                    style={{ background: isDark ? "rgba(255,255,255,0.03)" : "#F9FAFB", border: `1px solid ${c.border}` }}>
+                                    <Paperclip className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#A614C3" }} />
+                                    <div className="flex-1 min-w-0">
+                                      <div className="text-[11px] font-medium truncate" style={{ ...font, color: c.text }}>{supportingDoc.name}</div>
+                                      <div className="text-[10px]" style={{ ...font, color: c.muted }}>
+                                        Supporting {bucket.cat === "license" ? "License copy" : "W-9"} for {bucket.items.length === 1 ? bucket.items[0].label : `${bucket.items.length} fields`}
+                                      </div>
+                                    </div>
+                                    <button title="Preview"
+                                      onClick={() => setPreviewDoc({ id: supportingDoc.id, category: supportingDoc.category, name: supportingDoc.name, date: supportingDoc.date, archived: supportingDoc.archived, trashed: supportingDoc.trashed })}
+                                      className="p-1.5 rounded transition-colors flex-shrink-0"
+                                      style={{ color: c.muted }}
+                                      onMouseEnter={e => { e.currentTarget.style.background = c.hoverBg; e.currentTarget.style.color = c.text; }}
+                                      onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = c.muted; }}>
+                                      <Eye className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button title="Download"
+                                      onClick={() => showToast({ title: `Downloading ${supportingDoc.name}`, description: `${bucket.cat === "license" ? "License copy" : "W-9"} · ${supportingDoc.date}` })}
+                                      className="p-1.5 rounded transition-colors flex-shrink-0"
+                                      style={{ color: c.muted }}
+                                      onMouseEnter={e => { e.currentTarget.style.background = c.hoverBg; e.currentTarget.style.color = c.text; }}
+                                      onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = c.muted; }}>
+                                      <Download className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                )}
                               </div>
-                              <ArrowRight className="w-3.5 h-3.5 flex-shrink-0 mt-4" style={{ color: c.muted }} />
-                              <div className="flex-1 min-w-0">
-                                <p className="text-[10px] uppercase tracking-wider mb-1" style={{ ...font, color: c.muted, letterSpacing: "0.06em" }}>New</p>
-                                <input
-                                  value={editedValue}
-                                  onChange={e => setPendingOverrides(prev => ({ ...prev, [k]: e.target.value }))}
-                                  className="w-full text-[13px] font-semibold"
-                                  style={{ ...font, color: c.text, background: c.cardBg, border: `1px solid ${c.border}`, borderRadius: 6, padding: "5px 8px", outline: "none" }}
-                                />
-                              </div>
-                            </div>
-                            {supportingDoc && (
-                              <div className="mt-3 flex items-center gap-2 px-3 py-2 rounded-lg"
-                                style={{ background: isDark ? "rgba(255,255,255,0.03)" : "#F9FAFB", border: `1px solid ${c.border}` }}>
-                                <Paperclip className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#A614C3" }} />
-                                <div className="flex-1 min-w-0">
-                                  <div className="text-[11px] font-medium truncate" style={{ ...font, color: c.text }}>{supportingDoc.name}</div>
-                                  <div className="text-[10px]" style={{ ...font, color: c.muted }}>Supporting {supportingDocCat === "license" ? "License copy" : "W-9"}</div>
-                                </div>
-                                <button title="Preview"
-                                  onClick={() => setPreviewDoc({ id: supportingDoc.id, category: supportingDoc.category, name: supportingDoc.name, date: supportingDoc.date, archived: supportingDoc.archived, trashed: supportingDoc.trashed })}
-                                  className="p-1.5 rounded transition-colors flex-shrink-0"
-                                  style={{ color: c.muted }}
-                                  onMouseEnter={e => { e.currentTarget.style.background = c.hoverBg; e.currentTarget.style.color = c.text; }}
-                                  onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = c.muted; }}>
-                                  <Eye className="w-3.5 h-3.5" />
-                                </button>
-                                <button title="Download"
-                                  onClick={() => showToast({ title: `Downloading ${supportingDoc.name}`, description: `${supportingDocCat === "license" ? "License copy" : "W-9"} · ${supportingDoc.date}` })}
-                                  className="p-1.5 rounded transition-colors flex-shrink-0"
-                                  style={{ color: c.muted }}
-                                  onMouseEnter={e => { e.currentTarget.style.background = c.hoverBg; e.currentTarget.style.color = c.text; }}
-                                  onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = c.muted; }}>
-                                  <Download className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                          );
-                        })}
+                            );
+                          });
+                        })()}
                       </div>
                       <div className="p-6 pt-4 flex items-center justify-end gap-2" style={{ borderTop: `1px solid ${c.border}` }}>
                         <button
