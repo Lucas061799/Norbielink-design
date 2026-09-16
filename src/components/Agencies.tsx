@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import {
   Search, Plus, Star, MapPin, Users, ChevronDown, ChevronUp,
-  ChevronsUpDown, Building2, ChevronLeft, ChevronRight, X,
+  ChevronsUpDown, Building2, ChevronLeft, ChevronRight, ArrowRight, X,
   Calendar, RefreshCw, FileText, Edit2, Network, User,
   FileText as QuoteIcon, Shield,
   StickyNote, LayoutGrid, Trash2, Archive, Pin, List, Table2, FolderOpen, FileCheck,
@@ -1797,6 +1797,14 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
   // Files queued in the doc-update modal — Save Changes is gated on these.
   const [docModalUploads, setDocModalUploads] = useState<{ w9?: string; license?: string }>({});
   const [docModalDragOver, setDocModalDragOver] = useState<"w9" | "license" | null>(null);
+  // Dedicated License renewal mini-flow — opened from the expired-license
+  // banner. Bundles the new License upload with a fresh expiry date so
+  // uploading also clears the block, without a bounce through the Overview
+  // edit form (which itself is blocked while expired).
+  const [renewLicenseOpen, setRenewLicenseOpen] = useState(false);
+  const [renewLicenseFile, setRenewLicenseFile] = useState<string>("");
+  const [renewLicenseExp, setRenewLicenseExp] = useState<string>("");
+  const [renewLicenseDragOver, setRenewLicenseDragOver] = useState(false);
 
   // Book Roll modal — admin sells the entire policy book to another agency.
   const [bookRollOpen, setBookRollOpen] = useState(false);
@@ -2891,6 +2899,98 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
           </div>
         </div>
       )}
+      {renewLicenseOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-6"
+          style={{ background: "rgba(0,0,0,0.45)" }}>
+          <div className="w-[440px] rounded-2xl p-6 shadow-2xl" onClick={e => e.stopPropagation()}
+            style={{ background: c.cardBg, border: `1px solid ${c.border}`, fontFamily: FONT }}>
+            <div className="flex items-start gap-4 mb-4">
+              <div className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0"
+                style={{ background: isDark ? "rgba(168,85,247,0.22)" : "rgba(166,20,195,0.10)" }}>
+                <AlertCircle className="w-6 h-6" style={{ color: "#A614C3" }} strokeWidth={2} />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-[16px] font-bold mb-1.5" style={{ color: c.text }}>Renew License</h3>
+                <p className="text-[12px] leading-relaxed" style={{ color: c.muted }}>
+                  Upload the renewed License copy and set the new expiration date. Clearing the expired-license block for {effectiveAgency.name}.
+                </p>
+              </div>
+            </div>
+            <div className="space-y-4 mb-5">
+              <div>
+                <label className="block text-[12px] font-semibold mb-1.5" style={{ color: c.text }}>License copy</label>
+                {renewLicenseFile ? (
+                  <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg"
+                    style={{ background: "rgba(115,201,183,0.10)", border: "1px solid rgba(115,201,183,0.35)" }}>
+                    <CheckSquare className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#73C9B7" }} />
+                    <input value={renewLicenseFile} onChange={e => setRenewLicenseFile(e.target.value)}
+                      className="text-[12px] flex-1 outline-none bg-transparent min-w-0"
+                      style={{ color: c.text, fontFamily: FONT }} spellCheck={false} />
+                    <button onClick={() => setRenewLicenseFile("")}
+                      className="text-[11px] font-medium transition-opacity hover:opacity-70 flex-shrink-0"
+                      style={{ color: c.muted }}>Replace</button>
+                  </div>
+                ) : (
+                  <label className="flex flex-col items-center justify-center cursor-pointer transition-colors rounded-lg py-5"
+                    style={{ background: renewLicenseDragOver ? "rgba(168,85,247,0.08)" : c.hoverBg, border: `1.5px dashed ${renewLicenseDragOver ? "#A614C3" : c.borderStrong}` }}
+                    onDragOver={e => { e.preventDefault(); setRenewLicenseDragOver(true); }}
+                    onDragLeave={() => setRenewLicenseDragOver(false)}
+                    onDrop={e => { e.preventDefault(); setRenewLicenseDragOver(false); const f = e.dataTransfer.files?.[0]; if (f) setRenewLicenseFile(f.name); }}>
+                    <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png"
+                      onChange={e => { const f = e.target.files?.[0]; if (f) setRenewLicenseFile(f.name); }} />
+                    <Paperclip className="w-5 h-5 mb-1.5" style={{ color: "#A614C3" }} />
+                    <span className="text-[12px] font-medium" style={{ color: c.text }}>Drag &amp; Drop or Click to Browse</span>
+                    <span className="text-[11px] mt-0.5" style={{ color: c.muted }}>PDF, JPG, PNG · Max 10MB</span>
+                  </label>
+                )}
+              </div>
+              <div>
+                <label className="block text-[12px] font-semibold mb-1.5" style={{ color: c.text }}>New expiration date</label>
+                <DatePicker
+                  value={renewLicenseExp}
+                  onChange={setRenewLicenseExp}
+                  inputStyle={{ background: c.cardBg, color: c.text, border: `1px solid ${c.border}`, borderRadius: 8, padding: "8px 10px", fontFamily: FONT, fontSize: 13, width: "100%", outline: "none" }}
+                  c={c as unknown as Record<string, string>}
+                  btnGrad={btnGrad}
+                  font={{ fontFamily: FONT }}
+                />
+              </div>
+            </div>
+            {(() => {
+              const ready = !!renewLicenseFile && !!renewLicenseExp;
+              return (
+                <div className="flex gap-3 items-center justify-between">
+                  <button onClick={() => setRenewLicenseOpen(false)}
+                    className="px-4 py-2 rounded-lg text-[12px] font-medium transition-all"
+                    style={{ border: `1px solid ${c.borderStrong}`, color: c.text, background: "transparent" }}
+                    onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+                    onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (!ready) return;
+                      const today = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+                      setAgencyDocs(prev => [{ id: `d${Date.now()}-lic`, category: "license", name: renewLicenseFile, date: today }, ...prev]);
+                      // DatePicker returns MM/DD/YYYY, matching the rest of the app.
+                      setAgencyFieldOverride(prev => ({ ...prev, licenseExp: renewLicenseExp }));
+                      setELicExp(renewLicenseExp);
+                      showToast({ title: "License renewal submitted", description: `Accounting will verify the copy against the new ${renewLicenseExp} expiration and push to ITC.` }, 6000);
+                      setRenewLicenseOpen(false);
+                    }}
+                    disabled={!ready}
+                    className="px-4 py-2 rounded-lg text-[12px] font-semibold text-white transition-all"
+                    style={{ background: btnGrad, opacity: ready ? 1 : 0.5, cursor: ready ? "pointer" : "not-allowed" }}
+                    onMouseEnter={e => { if (ready) e.currentTarget.style.filter = "brightness(1.10)"; }}
+                    onMouseLeave={e => (e.currentTarget.style.filter = "none")}>
+                    Save License
+                  </button>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
       {removeUserConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-6"
           onClick={() => setRemoveUserConfirm(null)}
@@ -3317,16 +3417,30 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
             super admin sees the block wherever they land. */}
         {licenseExpiredInfo && (
           <div className="rounded-xl p-4 mb-6 flex items-start gap-3"
-            style={{ background: isDark ? "rgba(220,38,38,0.12)" : "rgba(220,38,38,0.06)", border: `1px solid ${isDark ? "rgba(248,113,113,0.45)" : "rgba(220,38,38,0.35)"}` }}>
-            <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: isDark ? "#F87171" : "#DC2626" }} strokeWidth={2} />
+            style={{ background: isDark ? "rgba(255,255,255,0.04)" : "#F9FAFB", border: `1px solid ${c.border}` }}>
+            <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: "#A614C3" }} strokeWidth={2} />
             <div className="flex-1 min-w-0">
-              <div className="text-[13px] font-semibold" style={{ ...font, color: isDark ? "#FCA5A5" : "#B91C1C" }}>
+              <div className="text-[13px] font-semibold" style={{
+                ...font,
+                backgroundImage: "linear-gradient(88.54deg, #5C2ED4 0.1%, #A614C3 63.88%)",
+                backgroundClip: "text",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+              }}>
                 License expired on {licenseExpiredInfo.date}
               </div>
-              <div className="text-[12px] mt-0.5" style={{ ...font, color: isDark ? "#FCA5A5" : "#7F1D1D", opacity: 0.85 }}>
-                Updates to this agency are blocked until a renewed license is on file. Upload a new License copy from the Documents tab to unblock.
+              <div className="text-[12px] mt-0.5" style={{ ...font, color: c.muted }}>
+                Updates to this agency are blocked until a renewed license is on file. Upload a renewed License to unblock.
               </div>
             </div>
+            <button
+              onClick={() => { setRenewLicenseFile(""); setRenewLicenseExp(""); setRenewLicenseOpen(true); }}
+              className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold text-white transition-all whitespace-nowrap"
+              style={{ ...font, background: btnGrad }}
+              onMouseEnter={e => (e.currentTarget.style.filter = "brightness(1.10)")}
+              onMouseLeave={e => (e.currentTarget.style.filter = "none")}>
+              <Upload className="w-3.5 h-3.5" />Upload New License
+            </button>
           </div>
         )}
 
@@ -6239,8 +6353,22 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                 {pendingItcOpen && record && (
                   <>
                     <div className="fixed inset-0 z-40" style={{ background: "rgba(0,0,0,0.35)" }} onClick={closePendingItc} />
-                    <div className="fixed left-1/2 top-1/2 z-50 rounded-2xl shadow-2xl overflow-hidden flex flex-col"
-                      style={{ transform: "translate(-50%, -50%)", background: c.cardBg, border: `1px solid ${c.border}`, width: "min(560px, 92vw)", maxHeight: "82vh" }}>
+                    {/* When the supporting-doc preview slides in on the right,
+                        park the pending-updates modal on the left half so the
+                        reviewer can compare field-for-field without flipping
+                        between overlays. Center otherwise. */}
+                    <div className="fixed top-1/2 z-50 rounded-2xl shadow-2xl overflow-hidden flex flex-col transition-all duration-200"
+                      style={{
+                        // Compare-mode: center within the LEFT half of the
+                        // viewport (preview panel occupies the right 50vw).
+                        // Center of the whole viewport otherwise.
+                        left: previewDoc ? "25vw" : "50%",
+                        transform: "translate(-50%, -50%)",
+                        background: c.cardBg,
+                        border: `1px solid ${c.border}`,
+                        width: previewDoc ? "min(460px, 46vw)" : "min(560px, 92vw)",
+                        maxHeight: "82vh",
+                      }}>
                       <div className="p-6 pb-4 flex items-start justify-between gap-4">
                         <div className="min-w-0">
                           <h3 className="text-[17px] font-bold mb-1" style={{ ...font, color: c.text }}>Pending Updates from Agency Info</h3>
@@ -6263,16 +6391,27 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                         {pendingUpdates.map(p => {
                           const k = p.key as string;
                           const editedValue = pendingOverrides[k] ?? p.agencyValue;
+                          // Docs backing this pending change, so the reviewer
+                          // can verify a new expiry/license # against the
+                          // uploaded W-9 or License copy before pushing.
+                          const supportingDocCat: AgencyDocCategory | null =
+                            k === "licenseNo" || k === "licenseExpires" ? "license"
+                            : (k === "name" || k === "address" || k === "city" || k === "state" || k === "zip" || k === "taxId") ? "w9"
+                            : null;
+                          const supportingDoc = supportingDocCat
+                            ? agencyDocs.find(d => d.category === supportingDocCat && !d.archived && !d.trashed) ?? null
+                            : null;
                           return (
                           <div key={k} className="py-4" style={{ borderTop: `1px solid ${c.border}` }}>
                             <p className="text-[13px] font-semibold mb-2" style={{ ...font, color: c.text }}>{p.label}</p>
-                            <div className="grid grid-cols-2 gap-4">
-                              <div>
-                                <p className="text-[11px] uppercase tracking-wider mb-1" style={{ ...font, color: c.muted, letterSpacing: "0.06em" }}>Current ITC value</p>
-                                <p className="text-[13px]" style={{ ...font, color: c.muted, textDecoration: "line-through" }}>{p.itcValue || "—"}</p>
+                            <div className="flex items-center gap-3">
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[10px] uppercase tracking-wider mb-1" style={{ ...font, color: c.muted, letterSpacing: "0.06em" }}>Current</p>
+                                <p className="text-[13px] truncate" style={{ ...font, color: c.muted, textDecoration: "line-through" }}>{p.itcValue || "—"}</p>
                               </div>
-                              <div>
-                                <p className="text-[11px] uppercase tracking-wider mb-1" style={{ ...font, color: c.muted, letterSpacing: "0.06em" }}>New value (from Agency Info)</p>
+                              <ArrowRight className="w-3.5 h-3.5 flex-shrink-0 mt-4" style={{ color: c.muted }} />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[10px] uppercase tracking-wider mb-1" style={{ ...font, color: c.muted, letterSpacing: "0.06em" }}>New</p>
                                 <input
                                   value={editedValue}
                                   onChange={e => setPendingOverrides(prev => ({ ...prev, [k]: e.target.value }))}
@@ -6281,6 +6420,32 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                                 />
                               </div>
                             </div>
+                            {supportingDoc && (
+                              <div className="mt-3 flex items-center gap-2 px-3 py-2 rounded-lg"
+                                style={{ background: isDark ? "rgba(255,255,255,0.03)" : "#F9FAFB", border: `1px solid ${c.border}` }}>
+                                <Paperclip className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#A614C3" }} />
+                                <div className="flex-1 min-w-0">
+                                  <div className="text-[11px] font-medium truncate" style={{ ...font, color: c.text }}>{supportingDoc.name}</div>
+                                  <div className="text-[10px]" style={{ ...font, color: c.muted }}>Supporting {supportingDocCat === "license" ? "License copy" : "W-9"}</div>
+                                </div>
+                                <button title="Preview"
+                                  onClick={() => setPreviewDoc({ id: supportingDoc.id, category: supportingDoc.category, name: supportingDoc.name, date: supportingDoc.date, archived: supportingDoc.archived, trashed: supportingDoc.trashed })}
+                                  className="p-1.5 rounded transition-colors flex-shrink-0"
+                                  style={{ color: c.muted }}
+                                  onMouseEnter={e => { e.currentTarget.style.background = c.hoverBg; e.currentTarget.style.color = c.text; }}
+                                  onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = c.muted; }}>
+                                  <Eye className="w-3.5 h-3.5" />
+                                </button>
+                                <button title="Download"
+                                  onClick={() => showToast({ title: `Downloading ${supportingDoc.name}`, description: `${supportingDocCat === "license" ? "License copy" : "W-9"} · ${supportingDoc.date}` })}
+                                  className="p-1.5 rounded transition-colors flex-shrink-0"
+                                  style={{ color: c.muted }}
+                                  onMouseEnter={e => { e.currentTarget.style.background = c.hoverBg; e.currentTarget.style.color = c.text; }}
+                                  onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = c.muted; }}>
+                                  <Download className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            )}
                           </div>
                           );
                         })}
@@ -6310,6 +6475,65 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                     </div>
                   </>
                 )}
+
+                {/* Side-drawer preview for pending-updates supporting docs.
+                    The Documents-tab preview slots don't render here, so this
+                    dedicated overlay lets the reviewer inspect the W-9 or
+                    License copy without leaving the Accounting tab. Placeholder
+                    body mirrors the Documents-tab preview so styling stays
+                    consistent across surfaces. */}
+                {previewDoc && (() => {
+                  const CAT_LABEL: Record<AgencyDocCategory, string> = { bor: "Broker of Record", w9: "W-9", license: "License", agreement: "Agreements", other: "Other", eo: "E&O Certificate" };
+                  return (
+                    <div className="fixed inset-y-0 right-0 z-[60] flex" style={{ width: "50vw", minWidth: 480 }}>
+                      {/* Skip the dim overlay when the pending-updates modal
+                          is also open — it sits on the left half by design,
+                          and dimming it would defeat the side-by-side compare. */}
+                      {!pendingItcOpen && (
+                        <div className="flex-1 cursor-pointer" onClick={() => setPreviewDoc(null)} style={{ background: "rgba(0,0,0,0.25)" }} />
+                      )}
+                      <div className="flex flex-col h-full shadow-2xl" style={{ width: "100%", background: c.cardBg, borderLeft: `1px solid ${c.border}` }}>
+                        <div className="flex items-center justify-between px-6 py-3 flex-shrink-0"
+                          style={{ borderBottom: `1px solid ${c.border}`, background: isDark ? "rgba(255,255,255,0.02)" : "rgba(249,250,251,0.80)" }}>
+                          <div className="flex items-center gap-2 min-w-0">
+                            <FileText className="w-3.5 h-3.5 flex-shrink-0" style={{ color: c.muted }} />
+                            <span className="text-[11px] flex-shrink-0" style={{ fontFamily: FONT, color: c.muted }}>Supporting doc</span>
+                            <ChevronRight className="w-3 h-3 flex-shrink-0" style={{ color: c.muted }} />
+                            <span className="text-[11px] flex-shrink-0" style={{ fontFamily: FONT, color: c.muted }}>{CAT_LABEL[previewDoc.category]}</span>
+                            <ChevronRight className="w-3 h-3 flex-shrink-0" style={{ color: c.muted }} />
+                            <span className="text-[12px] font-semibold truncate max-w-[420px]" style={{ fontFamily: FONT, color: c.text }}>{previewDoc.name}</span>
+                          </div>
+                          <div className="flex items-center gap-0.5 flex-shrink-0">
+                            <button title="Download"
+                              onClick={() => showToast({ title: `Downloading ${previewDoc.name}`, description: `${CAT_LABEL[previewDoc.category]} · ${previewDoc.date}` })}
+                              className="p-1.5 rounded-md transition-colors" style={{ color: c.muted }}
+                              onMouseEnter={e => { e.currentTarget.style.background = c.hoverBg; e.currentTarget.style.color = c.text; }}
+                              onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = c.muted; }}>
+                              <Download className="w-3.5 h-3.5" />
+                            </button>
+                            <button title="Close" onClick={() => setPreviewDoc(null)} className="p-1.5 rounded-md transition-colors" style={{ color: c.muted }}
+                              onMouseEnter={e => { e.currentTarget.style.background = c.hoverBg; e.currentTarget.style.color = c.text; }}
+                              onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = c.muted; }}>
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-4 px-6 py-3 flex-shrink-0 text-[12px]" style={{ ...font, color: c.muted, borderBottom: `1px solid ${c.border}` }}>
+                          <span className="flex items-center gap-1.5"><FolderOpen className="w-3.5 h-3.5" style={{ color: "#A855F7" }} />{CAT_LABEL[previewDoc.category]}</span>
+                          <span className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" />{previewDoc.date}</span>
+                        </div>
+                        <div className="flex-1 min-h-0 overflow-auto p-6" style={{ background: isDark ? "rgba(255,255,255,0.02)" : "#F9FAFB" }}>
+                          <div className="mx-auto rounded shadow-sm flex flex-col items-center justify-center"
+                            style={{ background: "#FFFFFF", border: `1px solid ${c.border}`, aspectRatio: "8.5 / 11", maxWidth: 560, minHeight: 560, fontFamily: FONT }}>
+                            <FileText className="w-16 h-16 mb-3" style={{ color: "#D1D5DB" }} />
+                            <div className="text-[13px] font-semibold mb-1" style={{ color: "#374151" }}>{previewDoc.name}</div>
+                            <div className="text-[11px]" style={{ color: "#9CA3AF" }}>Preview not available in demo</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* ── Statements card — 12-month rolling archive.
                     Phase 1 scope: two statements per month (commission +
