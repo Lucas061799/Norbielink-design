@@ -827,6 +827,10 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
   const [detailTab, setDetailTab] = useState<DetailTab>(initialTab ?? "overview");
   const [isEditing, setIsEditing]           = useState(false);
   const [editExpanded, setEditExpanded]     = useState(false);
+  // Read-only "view expanded" side panel for the Agency Information card
+  // on the Overview tab. Header's maximize icon toggles this — matches the
+  // edit-mode expand pattern but without any edit affordance.
+  const [overviewExpanded, setOverviewExpanded] = useState(false);
   const [contactCardEditing, setContactCardEditing] = useState(false);
   const [contactMode, setContactMode] = useState<"edit"|"reassign"|"new">("edit");
   const [reassignSelection, setReassignSelection] = useState<string>("");
@@ -896,6 +900,28 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
   const [wcOverride,    setWcOverride]    = useState<string[] | null>(null);
   const effectiveAffils = affilOverride ?? agency.affiliations ?? [];
   const effectiveWC     = wcOverride    ?? agency.workersComp ?? [];
+  // Persisted overrides for the ITC-diffed core fields. Save Changes writes
+  // the current edit-form values in here so the Accounting → ITC Record view
+  // sees the drift as pending updates the super admin can push. Keeps the
+  // parent `agency` object unmodified — this is just the UI's local memory
+  // of "what the agency should look like now."
+  type AgencyFieldOverride = Partial<Pick<AgencyDetail, "name" | "street" | "city" | "state" | "zip" | "phone" | "contactEmail" | "licenseNo" | "licenseExp">>;
+  const [agencyFieldOverride, setAgencyFieldOverride] = useState<AgencyFieldOverride>({});
+  const effectiveAgency: AgencyDetail = { ...agency, ...agencyFieldOverride };
+  // Batch-fed compliance gate: when the agency's license is past its expiry
+  // date, edits are blocked and a red banner is shown across every tab.
+  // Parses the mock MM/DD/YYYY strings; a blank / unparseable value leaves
+  // the gate open so we don't false-positive on missing data.
+  const licenseExpiredInfo: { date: string } | null = (() => {
+    const raw = (effectiveAgency.licenseExp ?? "").trim();
+    if (!raw) return null;
+    const parsed = new Date(raw);
+    if (Number.isNaN(parsed.getTime())) return null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    parsed.setHours(0, 0, 0, 0);
+    return parsed < today ? { date: raw } : null;
+  })();
   const [eStatusOpen, setEStatusOpen] = useState(false);
   const [eBizTypeOpen, setEBizTypeOpen] = useState(false);
   const [eReason, setEReason] = useState("");
@@ -2833,11 +2859,20 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                             description: "We'll review your edits and update the agency record shortly.",
                           }, 5000);
                         } else {
-                          showToast({ title: "Changes saved", description: "Updated documents uploaded successfully." });
+                          // Internal staff upload — same messaging as the no-doc
+                          // internal save path so the workflow reads consistently.
+                          showToast({
+                            title: "Sent to Accounting for review",
+                            description: "They'll review and push to ITC.",
+                          }, 5000);
                         }
                         setBadgesOverride(Array.from(eBadges));
                         setAffilOverride(Array.from(eAffil));
                         setWcOverride(Array.from(eWC));
+                        setAgencyFieldOverride({
+                          name: eName, street: eStreet, city: eCity, state: eState, zip: eZip,
+                          phone: ePhone, contactEmail: eEmail, licenseNo: eLicNo, licenseExp: eLicExp,
+                        });
                         setIsEditing(false);
                         setDocUpdateModal(null);
                         setDocModalUploads({});
@@ -3248,7 +3283,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
             // so the super admin knows there's something to review before
             // opening the tab. Internal + super-admin gated.
             const pendingItc = key === "accounting" && viewMode === "internal" && isSuperAdmin
-              ? countPendingItcUpdates(agency, itcRecords?.[agency.code] ?? null)
+              ? countPendingItcUpdates(effectiveAgency, itcRecords?.[agency.code] ?? null)
               : 0;
             return (
               <button key={key} onClick={() => { setDetailTab(key); }}
@@ -3275,6 +3310,26 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
           })}
         </div>
 
+        {/* License-expired banner. Drives off effectiveAgency.licenseExp so
+            local edits (mid-session renewal date bump) take effect immediately.
+            When expired, the batch-fed compliance signal blocks further edits
+            until a new license copy lands. Shown across every tab so the
+            super admin sees the block wherever they land. */}
+        {licenseExpiredInfo && (
+          <div className="rounded-xl p-4 mb-6 flex items-start gap-3"
+            style={{ background: isDark ? "rgba(220,38,38,0.12)" : "rgba(220,38,38,0.06)", border: `1px solid ${isDark ? "rgba(248,113,113,0.45)" : "rgba(220,38,38,0.35)"}` }}>
+            <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: isDark ? "#F87171" : "#DC2626" }} strokeWidth={2} />
+            <div className="flex-1 min-w-0">
+              <div className="text-[13px] font-semibold" style={{ ...font, color: isDark ? "#FCA5A5" : "#B91C1C" }}>
+                License expired on {licenseExpiredInfo.date}
+              </div>
+              <div className="text-[12px] mt-0.5" style={{ ...font, color: isDark ? "#FCA5A5" : "#7F1D1D", opacity: 0.85 }}>
+                Updates to this agency are blocked until a renewed license is on file. Upload a new License copy from the Documents tab to unblock.
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ── Overview tab ── */}
         {detailTab === "overview" && !isEditing && (
           <div className="pb-6">
@@ -3282,10 +3337,13 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-[17px] font-bold" style={{ ...font, color: c.text }}>Agency Information</h3>
               {currentUserIsAdmin && (
-                <button onClick={() => setIsEditing(true)}
+                <button
+                  onClick={() => { if (!licenseExpiredInfo) setIsEditing(true); }}
+                  disabled={!!licenseExpiredInfo}
+                  title={licenseExpiredInfo ? "License expired — upload a renewed license before editing." : undefined}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-colors"
-                  style={{ ...font, border: `1px solid ${isDark ? "rgba(255,255,255,0.10)" : "#E5E7EB"}`, color: c.muted }}
-                  onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+                  style={{ ...font, border: `1px solid ${isDark ? "rgba(255,255,255,0.10)" : "#E5E7EB"}`, color: c.muted, opacity: licenseExpiredInfo ? 0.5 : 1, cursor: licenseExpiredInfo ? "not-allowed" : "pointer" }}
+                  onMouseEnter={e => { if (!licenseExpiredInfo) e.currentTarget.style.background = c.hoverBg; }}
                   onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
                   <Pencil className="w-3.5 h-3.5" />Edit
                 </button>
@@ -3851,17 +3909,24 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                 Cancel
               </button>
               <button onClick={() => {
+                  if (licenseExpiredInfo) return;
                   // Doc-refresh gate runs for both internal staff AND external
                   // (client / Admin) principals. Client-locked fields (Name /
                   // Type / Address) can't be changed from the Admin view, so
-                  // in practice only Tax ID and License # trigger it there.
-                  // The uploaded W-9 / License lands in agencyDocs as w9 /
-                  // license (soft-hidden) either way.
+                  // in practice only Tax ID, License #, and mailing address
+                  // trigger it there. The uploaded W-9 / License lands in
+                  // agencyDocs as w9 / license (soft-hidden) either way.
+                  // Mailing address is what shows on the 1099, so any edit to
+                  // it also demands a refreshed W-9 per Accounting policy.
+                  const mailingChanged = !eSameAddr && (
+                    eMStreet !== "" || eMCity !== "" || eMState !== "" || eMZip !== ""
+                  );
                   const w9Changed = (
                     eName !== agency.name
                     || eType !== agency.agencyType
                     || eStreet !== agency.street || eCity !== agency.city || eState !== agency.state || eZip !== agency.zip
                     || eTaxId !== agency.taxId
+                    || mailingChanged
                   );
                   const licChanged = eLicNo !== agency.licenseNo;
                   if (w9Changed || licChanged) {
@@ -3872,6 +3937,13 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                   setBadgesOverride(Array.from(eBadges));
                   setAffilOverride(Array.from(eAffil));
                   setWcOverride(Array.from(eWC));
+                  // Persist ITC-diffed field edits so the Accounting → ITC
+                  // Record view sees them as pending updates the super admin
+                  // can review and push.
+                  setAgencyFieldOverride({
+                    name: eName, street: eStreet, city: eCity, state: eState, zip: eZip,
+                    phone: ePhone, contactEmail: eEmail, licenseNo: eLicNo, licenseExp: eLicExp,
+                  });
                   setIsEditing(false);
                   if (clientLocked) {
                     // Principal (external admin) submitted their editable-tier changes.
@@ -3882,11 +3954,22 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                       title: "Changes submitted for review",
                       description: "We'll review your edits and update the agency record shortly.",
                     }, 5000);
+                  } else {
+                    // Internal staff editing agency info — remind them that even
+                    // internal edits still need Accounting to sign off before they
+                    // push to ITC. Toast names the team explicitly for internal
+                    // workflow transparency.
+                    showToast({
+                      title: "Sent to Accounting for review",
+                      description: "They'll review and push to ITC.",
+                    }, 5000);
                   }
                 }}
+                disabled={!!licenseExpiredInfo}
+                title={licenseExpiredInfo ? "License expired — upload a renewed license before saving." : undefined}
                 className="text-[13px] font-semibold text-white transition-all"
-                style={{ ...font, background: btnGrad, padding:"10px 24px", borderRadius:"5.58px" }}
-                onMouseEnter={e => (e.currentTarget.style.filter = "brightness(1.10)")}
+                style={{ ...font, background: btnGrad, padding:"10px 24px", borderRadius:"5.58px", opacity: licenseExpiredInfo ? 0.5 : 1, cursor: licenseExpiredInfo ? "not-allowed" : "pointer" }}
+                onMouseEnter={e => { if (!licenseExpiredInfo) e.currentTarget.style.filter = "brightness(1.10)"; }}
                 onMouseLeave={e => (e.currentTarget.style.filter = "none")}>
                 Save Changes
               </button>
@@ -3910,19 +3993,14 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
             : showDocArchived
               ? archivedDocs
               : agencyDocs.filter(d => !d.trashed && !d.archived);
-          // Soft-hidden categories — kept in the type + CAT_LABEL + mock data per the
-          // product decision to retain the underlying schema, but hidden from the
-          // INTERNAL staff view of agency docs (Lisa's rule). In the client view, the
-          // agency is looking at their own portal and should see their own W-9 / Other
-          // docs, so the hide list only applies when viewMode === "internal".
-          const HIDDEN_AGENCY_DOC_CATEGORIES = viewMode === "internal"
-            ? new Set<AgencyDocCategory>(["w9", "other"])
-            : new Set<AgencyDocCategory>();
-          // Category list for pickers (Filter, By Type filter, Upload modal) and the By Type
-          // section ORDER. Mirrors the hide rule above so the client view exposes W-9 / Other.
-          const DOC_CATEGORY_LIST: AgencyDocCategory[] = viewMode === "internal"
-            ? ["bor","license","agreement","eo"]
-            : ["bor","w9","license","agreement","eo","other"];
+          // Shared category set across internal + client views so both surfaces
+          // expose the same 6 categories (Broker of Record / W-9 / License /
+          // Agreements / E&O Certificate / Other). The earlier internal-only
+          // hide of W-9 + Other has been retired.
+          const HIDDEN_AGENCY_DOC_CATEGORIES = new Set<AgencyDocCategory>();
+          // Category list for pickers (Filter, By Type filter, Upload modal) and
+          // the By Type section ORDER.
+          const DOC_CATEGORY_LIST: AgencyDocCategory[] = ["bor","w9","license","agreement","eo","other"];
           const visibleDocs = baseDocs
             .filter(d => !HIDDEN_AGENCY_DOC_CATEGORIES.has(d.category))
             .filter(d => docFilterCats.size === 0 || docFilterCats.has(d.category))
@@ -5978,15 +6056,15 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
               return s;
             };
             const ITC_AGENCY_MAP: Array<{ key: keyof ITCRecord; label: string; agencyValue: string }> = record ? [
-              { key: "name",           label: "Name",            agencyValue: agency.name },
-              { key: "address",        label: "Address",         agencyValue: agency.street },
-              { key: "city",           label: "City",            agencyValue: agency.city },
-              { key: "state",          label: "State",           agencyValue: agency.state },
-              { key: "zip",            label: "Zip",             agencyValue: agency.zip },
-              { key: "telephone",      label: "Telephone",       agencyValue: agency.phone },
-              { key: "email",          label: "Email",           agencyValue: agency.contactEmail },
-              { key: "licenseNo",      label: "License No",      agencyValue: agency.licenseNo },
-              { key: "licenseExpires", label: "License Expires", agencyValue: agency.licenseExp },
+              { key: "name",           label: "Name",            agencyValue: effectiveAgency.name },
+              { key: "address",        label: "Address",         agencyValue: effectiveAgency.street },
+              { key: "city",           label: "City",            agencyValue: effectiveAgency.city },
+              { key: "state",          label: "State",           agencyValue: effectiveAgency.state },
+              { key: "zip",            label: "Zip",             agencyValue: effectiveAgency.zip },
+              { key: "telephone",      label: "Telephone",       agencyValue: effectiveAgency.phone },
+              { key: "email",          label: "Email",           agencyValue: effectiveAgency.contactEmail },
+              { key: "licenseNo",      label: "License No",      agencyValue: effectiveAgency.licenseNo },
+              { key: "licenseExpires", label: "License Expires", agencyValue: effectiveAgency.licenseExp },
             ] : [];
             const pendingUpdates = record
               ? ITC_AGENCY_MAP
@@ -6055,18 +6133,20 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                   </div>
                 )}
                 {viewMode === "internal" && record && accountingView === "record" && (
-                <div className="rounded-2xl p-8 mb-8" style={{ background: c.cardBg, border: `1px solid ${c.border}` }}>
+                <>
+                {overviewExpanded && <div className="fixed inset-0 z-40" style={{ background: "rgba(0,0,0,0.35)" }} onClick={() => setOverviewExpanded(false)} />}
+                <div className={overviewExpanded ? "fixed inset-y-0 right-0 z-50 flex flex-col shadow-2xl overflow-y-auto" : ""}
+                  style={overviewExpanded ? { width: "70vw", background: c.cardBg, borderLeft: `1px solid ${c.border}` } : undefined}>
+                <div className={overviewExpanded ? "p-8 mb-8" : "rounded-2xl p-8 mb-8"}
+                  style={overviewExpanded ? { background: c.cardBg } : { background: c.cardBg, border: `1px solid ${c.border}` }}>
                   <div className="flex items-center justify-between mb-6">
                     <h3 className="text-[17px] font-bold" style={{ ...font, color: c.text }}>ITC Record</h3>
-                    {isSuperAdmin && (
-                      <button onClick={() => { setItcDraft(record); setItcEditing(true); }}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-colors"
-                        style={{ ...font, border: `1px solid ${isDark ? "rgba(255,255,255,0.10)" : "#E5E7EB"}`, color: c.muted }}
-                        onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
-                        onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-                        <Pencil className="w-3.5 h-3.5" />Edit
-                      </button>
-                    )}
+                    <button onClick={() => setOverviewExpanded(p => !p)} title={overviewExpanded ? "Collapse" : "Expand"}
+                      className="p-1.5 rounded-md transition-colors" style={{ color: overviewExpanded ? "#A855F7" : c.muted }}
+                      onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+                      onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                      {overviewExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                    </button>
                   </div>
 
                   <SectionHeader title="Producer" first />
@@ -6147,6 +6227,8 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                     </div>
                   </div>
                 </div>
+                </div>
+                </>
                 )}
 
                 {/* ── Pending ITC Updates modal ──
@@ -6159,11 +6241,23 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                     <div className="fixed inset-0 z-40" style={{ background: "rgba(0,0,0,0.35)" }} onClick={closePendingItc} />
                     <div className="fixed left-1/2 top-1/2 z-50 rounded-2xl shadow-2xl overflow-hidden flex flex-col"
                       style={{ transform: "translate(-50%, -50%)", background: c.cardBg, border: `1px solid ${c.border}`, width: "min(560px, 92vw)", maxHeight: "82vh" }}>
-                      <div className="p-6 pb-4">
-                        <h3 className="text-[17px] font-bold mb-1" style={{ ...font, color: c.text }}>Pending Updates from Agency Info</h3>
-                        <p className="text-[12.5px]" style={{ ...font, color: c.muted }}>
-                          {pendingUpdates.length} {pendingUpdates.length === 1 ? "field is" : "fields are"} out of sync with ITC. Review and push.
-                        </p>
+                      <div className="p-6 pb-4 flex items-start justify-between gap-4">
+                        <div className="min-w-0">
+                          <h3 className="text-[17px] font-bold mb-1" style={{ ...font, color: c.text }}>Pending Updates from Agency Info</h3>
+                          <p className="text-[12.5px]" style={{ ...font, color: c.muted }}>
+                            {pendingUpdates.length} {pendingUpdates.length === 1 ? "field is" : "fields are"} out of sync with ITC. Review and push.
+                          </p>
+                        </div>
+                        <button
+                          onClick={closePendingItc}
+                          title="Close — I'll review this later"
+                          aria-label="Close"
+                          className="flex-shrink-0 p-1.5 rounded-md transition-colors"
+                          style={{ color: c.muted }}
+                          onMouseEnter={e => { e.currentTarget.style.background = c.hoverBg; e.currentTarget.style.color = c.text; }}
+                          onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = c.muted; }}>
+                          <X className="w-4 h-4" />
+                        </button>
                       </div>
                       <div className="overflow-y-auto px-6" style={{ flex: "1 1 auto" }}>
                         {pendingUpdates.map(p => {
@@ -6191,14 +6285,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                           );
                         })}
                       </div>
-                      <div className="p-6 pt-4 flex items-center justify-between gap-2" style={{ borderTop: `1px solid ${c.border}` }}>
-                        <button onClick={() => { closePendingItc(); setItcDraft(record); setItcEditing(true); }}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-colors"
-                          style={{ ...font, border: `1px solid ${isDark ? "rgba(255,255,255,0.10)" : "#E5E7EB"}`, color: c.text }}
-                          onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
-                          onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-                          Edit Record Instead
-                        </button>
+                      <div className="p-6 pt-4 flex items-center justify-end gap-2" style={{ borderTop: `1px solid ${c.border}` }}>
                         <button
                           onClick={() => {
                             if (setItcRecords) setItcRecords(prev => {
@@ -6213,7 +6300,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                             });
                             const count = pendingUpdates.length;
                             closePendingItc();
-                            showToast({ title: "ITC updated", description: `${count} ${count === 1 ? "change" : "changes"} pushed to ITC for ${agency.name}.` });
+                            showToast({ title: "ITC updated", description: `${count} ${count === 1 ? "change" : "changes"} pushed to ITC for ${effectiveAgency.name}.` });
                           }}
                           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold text-white transition-colors"
                           style={{ ...font, background: btnGrad }}>
