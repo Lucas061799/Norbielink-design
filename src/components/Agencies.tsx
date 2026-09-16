@@ -6229,19 +6229,27 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                     review/push in one action. */}
                 {viewMode === "internal" && isSuperAdmin && record && accountingView === "record" && pendingUpdates.length > 0 && (
                   <div className="rounded-xl p-4 mb-6 flex items-start gap-3"
-                    style={{ background: "rgba(166,20,195,0.06)", border: "1px solid rgba(166,20,195,0.28)" }}>
+                    style={{ background: isDark ? "rgba(255,255,255,0.04)" : "#F9FAFB", border: `1px solid ${c.border}` }}>
                     <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: "#A614C3" }} strokeWidth={2} />
                     <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-bold" style={{ ...font, color: c.text }}>
+                      <div className="text-[13px] font-semibold" style={{
+                        ...font,
+                        backgroundImage: "linear-gradient(88.54deg, #5C2ED4 0.1%, #A614C3 63.88%)",
+                        backgroundClip: "text",
+                        WebkitBackgroundClip: "text",
+                        WebkitTextFillColor: "transparent",
+                      }}>
                         {pendingUpdates.length} pending {pendingUpdates.length === 1 ? "update" : "updates"} from recent edits
-                      </p>
-                      <p className="text-[12px] mt-0.5" style={{ ...font, color: c.text }}>
+                      </div>
+                      <div className="text-[12px] mt-0.5" style={{ ...font, color: c.muted }}>
                         The agency info was edited — the ITC record is now behind. Review the changes and push to ITC.
-                      </p>
+                      </div>
                     </div>
                     <button onClick={() => setPendingItcOpen(true)}
-                      className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold text-white transition-colors"
-                      style={{ ...font, background: btnGrad }}>
+                      className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold text-white transition-all whitespace-nowrap"
+                      style={{ ...font, background: btnGrad }}
+                      onMouseEnter={e => (e.currentTarget.style.filter = "brightness(1.10)")}
+                      onMouseLeave={e => (e.currentTarget.style.filter = "none")}>
                       Review Updates
                     </button>
                   </div>
