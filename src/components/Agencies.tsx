@@ -990,11 +990,12 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
     licenseNo: "licenseNo",
     licenseExpires: "licenseExp",
   };
-  // Inline-edit gate: fields backed by W-9 or License doc can't be
-  // edited inline in the Pending Updates modal (doing so would let
-  // a super admin change tax-sensitive data without a fresh doc).
-  // Telephone and Email have no doc requirement so they stay editable.
-  const INLINE_EDITABLE_ITC_KEYS = new Set(["telephone", "email"]);
+  // Inline editing in the Pending Updates modal is available on every
+  // field, including the doc-gated ones (Name / Address / City / State /
+  // Zip / License #). The whole point of inline is that the super admin
+  // is reviewing against the uploaded W-9 or License copy in the side
+  // panel — if the submitter typed a typo, super admin corrects it here
+  // to match the source doc, then Push to ITC.
   // Small "Pending" pill shown next to any field that has an
   // unpushed override, mirroring the Appointed / DreamTeam badge
   // language so a returning editor can spot at a glance which
@@ -1029,20 +1030,6 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
       </span>
     );
   };
-  // Batch-fed compliance gate: when the agency's license is past its expiry
-  // date, edits are blocked and a red banner is shown across every tab.
-  // Parses the mock MM/DD/YYYY strings; a blank / unparseable value leaves
-  // the gate open so we don't false-positive on missing data.
-  const licenseExpiredInfo: { date: string } | null = (() => {
-    const raw = (effectiveAgency.licenseExp ?? "").trim();
-    if (!raw) return null;
-    const parsed = new Date(raw);
-    if (Number.isNaN(parsed.getTime())) return null;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    parsed.setHours(0, 0, 0, 0);
-    return parsed < today ? { date: raw } : null;
-  })();
   const [eStatusOpen, setEStatusOpen] = useState(false);
   const [eBizTypeOpen, setEBizTypeOpen] = useState(false);
   const [eReason, setEReason] = useState("");
@@ -1918,14 +1905,6 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
   // Files queued in the doc-update modal — Save Changes is gated on these.
   const [docModalUploads, setDocModalUploads] = useState<{ w9?: string; license?: string }>({});
   const [docModalDragOver, setDocModalDragOver] = useState<"w9" | "license" | null>(null);
-  // Dedicated License renewal mini-flow — opened from the expired-license
-  // banner. Bundles the new License upload with a fresh expiry date so
-  // uploading also clears the block, without a bounce through the Overview
-  // edit form (which itself is blocked while expired).
-  const [renewLicenseOpen, setRenewLicenseOpen] = useState(false);
-  const [renewLicenseFile, setRenewLicenseFile] = useState<string>("");
-  const [renewLicenseExp, setRenewLicenseExp] = useState<string>("");
-  const [renewLicenseDragOver, setRenewLicenseDragOver] = useState(false);
 
   // Book Roll modal — admin sells the entire policy book to another agency.
   const [bookRollOpen, setBookRollOpen] = useState(false);
@@ -2905,6 +2884,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
               if (docUpdateModal.w9)      required.push({ key: "w9",      label: "New W-9",          hint: "Name · Entity · Address · TIN" });
               if (docUpdateModal.license) required.push({ key: "license", label: "New License copy", hint: "License number changed" });
               const allUploaded = required.every(r => docModalUploads[r.key]);
+              const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
               const onPickFile = (key: "w9" | "license", file: File | null | undefined) => {
                 if (!file) return;
                 // W-9 restricted to PDF (Accounting requirement); catches
@@ -2916,6 +2896,12 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                     showToast({ title: "PDF required", description: `W-9 must be a PDF. "${file.name}" was not attached.` }, 5000);
                     return;
                   }
+                }
+                // Size cap matches the label under the drop zone (10MB).
+                if (file.size > MAX_UPLOAD_BYTES) {
+                  const mb = (file.size / (1024 * 1024)).toFixed(1);
+                  showToast({ title: "File too large", description: `"${file.name}" is ${mb}MB. Max 10MB.` }, 5000);
+                  return;
                 }
                 setDocModalUploads(p => ({ ...p, [key]: file.name }));
               };
@@ -3029,98 +3015,6 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                     </button>
                   </div>
                 </>
-              );
-            })()}
-          </div>
-        </div>
-      )}
-      {renewLicenseOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-6"
-          style={{ background: "rgba(0,0,0,0.45)" }}>
-          <div className="w-[440px] rounded-2xl p-6 shadow-2xl" onClick={e => e.stopPropagation()}
-            style={{ background: c.cardBg, border: `1px solid ${c.border}`, fontFamily: FONT }}>
-            <div className="flex items-start gap-4 mb-4">
-              <div className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0"
-                style={{ background: isDark ? "rgba(168,85,247,0.22)" : "rgba(166,20,195,0.10)" }}>
-                <AlertCircle className="w-6 h-6" style={{ color: "#A614C3" }} strokeWidth={2} />
-              </div>
-              <div className="flex-1">
-                <h3 className="text-[16px] font-bold mb-1.5" style={{ color: c.text }}>Renew License</h3>
-                <p className="text-[12px] leading-relaxed" style={{ color: c.muted }}>
-                  Upload the renewed License copy and set the new expiration date. Clearing the expired-license block for {effectiveAgency.name}.
-                </p>
-              </div>
-            </div>
-            <div className="space-y-4 mb-5">
-              <div>
-                <label className="block text-[12px] font-semibold mb-1.5" style={{ color: c.text }}>License copy</label>
-                {renewLicenseFile ? (
-                  <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg"
-                    style={{ background: "rgba(115,201,183,0.10)", border: "1px solid rgba(115,201,183,0.35)" }}>
-                    <CheckSquare className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#73C9B7" }} />
-                    <input value={renewLicenseFile} onChange={e => setRenewLicenseFile(e.target.value)}
-                      className="text-[12px] flex-1 outline-none bg-transparent min-w-0"
-                      style={{ color: c.text, fontFamily: FONT }} spellCheck={false} />
-                    <button onClick={() => setRenewLicenseFile("")}
-                      className="text-[11px] font-medium transition-opacity hover:opacity-70 flex-shrink-0"
-                      style={{ color: c.muted }}>Replace</button>
-                  </div>
-                ) : (
-                  <label className="flex flex-col items-center justify-center cursor-pointer transition-colors rounded-lg py-5"
-                    style={{ background: renewLicenseDragOver ? "rgba(168,85,247,0.08)" : c.hoverBg, border: `1.5px dashed ${renewLicenseDragOver ? "#A614C3" : c.borderStrong}` }}
-                    onDragOver={e => { e.preventDefault(); setRenewLicenseDragOver(true); }}
-                    onDragLeave={() => setRenewLicenseDragOver(false)}
-                    onDrop={e => { e.preventDefault(); setRenewLicenseDragOver(false); const f = e.dataTransfer.files?.[0]; if (f) setRenewLicenseFile(f.name); }}>
-                    <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png"
-                      onChange={e => { const f = e.target.files?.[0]; if (f) setRenewLicenseFile(f.name); }} />
-                    <Paperclip className="w-5 h-5 mb-1.5" style={{ color: "#A614C3" }} />
-                    <span className="text-[12px] font-medium" style={{ color: c.text }}>Drag &amp; Drop or Click to Browse</span>
-                    <span className="text-[11px] mt-0.5" style={{ color: c.muted }}>PDF, JPG, PNG · Max 10MB</span>
-                  </label>
-                )}
-              </div>
-              <div>
-                <label className="block text-[12px] font-semibold mb-1.5" style={{ color: c.text }}>New expiration date</label>
-                <DatePicker
-                  value={renewLicenseExp}
-                  onChange={setRenewLicenseExp}
-                  inputStyle={{ background: c.cardBg, color: c.text, border: `1px solid ${c.border}`, borderRadius: 8, padding: "8px 10px", fontFamily: FONT, fontSize: 13, width: "100%", outline: "none" }}
-                  c={c as unknown as Record<string, string>}
-                  btnGrad={btnGrad}
-                  font={{ fontFamily: FONT }}
-                />
-              </div>
-            </div>
-            {(() => {
-              const ready = !!renewLicenseFile && !!renewLicenseExp;
-              return (
-                <div className="flex gap-3 items-center justify-between">
-                  <button onClick={() => setRenewLicenseOpen(false)}
-                    className="px-4 py-2 rounded-lg text-[12px] font-medium transition-all"
-                    style={{ border: `1px solid ${c.borderStrong}`, color: c.text, background: "transparent" }}
-                    onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
-                    onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-                    Cancel
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (!ready) return;
-                      const today = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-                      setAgencyDocs(prev => [{ id: `d${Date.now()}-lic`, category: "license", name: renewLicenseFile, date: today }, ...prev]);
-                      // DatePicker returns MM/DD/YYYY, matching the rest of the app.
-                      setAgencyFieldOverride(prev => ({ ...prev, licenseExp: renewLicenseExp }));
-                      setELicExp(renewLicenseExp);
-                      showToast({ title: "License renewal submitted", description: `Accounting will verify the copy against the new ${renewLicenseExp} expiration and push to ITC.` }, 6000);
-                      setRenewLicenseOpen(false);
-                    }}
-                    disabled={!ready}
-                    className="px-4 py-2 rounded-lg text-[12px] font-semibold text-white transition-all"
-                    style={{ background: btnGrad, opacity: ready ? 1 : 0.5, cursor: ready ? "pointer" : "not-allowed" }}
-                    onMouseEnter={e => { if (ready) e.currentTarget.style.filter = "brightness(1.10)"; }}
-                    onMouseLeave={e => (e.currentTarget.style.filter = "none")}>
-                    Save License
-                  </button>
-                </div>
               );
             })()}
           </div>
@@ -3544,49 +3438,6 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
           })}
         </div>
 
-        {/* License-expired banner. Drives off effectiveAgency.licenseExp so
-            local edits (mid-session renewal date bump) take effect immediately.
-            When expired, the batch-fed compliance signal blocks further edits
-            until a new license copy lands. Shown across every tab so the
-            super admin sees the block wherever they land. */}
-        {licenseExpiredInfo && (
-          <div className="rounded-xl p-4 mb-6 flex items-start gap-3"
-            style={{ background: isDark ? "rgba(255,255,255,0.04)" : "#F9FAFB", border: `1px solid ${c.border}` }}>
-            <svg className="w-5 h-5 flex-shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <defs>
-                <linearGradient id="alert-razz-license" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="24" y2="0">
-                  <stop offset="0%" stopColor="#5C2ED4" />
-                  <stop offset="100%" stopColor="#A614C3" />
-                </linearGradient>
-              </defs>
-              <circle cx="12" cy="12" r="10" stroke="url(#alert-razz-license)" />
-              <line x1="12" x2="12" y1="8" y2="12" stroke="url(#alert-razz-license)" />
-              <line x1="12" x2="12.01" y1="16" y2="16" stroke="url(#alert-razz-license)" />
-            </svg>
-            <div className="flex-1 min-w-0">
-              <div className="text-[13px] font-semibold" style={{
-                ...font,
-                backgroundImage: "linear-gradient(88.54deg, #5C2ED4 0.1%, #A614C3 63.88%)",
-                backgroundClip: "text",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-              }}>
-                License expired on {licenseExpiredInfo.date}
-              </div>
-              <div className="text-[12px] mt-0.5" style={{ ...font, color: c.muted }}>
-                Updates to this agency are blocked until a renewed license is on file. Upload a renewed License to unblock.
-              </div>
-            </div>
-            <button
-              onClick={() => { setRenewLicenseFile(""); setRenewLicenseExp(""); setRenewLicenseOpen(true); }}
-              className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold text-white transition-all whitespace-nowrap"
-              style={{ ...font, background: btnGrad }}
-              onMouseEnter={e => (e.currentTarget.style.filter = "brightness(1.10)")}
-              onMouseLeave={e => (e.currentTarget.style.filter = "none")}>
-              <Upload className="w-3.5 h-3.5" />Upload New License
-            </button>
-          </div>
-        )}
 
         {/* ── Overview tab ── */}
         {detailTab === "overview" && !isEditing && (
@@ -3596,12 +3447,10 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
               <h3 className="text-[17px] font-bold" style={{ ...font, color: c.text }}>Agency Information</h3>
               {currentUserIsAdmin && (
                 <button
-                  onClick={() => { if (!licenseExpiredInfo) setIsEditing(true); }}
-                  disabled={!!licenseExpiredInfo}
-                  title={licenseExpiredInfo ? "License expired — upload a renewed license before editing." : undefined}
+                  onClick={() => setIsEditing(true)}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-colors"
-                  style={{ ...font, border: `1px solid ${isDark ? "rgba(255,255,255,0.10)" : "#E5E7EB"}`, color: c.muted, opacity: licenseExpiredInfo ? 0.5 : 1, cursor: licenseExpiredInfo ? "not-allowed" : "pointer" }}
-                  onMouseEnter={e => { if (!licenseExpiredInfo) e.currentTarget.style.background = c.hoverBg; }}
+                  style={{ ...font, border: `1px solid ${isDark ? "rgba(255,255,255,0.10)" : "#E5E7EB"}`, color: c.muted }}
+                  onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
                   onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
                   <Pencil className="w-3.5 h-3.5" />Edit
                 </button>
@@ -4273,7 +4122,6 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                 Cancel
               </button>
               <button onClick={() => {
-                  if (licenseExpiredInfo) return;
                   const errs = runEditValidation();
                   if (Object.keys(errs).length > 0) {
                     setFieldErrors(errs);
@@ -4348,11 +4196,9 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                     }, 5000);
                   }
                 }}
-                disabled={!!licenseExpiredInfo}
-                title={licenseExpiredInfo ? "License expired — upload a renewed license before saving." : undefined}
                 className="text-[13px] font-semibold text-white transition-all"
-                style={{ ...font, background: btnGrad, padding:"10px 24px", borderRadius:"5.58px", opacity: licenseExpiredInfo ? 0.5 : 1, cursor: licenseExpiredInfo ? "not-allowed" : "pointer" }}
-                onMouseEnter={e => { if (!licenseExpiredInfo) e.currentTarget.style.filter = "brightness(1.10)"; }}
+                style={{ ...font, background: btnGrad, padding:"10px 24px", borderRadius:"5.58px" }}
+                onMouseEnter={e => (e.currentTarget.style.filter = "brightness(1.10)")}
                 onMouseLeave={e => (e.currentTarget.style.filter = "none")}>
                 Save Changes
               </button>
@@ -4834,7 +4680,15 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                   )}
                   {docUploadModalOpen && (() => {
                     const closeModal = () => { setDocUploadModalOpen(false); setDocUploadModalFile(null); setDocUploadModalCat(""); setDocUploadModalCatOpen(false); setDocUploadModalDrag(false); };
-                    const onPick = (f?: File | null) => { if (f) setDocUploadModalFile(f.name); };
+                    const onPick = (f?: File | null) => {
+                      if (!f) return;
+                      if (f.size > 10 * 1024 * 1024) {
+                        const mb = (f.size / (1024 * 1024)).toFixed(1);
+                        showToast({ title: "File too large", description: `"${f.name}" is ${mb}MB. Max 10MB.` }, 5000);
+                        return;
+                      }
+                      setDocUploadModalFile(f.name);
+                    };
                     const canUpload = !!docUploadModalFile && !!docUploadModalCat;
                     return (
                       <div className="fixed inset-0 z-50 flex items-center justify-center p-6"
@@ -6701,7 +6555,6 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                                 {bucket.items.map((p, iIdx) => {
                                   const k = p.key as string;
                                   const editedValue = pendingOverrides[k] ?? p.agencyValue;
-                                  const inlineEditable = INLINE_EDITABLE_ITC_KEYS.has(k);
                                   const overrideKey = OVERRIDE_KEY_FOR_ITC[k];
                                   const isRejecting = rejectingKey === k;
                                   if (isRejecting) {
@@ -6799,28 +6652,13 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                                         </div>
                                         <ArrowRight className="w-3.5 h-3.5 flex-shrink-0 mt-4" style={{ color: c.muted }} />
                                         <div className="flex-1 min-w-0">
-                                          <p className="text-[10px] uppercase tracking-wider mb-1 flex items-center gap-1" style={{ ...font, color: c.muted, letterSpacing: "0.06em" }}>
-                                            New
-                                            {!inlineEditable && (
-                                              <Lock className="w-2.5 h-2.5" style={{ color: c.muted }} aria-label="Doc-gated: edit in the Overview form" />
-                                            )}
-                                          </p>
-                                          {inlineEditable ? (
-                                            <input
-                                              value={editedValue}
-                                              onChange={e => setPendingOverrides(prev => ({ ...prev, [k]: e.target.value }))}
-                                              className="w-full text-[13px] font-semibold"
-                                              style={{ ...font, color: c.text, background: c.cardBg, border: `1px solid ${c.border}`, borderRadius: 6, padding: "5px 8px", outline: "none" }}
-                                            />
-                                          ) : (
-                                            <p
-                                              className="w-full text-[13px] font-semibold truncate"
-                                              title="Doc-gated field — edit through the Overview form so the W-9 / License gate can run."
-                                              style={{ ...font, color: c.text, background: isDark ? "rgba(255,255,255,0.04)" : "#F9FAFB", border: `1px solid ${c.border}`, borderRadius: 6, padding: "5px 8px" }}
-                                            >
-                                              {editedValue}
-                                            </p>
-                                          )}
+                                          <p className="text-[10px] uppercase tracking-wider mb-1" style={{ ...font, color: c.muted, letterSpacing: "0.06em" }}>New</p>
+                                          <input
+                                            value={editedValue}
+                                            onChange={e => setPendingOverrides(prev => ({ ...prev, [k]: e.target.value }))}
+                                            className="w-full text-[13px] font-semibold"
+                                            style={{ ...font, color: c.text, background: c.cardBg, border: `1px solid ${c.border}`, borderRadius: 6, padding: "5px 8px", outline: "none" }}
+                                          />
                                         </div>
                                       </div>
                                     </div>
