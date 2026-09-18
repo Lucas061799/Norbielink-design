@@ -4088,21 +4088,24 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
               </button>
               <button onClick={() => {
                   if (licenseExpiredInfo) return;
-                  // Doc-refresh gate runs for both internal staff AND external
-                  // (client / Admin) principals. Client-locked fields (Name /
-                  // Type / Address) can't be changed from the Admin view, so
-                  // in practice only Tax ID, License #, and mailing address
-                  // trigger it there. The uploaded W-9 / License lands in
-                  // agencyDocs as w9 / license (soft-hidden) either way.
-                  // Mailing address is what shows on the 1099, so any edit to
-                  // it also demands a refreshed W-9 per Accounting policy.
-                  const mailingChanged = !eSameAddr && (
-                    eMStreet !== "" || eMCity !== "" || eMState !== "" || eMZip !== ""
-                  );
+                  // Doc-refresh gate. Per Shannon (Accounting): W-9 is required
+                  // only when the *effective* mailing address changes — the
+                  // address the 1099 will be mailed to. Editing the physical
+                  // Agency Address while Mailing stays the same does NOT
+                  // require a new W-9, even if it crosses state lines
+                  // (license/NIPR checks are a separate downstream review).
+                  // Baseline mailing (there’s no separate mailing field on
+                  // the seed AgencyDetail) is the current agency address —
+                  // the Same-as-Agency default rolls physical into mailing.
+                  const norm = (s: string) => s.trim().toLowerCase();
+                  const beforeMailing = [agency.street, agency.city, agency.state, agency.zip].map(norm).join("|");
+                  const afterMailing = eSameAddr
+                    ? [eStreet, eCity, eState, eZip].map(norm).join("|")
+                    : [eMStreet, eMCity, eMState, eMZip].map(norm).join("|");
+                  const mailingChanged = beforeMailing !== afterMailing;
                   const w9Changed = (
                     eName !== agency.name
                     || eType !== agency.agencyType
-                    || eStreet !== agency.street || eCity !== agency.city || eState !== agency.state || eZip !== agency.zip
                     || eTaxId !== agency.taxId
                     || mailingChanged
                   );
