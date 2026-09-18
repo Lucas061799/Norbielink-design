@@ -800,6 +800,59 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
   // bounce out to the full ITC edit form. Keyed by ITCRecord field name,
   // cleared whenever the modal closes so a fresh diff loads next time.
   const [pendingOverrides, setPendingOverrides] = useState<Record<string, string>>({});
+  // Field-level validation for the Overview Edit form. Save Changes
+  // runs runEditValidation() first, sets fieldErrors, and blocks the
+  // save + scrolls to the first invalid input if anything fails.
+  // Errors clear per-field as the user types.
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const editErr = (k: string) => fieldErrors[k];
+  const editErrStyle = (k: string): React.CSSProperties => editErr(k)
+    ? { borderColor: "#DC2626", boxShadow: "0 0 0 1px rgba(220,38,38,0.15)" }
+    : {};
+  const clearEditErr = (k: string) => {
+    setFieldErrors(prev => {
+      if (!(k in prev)) return prev;
+      const next = { ...prev }; delete next[k]; return next;
+    });
+  };
+  const EditErrLine = ({ k }: { k: string }) => {
+    const msg = editErr(k);
+    if (!msg) return null;
+    return (
+      <div className="flex items-center gap-1.5 mt-1 text-[11px]" style={{ ...font, color: "#DC2626" }}>
+        <AlertCircle className="w-3 h-3 flex-shrink-0" strokeWidth={2.25} />
+        {msg}
+      </div>
+    );
+  };
+  const editValidEmail = (s: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.trim());
+  const editValidPhone = (s: string) => s.replace(/\D/g, "").length === 10;
+  const editValidZip   = (s: string) => /^\d{5}(-\d{4})?$/.test(s.trim());
+  const runEditValidation = (): Record<string, string> => {
+    const errs: Record<string, string> = {};
+    if (!eName.trim())    errs.name    = "Agency Name is required.";
+    if (!eStreet.trim())  errs.street  = "Street address is required.";
+    if (!eCity.trim())    errs.city    = "City is required.";
+    if (!eState.trim())   errs.state   = "State is required.";
+    if (!eZip.trim())     errs.zip     = "Zip is required.";
+    else if (!editValidZip(eZip)) errs.zip = "Zip must be 5 digits (12345 or 12345-6789).";
+    if (!eSameAddr) {
+      if (!eMStreet.trim()) errs.mStreet = "Mailing street is required.";
+      if (!eMCity.trim())   errs.mCity   = "Mailing city is required.";
+      if (!eMState.trim())  errs.mState  = "Mailing state is required.";
+      if (!eMZip.trim())    errs.mZip    = "Mailing zip is required.";
+      else if (!editValidZip(eMZip)) errs.mZip = "Mailing zip must be 5 digits (12345 or 12345-6789).";
+    }
+    if (!eContact.trim()) errs.contact = "Agency Contact is required.";
+    if (!eEmail.trim())   errs.email   = "Email is required.";
+    else if (!editValidEmail(eEmail)) errs.email = "Enter a valid email address.";
+    if (!ePhone.trim())   errs.phone   = "Phone Number is required.";
+    else if (!editValidPhone(ePhone)) errs.phone = "Phone must be 10 digits (US format).";
+    if (eTollFree.trim() && !editValidPhone(eTollFree)) errs.tollFree = "Toll Free must be 10 digits.";
+    if (!eLicNo.trim())   errs.licNo   = "License Number is required.";
+    if (!eLicExp.trim())  errs.licExp  = "License Expiration is required.";
+    return errs;
+  };
   // Reject-with-reason flow inside the Pending Updates modal. When the
   // super admin clicks Reject on a row, that row transforms into a
   // reason-capture card. Sending the rejection reverts the field to
@@ -3693,7 +3746,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                   onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
                   {editExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
                 </button>
-                <button onClick={() => { setIsEditing(false); setEditExpanded(false); }}
+                <button onClick={() => { setIsEditing(false); setEditExpanded(false); setFieldErrors({}); }}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-colors"
                   style={{ ...font, border: `1px solid ${isDark ? "rgba(255,255,255,0.10)" : "#E5E7EB"}`, color: c.text }}
                   onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
@@ -3749,7 +3802,10 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                 <label style={labelStyle}>Agency Name:{pendingTag(["name"])}</label>
                 {clientLocked
                   ? <LockedInput value={eName} />
-                  : <input value={eName} onChange={e => setEName(e.target.value)} style={inputStyle} />}
+                  : <div data-edit-error={editErr("name") ? "true" : undefined}>
+                      <input value={eName} onChange={e => { setEName(e.target.value); clearEditErr("name"); }} style={{ ...inputStyle, ...editErrStyle("name") }} />
+                      <EditErrLine k="name" />
+                    </div>}
               </div>
               <div>
                 <label style={labelStyle}>Agency Code:</label>
@@ -3830,37 +3886,47 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                     c={selectC}
                     font={font}
                   />
-                  <AddressAutocomplete
-                    value={eStreet}
-                    onChange={setEStreet}
-                    onSelect={a => {
-                      setEStreet(a.street);
-                      if (a.city) setECity(a.city);
-                      if (a.state) setEState(a.state);
-                      if (a.zip) setEZip(a.zip);
-                      if (a.country) setECountry(a.country);
-                    }}
-                    placeholder="Street address"
-                    containerStyle={{ width: "100%" }}
-                    inputStyle={{ ...inputStyle, width: "100%" }}
-                    dropdownBg={c.cardBg} dropdownText={c.text} dropdownBorder={c.border}
-                  />
+                  <div data-edit-error={editErr("street") ? "true" : undefined}>
+                    <AddressAutocomplete
+                      value={eStreet}
+                      onChange={v => { setEStreet(v); clearEditErr("street"); }}
+                      onSelect={a => {
+                        setEStreet(a.street); clearEditErr("street");
+                        if (a.city) { setECity(a.city); clearEditErr("city"); }
+                        if (a.state) { setEState(a.state); clearEditErr("state"); }
+                        if (a.zip) { setEZip(a.zip); clearEditErr("zip"); }
+                        if (a.country) setECountry(a.country);
+                      }}
+                      placeholder="Street address"
+                      containerStyle={{ width: "100%" }}
+                      inputStyle={{ ...inputStyle, width: "100%", ...editErrStyle("street") }}
+                      dropdownBg={c.cardBg} dropdownText={c.text} dropdownBorder={c.border}
+                    />
+                    <EditErrLine k="street" />
+                  </div>
                   <div />
                 </div>
                 <div className="grid grid-cols-3 gap-6">
-                  <input value={eCity} onChange={e => setECity(e.target.value)} placeholder="City" style={inputStyle} />
+                  <div data-edit-error={editErr("city") ? "true" : undefined}>
+                    <input value={eCity} onChange={e => { setECity(e.target.value); clearEditErr("city"); }} placeholder="City" style={{ ...inputStyle, ...editErrStyle("city") }} />
+                    <EditErrLine k="city" />
+                  </div>
                   <div className="flex gap-4">
-                    <div style={{ flex: 1 }}>
+                    <div style={{ flex: 1 }} data-edit-error={editErr("state") ? "true" : undefined}>
                       <StyledSelect<StateCode>
                         value={(STATES as readonly string[]).includes(eState) ? (eState as StateCode) : "IA"}
-                        onChange={v => setEState(v)}
+                        onChange={v => { setEState(v); clearEditErr("state"); }}
                         options={STATES}
-                        triggerStyle={{ ...selectStyle, width: "100%" }}
+                        triggerStyle={{ ...selectStyle, width: "100%", ...editErrStyle("state") }}
                         c={selectC}
                         font={font}
                       />
+                      <EditErrLine k="state" />
                     </div>
-                    <input value={eZip} onChange={e => setEZip(e.target.value)} placeholder="ZIP" style={{ ...inputStyle, flex: 1 }} />
+                    <div style={{ flex: 1 }} data-edit-error={editErr("zip") ? "true" : undefined}>
+                      <input value={eZip} onChange={e => { setEZip(e.target.value); clearEditErr("zip"); }} placeholder="ZIP" style={{ ...inputStyle, ...editErrStyle("zip") }} />
+                      <EditErrLine k="zip" />
+                    </div>
                   </div>
                   <div />
                 </div>
@@ -4007,13 +4073,15 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
 
             {/* Agency Contact | Email */}
             <div className="grid grid-cols-3 gap-6 mb-6">
-              <div>
+              <div data-edit-error={editErr("contact") ? "true" : undefined}>
                 <label style={labelStyle}>Agency Contact:</label>
-                <input value={eContact} onChange={e => setEContact(e.target.value)} style={inputStyle} />
+                <input value={eContact} onChange={e => { setEContact(e.target.value); clearEditErr("contact"); }} style={{ ...inputStyle, ...editErrStyle("contact") }} />
+                <EditErrLine k="contact" />
               </div>
-              <div>
+              <div data-edit-error={editErr("email") ? "true" : undefined}>
                 <label style={labelStyle}>Email Address:{pendingTag(["contactEmail"])}</label>
-                <input value={eEmail} onChange={e => setEEmail(e.target.value)} style={inputStyle} type="email" />
+                <input value={eEmail} onChange={e => { setEEmail(e.target.value); clearEditErr("email"); }} style={{ ...inputStyle, ...editErrStyle("email") }} type="email" />
+                <EditErrLine k="email" />
               </div>
             </div>
 
@@ -4066,32 +4134,42 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
 
             {/* Phone | Toll Free */}
             <div className="grid grid-cols-3 gap-6 mb-6">
-              <div>
+              <div data-edit-error={editErr("phone") ? "true" : undefined}>
                 <label style={labelStyle}>Phone Number:{pendingTag(["phone"])}</label>
-                <input value={ePhone} onChange={e => setEPhone(formatPhone(e.target.value))} placeholder="(000) 000-0000" style={inputStyle} inputMode="tel" />
+                <input value={ePhone} onChange={e => { setEPhone(formatPhone(e.target.value)); clearEditErr("phone"); }} placeholder="(000) 000-0000" style={{ ...inputStyle, ...editErrStyle("phone") }} inputMode="tel" />
+                <EditErrLine k="phone" />
               </div>
-              <div>
+              <div data-edit-error={editErr("tollFree") ? "true" : undefined}>
                 <label style={labelStyle}>Toll Free Number:</label>
                 {clientLocked
                   ? <LockedInput value={eTollFree || "—"} />
-                  : <input value={eTollFree} onChange={e => setETollFree(formatPhone(e.target.value))} placeholder="(000) 000-0000" style={inputStyle} inputMode="tel" />}
+                  : (<>
+                      <input value={eTollFree} onChange={e => { setETollFree(formatPhone(e.target.value)); clearEditErr("tollFree"); }} placeholder="(000) 000-0000" style={{ ...inputStyle, ...editErrStyle("tollFree") }} inputMode="tel" />
+                      <EditErrLine k="tollFree" />
+                    </>)}
               </div>
               <div />
             </div>
 
             {/* License */}
             <div className="grid grid-cols-3 gap-6 mb-6">
-              <div>
+              <div data-edit-error={editErr("licNo") ? "true" : undefined}>
                 <label style={labelStyle}>License Number:{pendingTag(["licenseNo"])}</label>
                 {clientLocked
                   ? <LockedInput value={eLicNo || "—"} />
-                  : <input value={eLicNo} onChange={e => setELicNo(e.target.value)} style={inputStyle} />}
+                  : (<>
+                      <input value={eLicNo} onChange={e => { setELicNo(e.target.value); clearEditErr("licNo"); }} style={{ ...inputStyle, ...editErrStyle("licNo") }} />
+                      <EditErrLine k="licNo" />
+                    </>)}
               </div>
-              <div>
+              <div data-edit-error={editErr("licExp") ? "true" : undefined}>
                 <label style={labelStyle}>Expiration Date:{pendingTag(["licenseExp"])}</label>
                 {clientLocked
                   ? <LockedInput value={eLicExp || "—"} />
-                  : <DatePicker value={eLicExp} onChange={setELicExp} inputStyle={inputStyle} c={c} btnGrad={btnGrad} font={font} />}
+                  : (<>
+                      <DatePicker value={eLicExp} onChange={v => { setELicExp(v); clearEditErr("licExp"); }} inputStyle={{ ...inputStyle, ...editErrStyle("licExp") }} c={c} btnGrad={btnGrad} font={font} />
+                      <EditErrLine k="licExp" />
+                    </>)}
               </div>
               <div>
                 <label style={labelStyle}>NPN:</label>
@@ -4187,7 +4265,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
 
             {/* Footer buttons — inside the card so they share width and don't float independently */}
             <div className="flex items-center justify-between" style={{ marginTop: 36, paddingTop: 28, paddingBottom: 8, borderTop: `1px solid ${c.border}` }}>
-              <button onClick={() => setIsEditing(false)}
+              <button onClick={() => { setIsEditing(false); setFieldErrors({}); }}
                 className="px-6 py-2.5 rounded-xl text-[13px] font-semibold transition-all"
                 style={{ ...font, border: `1px solid ${c.borderStrong}`, color: c.text, background: "transparent" }}
                 onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
@@ -4196,6 +4274,21 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
               </button>
               <button onClick={() => {
                   if (licenseExpiredInfo) return;
+                  const errs = runEditValidation();
+                  if (Object.keys(errs).length > 0) {
+                    setFieldErrors(errs);
+                    // Scroll the first error into view + focus so the
+                    // user doesn't have to hunt for what's wrong.
+                    setTimeout(() => {
+                      const el = document.querySelector<HTMLElement>('[data-edit-error="true"]');
+                      if (el) {
+                        el.scrollIntoView({ behavior: "smooth", block: "center" });
+                        (el.querySelector("input, textarea, select, button") as HTMLElement | null)?.focus?.();
+                      }
+                    }, 0);
+                    return;
+                  }
+                  setFieldErrors({});
                   // Doc-refresh gate. Per Shannon (Accounting), final call:
                   // any address change requires a fresh W-9 — physical,
                   // mailing, or both. Simpler than the earlier
@@ -6611,13 +6704,6 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                                   const inlineEditable = INLINE_EDITABLE_ITC_KEYS.has(k);
                                   const overrideKey = OVERRIDE_KEY_FOR_ITC[k];
                                   const isRejecting = rejectingKey === k;
-                                  // Mock editor attribution — in prod this comes from
-                                  // the audit row that produced the override. Names
-                                  // rotate so the demo shows the notification target
-                                  // rather than always the same person.
-                                  const mockEditor = (k === "phone" || k === "email")
-                                    ? { name: "Maria Chen", email: "m.chen@" + effectiveAgency.website.replace(/^www\./, "") }
-                                    : { name: "BTIS · Sarah Johnson", email: "sjohnson@btisinc.com" };
                                   if (isRejecting) {
                                     return (
                                       <div key={k}
@@ -6625,7 +6711,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                                         style={{ background: isDark ? "rgba(220,38,38,0.10)" : "rgba(220,38,38,0.05)", border: `1px solid ${isDark ? "rgba(248,113,113,0.35)" : "rgba(220,38,38,0.28)"}`, marginTop: iIdx === 0 ? 0 : 16 }}>
                                         <div className="flex items-center justify-between mb-2">
                                           <p className="text-[12px] font-semibold" style={{ ...font, color: isDark ? "#FCA5A5" : "#B91C1C" }}>
-                                            Send rejection to {mockEditor.name}
+                                            Reject this change
                                           </p>
                                           <button onClick={() => { setRejectingKey(null); setRejectReason(""); }}
                                             title="Cancel"
@@ -6637,7 +6723,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                                           </button>
                                         </div>
                                         <p className="text-[11px] mb-2" style={{ ...font, color: c.muted }}>
-                                          {p.label}: <span style={{ textDecoration: "line-through" }}>{p.agencyValue}</span> → reverts to <span className="font-semibold" style={{ color: c.text }}>{p.itcValue || "—"}</span>. An email will be sent to {mockEditor.email} explaining why.
+                                          {p.label}: <span style={{ textDecoration: "line-through" }}>{p.agencyValue}</span> → reverts to <span className="font-semibold" style={{ color: c.text }}>{p.itcValue || "—"}</span>. The agency contact (<span className="font-semibold" style={{ color: c.text }}>{effectiveAgency.contactEmail || "—"}</span>) will be notified and the reason logged for audit.
                                         </p>
                                         <textarea
                                           value={rejectReason}
@@ -6675,15 +6761,15 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                                               setRejectingKey(null);
                                               setRejectReason("");
                                               showToast({
-                                                title: "Rejection sent",
-                                                description: "The editor has been notified by email.",
+                                                title: "Change rejected",
+                                                description: "The agency contact has been notified.",
                                               });
                                             }}
                                             className="px-3 py-1.5 rounded-md text-[11px] font-semibold text-white transition-all"
                                             style={{ ...font, background: "#DC2626", opacity: rejectReason.trim() ? 1 : 0.5, cursor: rejectReason.trim() ? "pointer" : "not-allowed" }}
                                             onMouseEnter={e => { if (rejectReason.trim()) e.currentTarget.style.filter = "brightness(1.10)"; }}
                                             onMouseLeave={e => (e.currentTarget.style.filter = "none")}>
-                                            Send rejection
+                                            Reject change
                                           </button>
                                         </div>
                                       </div>
@@ -6695,7 +6781,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                                         <p className="text-[13px] font-semibold" style={{ ...font, color: c.text }}>{p.label}</p>
                                         {overrideKey && (
                                           <button
-                                            title={`Reject — revert ${p.label} to the ITC value and notify the editor`}
+                                            title={`Reject — revert ${p.label} to the ITC value and notify the agency`}
                                             onClick={() => { setRejectingKey(k); setRejectReason(""); }}
                                             className="flex items-center gap-1 text-[11px] font-medium transition-colors px-2 py-1 rounded-md"
                                             style={{ ...font, color: c.muted }}
