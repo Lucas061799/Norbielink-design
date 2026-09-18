@@ -4088,26 +4088,27 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
               </button>
               <button onClick={() => {
                   if (licenseExpiredInfo) return;
-                  // Doc-refresh gate. Per Shannon (Accounting): W-9 is required
-                  // only when the *effective* mailing address changes — the
-                  // address the 1099 will be mailed to. Editing the physical
-                  // Agency Address while Mailing stays the same does NOT
-                  // require a new W-9, even if it crosses state lines
-                  // (license/NIPR checks are a separate downstream review).
-                  // Baseline mailing (there’s no separate mailing field on
-                  // the seed AgencyDetail) is the current agency address —
-                  // the Same-as-Agency default rolls physical into mailing.
-                  const norm = (s: string) => s.trim().toLowerCase();
-                  const beforeMailing = [agency.street, agency.city, agency.state, agency.zip].map(norm).join("|");
-                  const afterMailing = eSameAddr
-                    ? [eStreet, eCity, eState, eZip].map(norm).join("|")
-                    : [eMStreet, eMCity, eMState, eMZip].map(norm).join("|");
-                  const mailingChanged = beforeMailing !== afterMailing;
+                  // Doc-refresh gate. Per Shannon (Accounting), final call:
+                  // any address change requires a fresh W-9 — physical,
+                  // mailing, or both. Simpler than the earlier
+                  // "effective mailing only" rule, and matches what she
+                  // asked for: "to make it easier, we should just require
+                  // a W-9 on all address changes."
+                  const physChanged = (
+                    eStreet !== agency.street
+                    || eCity !== agency.city
+                    || eState !== agency.state
+                    || eZip !== agency.zip
+                  );
+                  const mailingChanged = !eSameAddr && (
+                    eMStreet !== "" || eMCity !== "" || eMState !== "" || eMZip !== ""
+                  );
+                  const addressChanged = physChanged || mailingChanged;
                   const w9Changed = (
                     eName !== agency.name
                     || eType !== agency.agencyType
                     || eTaxId !== agency.taxId
-                    || mailingChanged
+                    || addressChanged
                   );
                   const licChanged = eLicNo !== agency.licenseNo;
                   if (w9Changed || licChanged) {
