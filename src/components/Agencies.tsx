@@ -800,7 +800,14 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
   // bounce out to the full ITC edit form. Keyed by ITCRecord field name,
   // cleared whenever the modal closes so a fresh diff loads next time.
   const [pendingOverrides, setPendingOverrides] = useState<Record<string, string>>({});
-  const closePendingItc = () => { setPendingItcOpen(false); setPendingOverrides({}); };
+  // Reject-with-reason flow inside the Pending Updates modal. When the
+  // super admin clicks Reject on a row, that row transforms into a
+  // reason-capture card. Sending the rejection reverts the field to
+  // the ITC value AND surfaces a mock email confirmation naming the
+  // editor + reason so Accounting has a paper trail.
+  const [rejectingKey, setRejectingKey] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState<string>("");
+  const closePendingItc = () => { setPendingItcOpen(false); setPendingOverrides({}); setRejectingKey(null); setRejectReason(""); };
   // Sub-tabs within the Accounting tab — same segmented-control pattern
   // as the Documents toolbar so users don't have to scroll to switch
   // between the ITC record and the monthly statements archive.
@@ -906,8 +913,69 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
   // parent `agency` object unmodified — this is just the UI's local memory
   // of "what the agency should look like now."
   type AgencyFieldOverride = Partial<Pick<AgencyDetail, "name" | "street" | "city" | "state" | "zip" | "phone" | "contactEmail" | "licenseNo" | "licenseExp">>;
+  // Concurrency model = last-write-wins by design. Save Changes always
+  // overwrites the whole override object (see the Save handler below);
+  // if two people submit against the same agency, the later Save wins
+  // and the earlier pending diff is lost silently. The Edit form shows
+  // a razz-tint "pending edits on file" banner to warn the second user
+  // before they save (see the isEditing block).
   const [agencyFieldOverride, setAgencyFieldOverride] = useState<AgencyFieldOverride>({});
   const effectiveAgency: AgencyDetail = { ...agency, ...agencyFieldOverride };
+  const hasPendingOverride = Object.keys(agencyFieldOverride).length > 0;
+  // Map from ITC-record field key → agencyFieldOverride key. Used by
+  // the Reject action in the Pending Updates modal to revert a single
+  // field back to its ITC value without touching the other pending
+  // changes in the batch.
+  const OVERRIDE_KEY_FOR_ITC: Record<string, keyof AgencyFieldOverride> = {
+    name: "name",
+    address: "street",
+    city: "city",
+    state: "state",
+    zip: "zip",
+    telephone: "phone",
+    email: "contactEmail",
+    licenseNo: "licenseNo",
+    licenseExpires: "licenseExp",
+  };
+  // Inline-edit gate: fields backed by W-9 or License doc can't be
+  // edited inline in the Pending Updates modal (doing so would let
+  // a super admin change tax-sensitive data without a fresh doc).
+  // Telephone and Email have no doc requirement so they stay editable.
+  const INLINE_EDITABLE_ITC_KEYS = new Set(["telephone", "email"]);
+  // Small "Pending" pill shown next to any field that has an
+  // unpushed override, mirroring the Appointed / DreamTeam badge
+  // language so a returning editor can spot at a glance which
+  // fields will move on the next ITC push.
+  const pendingTag = (keys: (keyof AgencyFieldOverride)[]) => {
+    const isPending = keys.some(k => agencyFieldOverride[k] !== undefined);
+    if (!isPending) return null;
+    return (
+      <span
+        className="inline-flex items-center justify-center align-middle ml-2"
+        title="Edited — not yet pushed to ITC"
+        style={{
+          background: "linear-gradient(88.54deg, rgba(92,46,212,0.08) 0.1%, rgba(166,20,195,0.08) 63.88%)",
+          borderRadius: 9999,
+          padding: "2px 8px",
+        }}
+      >
+        <span
+          style={{
+            backgroundImage: "linear-gradient(88.54deg, #5C2ED4 0.1%, #A614C3 63.88%)",
+            backgroundClip: "text",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+            fontSize: 10,
+            fontWeight: 600,
+            lineHeight: "14px",
+            letterSpacing: "0.02em",
+          }}
+        >
+          Pending
+        </span>
+      </span>
+    );
+  };
   // Batch-fed compliance gate: when the agency's license is past its expiry
   // date, edits are blocked and a red banner is shown across every tab.
   // Parses the mock MM/DD/YYYY strings; a blank / unparseable value leaves
@@ -3635,10 +3703,50 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
               </div>
             </div>
 
+            {/* Concurrent-edit warning. If someone (internal or external)
+                already saved unpushed edits since ITC was last synced,
+                surface that state so the current editor knows a Save
+                will overwrite the earlier diff (last-write-wins).
+                Uses the same visual language as the Accounting-tab
+                Pending Updates alert so it reads as one family. The
+                "check the ITC Record tab" hint is only shown to viewers
+                who can actually see that tab (internal + super admin);
+                other viewers get the truncated form without the pointer. */}
+            {hasPendingOverride && (
+              <div className="rounded-xl p-4 mb-6 flex items-start gap-3"
+                style={{ background: isDark ? "rgba(255,255,255,0.04)" : "#F9FAFB", border: `1px solid ${c.border}` }}>
+                <svg className="w-5 h-5 flex-shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <defs>
+                    <linearGradient id="alert-razz-conflict" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="24" y2="0">
+                      <stop offset="0%" stopColor="#5C2ED4" />
+                      <stop offset="100%" stopColor="#A614C3" />
+                    </linearGradient>
+                  </defs>
+                  <circle cx="12" cy="12" r="10" stroke="url(#alert-razz-conflict)" />
+                  <line x1="12" x2="12" y1="8" y2="12" stroke="url(#alert-razz-conflict)" />
+                  <line x1="12" x2="12.01" y1="16" y2="16" stroke="url(#alert-razz-conflict)" />
+                </svg>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[13px] font-semibold" style={{
+                    ...font,
+                    backgroundImage: "linear-gradient(88.54deg, #5C2ED4 0.1%, #A614C3 63.88%)",
+                    backgroundClip: "text",
+                    WebkitBackgroundClip: "text",
+                    WebkitTextFillColor: "transparent",
+                  }}>
+                    Unpushed edits on file
+                  </div>
+                  <div className="text-[12px] mt-0.5" style={{ ...font, color: c.muted }}>
+                    This agency was already edited and is waiting for Accounting to review. Saving now will overwrite any conflicting field — last save wins.{viewMode === "internal" && isSuperAdmin ? " Check the Accounting → ITC Record tab if you want to see what’s pending first." : ""}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Row 1: Name | Code | Type */}
             <div className="grid grid-cols-3 gap-6 mb-6">
               <div>
-                <label style={labelStyle}>Agency Name:</label>
+                <label style={labelStyle}>Agency Name:{pendingTag(["name"])}</label>
                 {clientLocked
                   ? <LockedInput value={eName} />
                   : <input value={eName} onChange={e => setEName(e.target.value)} style={inputStyle} />}
@@ -3711,7 +3819,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
               return (
             <>
             <div className="mb-4">
-              <label style={{ ...labelStyle, marginBottom: 12 }}>Agency Address:</label>
+              <label style={{ ...labelStyle, marginBottom: 12 }}>Agency Address:{pendingTag(["street", "city", "state", "zip"])}</label>
               <div className="space-y-3">
                 <div className="grid grid-cols-3 gap-6">
                   <StyledSelect<Country>
@@ -3904,7 +4012,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                 <input value={eContact} onChange={e => setEContact(e.target.value)} style={inputStyle} />
               </div>
               <div>
-                <label style={labelStyle}>Email Address:</label>
+                <label style={labelStyle}>Email Address:{pendingTag(["contactEmail"])}</label>
                 <input value={eEmail} onChange={e => setEEmail(e.target.value)} style={inputStyle} type="email" />
               </div>
             </div>
@@ -3959,7 +4067,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
             {/* Phone | Toll Free */}
             <div className="grid grid-cols-3 gap-6 mb-6">
               <div>
-                <label style={labelStyle}>Phone Number:</label>
+                <label style={labelStyle}>Phone Number:{pendingTag(["phone"])}</label>
                 <input value={ePhone} onChange={e => setEPhone(formatPhone(e.target.value))} placeholder="(000) 000-0000" style={inputStyle} inputMode="tel" />
               </div>
               <div>
@@ -3974,13 +4082,13 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
             {/* License */}
             <div className="grid grid-cols-3 gap-6 mb-6">
               <div>
-                <label style={labelStyle}>License Number:</label>
+                <label style={labelStyle}>License Number:{pendingTag(["licenseNo"])}</label>
                 {clientLocked
                   ? <LockedInput value={eLicNo || "—"} />
                   : <input value={eLicNo} onChange={e => setELicNo(e.target.value)} style={inputStyle} />}
               </div>
               <div>
-                <label style={labelStyle}>Expiration Date:</label>
+                <label style={labelStyle}>Expiration Date:{pendingTag(["licenseExp"])}</label>
                 {clientLocked
                   ? <LockedInput value={eLicExp || "—"} />
                   : <DatePicker value={eLicExp} onChange={setELicExp} inputStyle={inputStyle} c={c} btnGrad={btnGrad} font={font} />}
@@ -6500,9 +6608,104 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                                 {bucket.items.map((p, iIdx) => {
                                   const k = p.key as string;
                                   const editedValue = pendingOverrides[k] ?? p.agencyValue;
+                                  const inlineEditable = INLINE_EDITABLE_ITC_KEYS.has(k);
+                                  const overrideKey = OVERRIDE_KEY_FOR_ITC[k];
+                                  const isRejecting = rejectingKey === k;
+                                  // Mock editor attribution — in prod this comes from
+                                  // the audit row that produced the override. Names
+                                  // rotate so the demo shows the notification target
+                                  // rather than always the same person.
+                                  const mockEditor = (k === "phone" || k === "email")
+                                    ? { name: "Maria Chen", email: "m.chen@" + effectiveAgency.website.replace(/^www\./, "") }
+                                    : { name: "BTIS · Sarah Johnson", email: "sjohnson@btisinc.com" };
+                                  if (isRejecting) {
+                                    return (
+                                      <div key={k}
+                                        className="rounded-lg p-3"
+                                        style={{ background: isDark ? "rgba(220,38,38,0.10)" : "rgba(220,38,38,0.05)", border: `1px solid ${isDark ? "rgba(248,113,113,0.35)" : "rgba(220,38,38,0.28)"}`, marginTop: iIdx === 0 ? 0 : 16 }}>
+                                        <div className="flex items-center justify-between mb-2">
+                                          <p className="text-[12px] font-semibold" style={{ ...font, color: isDark ? "#FCA5A5" : "#B91C1C" }}>
+                                            Send rejection to {mockEditor.name}
+                                          </p>
+                                          <button onClick={() => { setRejectingKey(null); setRejectReason(""); }}
+                                            title="Cancel"
+                                            className="p-1 rounded transition-colors"
+                                            style={{ color: c.muted }}
+                                            onMouseEnter={e => { e.currentTarget.style.background = c.hoverBg; e.currentTarget.style.color = c.text; }}
+                                            onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = c.muted; }}>
+                                            <X className="w-3.5 h-3.5" />
+                                          </button>
+                                        </div>
+                                        <p className="text-[11px] mb-2" style={{ ...font, color: c.muted }}>
+                                          {p.label}: <span style={{ textDecoration: "line-through" }}>{p.agencyValue}</span> → reverts to <span className="font-semibold" style={{ color: c.text }}>{p.itcValue || "—"}</span>. An email will be sent to {mockEditor.email} explaining why.
+                                        </p>
+                                        <textarea
+                                          value={rejectReason}
+                                          onChange={e => setRejectReason(e.target.value)}
+                                          placeholder="Reason for rejection (e.g. address doesn't match uploaded W-9)…"
+                                          rows={2}
+                                          className="w-full text-[12px] outline-none resize-none"
+                                          style={{ ...font, color: c.text, background: c.cardBg, border: `1px solid ${c.border}`, borderRadius: 6, padding: "6px 8px" }}
+                                        />
+                                        <div className="flex justify-end gap-2 mt-2">
+                                          <button onClick={() => { setRejectingKey(null); setRejectReason(""); }}
+                                            className="px-3 py-1.5 rounded-md text-[11px] font-semibold transition-colors"
+                                            style={{ ...font, color: c.text, border: `1px solid ${c.borderStrong}`, background: "transparent" }}
+                                            onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+                                            onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                                            Cancel
+                                          </button>
+                                          <button
+                                            disabled={!rejectReason.trim()}
+                                            onClick={() => {
+                                              const reason = rejectReason.trim();
+                                              if (!reason) return;
+                                              if (overrideKey) {
+                                                setAgencyFieldOverride(prev => {
+                                                  const next = { ...prev };
+                                                  delete next[overrideKey];
+                                                  return next;
+                                                });
+                                              }
+                                              setPendingOverrides(prev => {
+                                                const next = { ...prev };
+                                                delete next[k];
+                                                return next;
+                                              });
+                                              setRejectingKey(null);
+                                              setRejectReason("");
+                                              showToast({
+                                                title: "Rejection sent",
+                                                description: "The editor has been notified by email.",
+                                              });
+                                            }}
+                                            className="px-3 py-1.5 rounded-md text-[11px] font-semibold text-white transition-all"
+                                            style={{ ...font, background: "#DC2626", opacity: rejectReason.trim() ? 1 : 0.5, cursor: rejectReason.trim() ? "pointer" : "not-allowed" }}
+                                            onMouseEnter={e => { if (rejectReason.trim()) e.currentTarget.style.filter = "brightness(1.10)"; }}
+                                            onMouseLeave={e => (e.currentTarget.style.filter = "none")}>
+                                            Send rejection
+                                          </button>
+                                        </div>
+                                      </div>
+                                    );
+                                  }
                                   return (
                                     <div key={k} style={{ marginTop: iIdx === 0 ? 0 : 16 }}>
-                                      <p className="text-[13px] font-semibold mb-2" style={{ ...font, color: c.text }}>{p.label}</p>
+                                      <div className="flex items-center justify-between mb-2">
+                                        <p className="text-[13px] font-semibold" style={{ ...font, color: c.text }}>{p.label}</p>
+                                        {overrideKey && (
+                                          <button
+                                            title={`Reject — revert ${p.label} to the ITC value and notify the editor`}
+                                            onClick={() => { setRejectingKey(k); setRejectReason(""); }}
+                                            className="flex items-center gap-1 text-[11px] font-medium transition-colors px-2 py-1 rounded-md"
+                                            style={{ ...font, color: c.muted }}
+                                            onMouseEnter={e => { e.currentTarget.style.background = c.hoverBg; e.currentTarget.style.color = "#DC2626"; }}
+                                            onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = c.muted; }}
+                                          >
+                                            <X className="w-3 h-3" />Reject
+                                          </button>
+                                        )}
+                                      </div>
                                       <div className="flex items-center gap-3">
                                         <div className="flex-1 min-w-0">
                                           <p className="text-[10px] uppercase tracking-wider mb-1" style={{ ...font, color: c.muted, letterSpacing: "0.06em" }}>Current</p>
@@ -6510,13 +6713,28 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                                         </div>
                                         <ArrowRight className="w-3.5 h-3.5 flex-shrink-0 mt-4" style={{ color: c.muted }} />
                                         <div className="flex-1 min-w-0">
-                                          <p className="text-[10px] uppercase tracking-wider mb-1" style={{ ...font, color: c.muted, letterSpacing: "0.06em" }}>New</p>
-                                          <input
-                                            value={editedValue}
-                                            onChange={e => setPendingOverrides(prev => ({ ...prev, [k]: e.target.value }))}
-                                            className="w-full text-[13px] font-semibold"
-                                            style={{ ...font, color: c.text, background: c.cardBg, border: `1px solid ${c.border}`, borderRadius: 6, padding: "5px 8px", outline: "none" }}
-                                          />
+                                          <p className="text-[10px] uppercase tracking-wider mb-1 flex items-center gap-1" style={{ ...font, color: c.muted, letterSpacing: "0.06em" }}>
+                                            New
+                                            {!inlineEditable && (
+                                              <Lock className="w-2.5 h-2.5" style={{ color: c.muted }} aria-label="Doc-gated: edit in the Overview form" />
+                                            )}
+                                          </p>
+                                          {inlineEditable ? (
+                                            <input
+                                              value={editedValue}
+                                              onChange={e => setPendingOverrides(prev => ({ ...prev, [k]: e.target.value }))}
+                                              className="w-full text-[13px] font-semibold"
+                                              style={{ ...font, color: c.text, background: c.cardBg, border: `1px solid ${c.border}`, borderRadius: 6, padding: "5px 8px", outline: "none" }}
+                                            />
+                                          ) : (
+                                            <p
+                                              className="w-full text-[13px] font-semibold truncate"
+                                              title="Doc-gated field — edit through the Overview form so the W-9 / License gate can run."
+                                              style={{ ...font, color: c.text, background: isDark ? "rgba(255,255,255,0.04)" : "#F9FAFB", border: `1px solid ${c.border}`, borderRadius: 6, padding: "5px 8px" }}
+                                            >
+                                              {editedValue}
+                                            </p>
+                                          )}
                                         </div>
                                       </div>
                                     </div>
