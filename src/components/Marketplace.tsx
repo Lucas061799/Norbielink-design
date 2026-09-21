@@ -275,7 +275,13 @@ export default function Marketplace({ isDark = false }: MarketplaceProps) {
                 <button
                   key={cat.label}
                   onClick={
-                    cat.label === "Inland Marine"   ? () => setInlandOpen(true)
+                    // External LOB shop apps open in a new tab so the
+                    // Norbielink workspace stays put underneath.
+                    cat.label === "Contractor General Liability" ? () => window.open("https://con-gl.vercel.app/", "_blank", "noopener,noreferrer")
+                    : cat.label === "Worker's Comp" ? () => window.open("https://workers-comp.vercel.app/", "_blank", "noopener,noreferrer")
+                    : cat.label === "Commercial Auto" ? () => window.open("https://commercial-auto-app.vercel.app/", "_blank", "noopener,noreferrer")
+                    : cat.label === "Non-Contractors GL/BOP" ? () => window.open("https://gl-bop-app.vercel.app/", "_blank", "noopener,noreferrer")
+                    : cat.label === "Inland Marine"   ? () => window.open("https://inlandmarine.vercel.app/review", "_blank", "noopener,noreferrer")
                     : cat.label === "Personal Lines" ? () => setPersonalOpen(true)
                     : cat.label === "Non-Profit Risks" ? () => setAffinityOpen(true)
                     : cat.label === "Builders Risk" ? () => setBuildersOpen(true)
