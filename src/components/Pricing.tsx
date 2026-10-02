@@ -1,9 +1,12 @@
 "use client";
 
-import { Check, Zap, Rocket } from "lucide-react";
+import { Check, Zap, Rocket, Clock, Sparkles, Minus } from "lucide-react";
 
 interface PricingProps {
   isDark?: boolean;
+  // Phase 1 ships only the first two tiers (NorbieLink Free + Pro Plus)
+  // so the launch surface is lean. Phase 2 is the full 4-tier grid.
+  phase?: 1 | 2;
 }
 
 /* ─── Tier data ──────────────────────────────────────────────────────────
@@ -58,15 +61,16 @@ const TIERS: Tier[] = [
     cta: "Get Started",
     group: "essentials",
     features: [
-      "NorbieLink Portal Access",
-      "AI-Powered Appetite Search",
-      "Quote & Policy Management",
-      "Award-Winning Support",
-      "Knowledge Base Access",
-      "Enhanced security with MFA",
-      "Faster than the legacy view",
-      "One place for Endorsement Requests",
-      "Self-service Accounting Statements",
+      "Modern, Streamlined Agent Portal",
+      "Faster, More Efficient Agent Experience",
+      "Global Search Across Quotes, Policies & Bonds",
+      "Easy-to-Scan Quote & Policy Management",
+      "Clear Statuses & Action Items",
+      "Streamlined Endorsement Requests",
+      "Self-Service Agency & User Management",
+      "Enhanced Security with MFA",
+      "Self-Service Password Recovery",
+      "Light & Dark Mode",
     ],
   },
   {
@@ -79,14 +83,13 @@ const TIERS: Tier[] = [
     group: "essentials",
     features: [
       "Everything in Free, plus:",
-      "Full ProSuite Apps Suite",
-      "Quote Compare AI",
-      "NowCerts - Instant Certificates",
-      "Lead Connect - Real-time Leads",
-      "Easy CE Compliance (Save 10%)",
-      "Spanish Marketing Tools",
-      "Priority Support",
-      "Unlimited Agency Access",
+      "AI-Powered Quote Comparison",
+      "Self-Service Certificates, 24/7",
+      "Real-Time Commercial Leads",
+      "1:1 Agency Growth & Strategy Support",
+      "Legal & Compliance Document Library",
+      "CE Discounts + Easy Compliance Tracking",
+      "Agency-Wide Access for $99/Year",
     ],
   },
   {
@@ -131,7 +134,12 @@ const TIERS: Tier[] = [
   },
 ];
 
-export default function Pricing({ isDark = false }: PricingProps) {
+export default function Pricing({ isDark = false, phase = 2 }: PricingProps) {
+  // Phase 1 scope = first two tiers only. The 4-column grid collapses
+  // to 2 columns and the Next-Level band header is suppressed since
+  // its tiers are hidden; the Essentials header stays and spans 2 cols.
+  const visibleTiers = phase === 1 ? TIERS.slice(0, 2) : TIERS;
+  const gridCols = phase === 1 ? "grid-cols-2" : "grid-cols-4";
   const c = {
     text:    isDark ? "#F9FAFB" : "#1F2937",
     heading: isDark ? "#F9FAFB" : "#2D3653",
@@ -171,7 +179,7 @@ export default function Pricing({ isDark = false }: PricingProps) {
           (energy, quick wins), gradient Rocket for Next Level (growth,
           upgrade) — same Rocket the sidenav uses for the Pricing route
           itself so the visual thread runs from nav to page hero. */}
-      <div className="grid grid-cols-4 gap-5 mb-4">
+      <div className={`grid ${gridCols} gap-5 mb-4`}>
         <div className="col-span-2">
           <div className="inline-flex items-center gap-2 mb-1.5">
             <span
@@ -189,31 +197,256 @@ export default function Pricing({ isDark = false }: PricingProps) {
           <h3 className="text-[20px] font-bold leading-tight" style={{ color: c.heading }}>Get started with the basics</h3>
           <p className="text-[12.5px] mt-1" style={{ color: c.muted }}>Core tools to power your agency</p>
         </div>
-        <div className="col-span-2">
-          <div className="inline-flex items-center gap-2 mb-1.5">
-            <span
-              className="inline-flex items-center justify-center rounded-md"
-              style={{ width: 22, height: 22, background: btnGrad }}
-            >
-              <Rocket className="w-3 h-3 text-white" strokeWidth={2.25} />
-            </span>
-            <span className="text-[11px] font-semibold uppercase tracking-wider"
-              style={{ color: c.muted, letterSpacing: "0.14em" }}>Next Level</span>
+        {phase === 2 && (
+          <div className="col-span-2">
+            <div className="inline-flex items-center gap-2 mb-1.5">
+              <span
+                className="inline-flex items-center justify-center rounded-md"
+                style={{ width: 22, height: 22, background: btnGrad }}
+              >
+                <Rocket className="w-3 h-3 text-white" strokeWidth={2.25} />
+              </span>
+              <span className="text-[11px] font-semibold uppercase tracking-wider"
+                style={{ color: c.muted, letterSpacing: "0.14em" }}>Next Level</span>
+            </div>
+            <h3 className="text-[20px] font-bold leading-tight" style={{ color: c.heading }}>Power tools for growing agencies</h3>
+            <p className="text-[12.5px] mt-1" style={{ color: c.muted }}>Unlock your agency&apos;s full potential</p>
           </div>
-          <h3 className="text-[20px] font-bold leading-tight" style={{ color: c.heading }}>Power tools for growing agencies</h3>
-          <p className="text-[12.5px] mt-1" style={{ color: c.muted }}>Unlock your agency&apos;s full potential</p>
-        </div>
+        )}
       </div>
 
-      {/* Tier grid — 4 columns, same-height rounded cards. Badge pills
-          sit inline next to the tier name (not floating above the card)
-          so headers land on the same y-axis across all four. */}
-      <div className="grid grid-cols-4 gap-5 pb-12" style={{ alignItems: "stretch" }}>
-        {TIERS.map(tier => (
+      {/* Tier grid — 4 columns in phase 2, 2 columns in phase 1. Same-
+          height rounded cards. Badge pills sit inline next to the tier
+          name (not floating above the card) so headers land on the same
+          y-axis across every column. */}
+      <div className={`grid ${gridCols} gap-5 pb-12`} style={{ alignItems: "stretch" }}>
+        {visibleTiers.map(tier => (
           <TierCard key={tier.key} tier={tier} isDark={isDark} c={c} btnGrad={btnGrad} />
         ))}
       </div>
+
+      {/* 3-column comparison chart. Mirrors the "Legacy vs NorbieLink"
+          flyer in Documents, with a 3rd column showing what the
+          ProSuite upgrade adds on top of NorbieLink. Rendered below
+          the tier grid on both phases so the value prop reads top
+          (price cards) → bottom (feature-by-feature compare). */}
+      <ComparisonChart isDark={isDark} c={c} btnGrad={btnGrad} />
     </div>
+  );
+}
+
+/* ─── Legacy vs NorbieLink vs NorbieLink + ProSuite ────────────────────
+   Three-column feature compare grouped by workflow phase. Each tier
+   column has its own color treatment: Legacy = desaturated grey (the
+   past), NorbieLink = neutral card (the present), ProSuite = razz
+   gradient stripe (the upgrade). Row cells carry a status glyph
+   (check / minus / em-dash) so the eye can skim status before
+   reading the body copy. */
+function ComparisonChart({
+  isDark, c, btnGrad,
+}: {
+  isDark: boolean;
+  c: { text: string; heading: string; muted: string; subtle: string; border: string; cardBg: string; hoverBg: string };
+  btnGrad: string;
+}) {
+  type Cell = { kind: "yes" | "no" | "same"; text?: string };
+  type Row = { label: string; legacy: Cell; nl: Cell; pro: Cell };
+  type Section = { title: string; rows: Row[] };
+  const SECTIONS: Section[] = [
+    {
+      title: "Your workspace",
+      rows: [
+        { label: "Overall experience", legacy: { kind: "yes", text: "Dated agent dashboard" }, nl: { kind: "yes", text: "Modern, streamlined workspace" }, pro: { kind: "yes", text: "Full ProSuite apps embedded" } },
+        { label: "Navigation",         legacy: { kind: "yes", text: "Top nav, extra clicks" }, nl: { kind: "yes", text: "Streamlined side navigation" }, pro: { kind: "yes", text: "ProSuite tools in the same nav" } },
+        { label: "Search",             legacy: { kind: "yes", text: "Limited search" },         nl: { kind: "yes", text: "Global search across quotes, policies, bonds" }, pro: { kind: "yes", text: "AI-powered quote comparison" } },
+        { label: "Personalization",    legacy: { kind: "no" },                                  nl: { kind: "yes", text: "Light & dark mode" },           pro: { kind: "same" } },
+      ],
+    },
+    {
+      title: "Quoting & servicing",
+      rows: [
+        { label: "Quotes & policies",  legacy: { kind: "yes", text: "Right-click menus, cluttered views" }, nl: { kind: "yes", text: "Easy-to-scan views, clear statuses" }, pro: { kind: "yes", text: "AI quote comparison across carriers" } },
+        { label: "Certificates",       legacy: { kind: "yes", text: "Call BTIS Support" },                   nl: { kind: "yes", text: "Download existing certs" },           pro: { kind: "yes", text: "Self-service, 24/7 (NowCerts)" } },
+        { label: "Endorsements",       legacy: { kind: "yes", text: "Submitted through email" },             nl: { kind: "yes", text: "Guided in-portal workflow" },         pro: { kind: "same" } },
+        { label: "Lead generation",    legacy: { kind: "no" },                                               nl: { kind: "no" },                                              pro: { kind: "yes", text: "Real-time commercial leads" } },
+      ],
+    },
+    {
+      title: "Running your agency",
+      rows: [
+        { label: "Agency administration", legacy: { kind: "no" },                                            nl: { kind: "yes", text: "Self-service user mgmt + login resets" }, pro: { kind: "yes", text: "Agency-wide access for $99/yr" } },
+        { label: "Security",              legacy: { kind: "yes", text: "Existing login experience" },        nl: { kind: "yes", text: "MFA + self-service password recovery" }, pro: { kind: "same" } },
+        { label: "Compliance & CE",       legacy: { kind: "yes", text: "Manual tracking" },                  nl: { kind: "yes", text: "Knowledge base + compliance resources" }, pro: { kind: "yes", text: "CE discounts + compliance tracking" } },
+        { label: "Agent support",         legacy: { kind: "yes", text: "Routine tasks need BTIS Support" },  nl: { kind: "yes", text: "Self-service reduces calls" },           pro: { kind: "yes", text: "1:1 Agency growth & strategy" } },
+      ],
+    },
+  ];
+
+  const colTemplate = "minmax(170px, 1.1fr) minmax(170px, 1fr) minmax(170px, 1fr) minmax(170px, 1fr)";
+  const legacyBg = isDark ? "rgba(255,255,255,0.015)" : "#F9FAFB";
+  const proBg    = isDark ? "rgba(166,20,195,0.10)" : "rgba(166,20,195,0.055)";
+  const proBorder = isDark ? "rgba(166,20,195,0.35)" : "rgba(166,20,195,0.20)";
+
+  // Status glyph — compact badge that leads every data cell.
+  const Glyph = ({ kind, tone }: { kind: Cell["kind"]; tone: "legacy" | "nl" | "pro" }) => {
+    if (kind === "same") {
+      return (
+        <span className="inline-flex items-center justify-center flex-shrink-0 mt-0.5" style={{ width: 16, height: 16 }}>
+          <span style={{ display: "block", width: 10, height: 2, borderRadius: 2, background: c.subtle }} />
+        </span>
+      );
+    }
+    if (kind === "no") {
+      return (
+        <span className="inline-flex items-center justify-center flex-shrink-0 mt-0.5 rounded-full"
+          style={{ width: 16, height: 16, background: isDark ? "rgba(255,255,255,0.06)" : "#F3F4F6" }}>
+          <Minus className="w-2.5 h-2.5" style={{ color: c.subtle }} strokeWidth={3} />
+        </span>
+      );
+    }
+    const checkColor = tone === "pro" ? "#A614C3" : tone === "nl" ? "#A614C3" : (isDark ? "#8B8FA8" : "#9CA3AF");
+    const checkBg = tone === "pro"
+      ? (isDark ? "rgba(166,20,195,0.22)" : "rgba(166,20,195,0.12)")
+      : tone === "nl"
+      ? (isDark ? "rgba(166,20,195,0.14)" : "rgba(166,20,195,0.10)")
+      : (isDark ? "rgba(255,255,255,0.06)" : "#F3F4F6");
+    return (
+      <span className="inline-flex items-center justify-center flex-shrink-0 mt-0.5 rounded-full"
+        style={{ width: 16, height: 16, background: checkBg }}>
+        <Check className="w-2.5 h-2.5" style={{ color: checkColor }} strokeWidth={3} />
+      </span>
+    );
+  };
+
+  const cellTextStyle = (tone: "legacy" | "nl" | "pro"): React.CSSProperties => ({
+    fontSize: 12.5,
+    lineHeight: 1.5,
+    color: tone === "legacy" ? c.muted : c.text,
+    fontWeight: tone === "pro" ? 500 : 400,
+  });
+
+  return (
+    <section className="pb-16">
+      <div className="mb-5 flex items-end justify-between gap-6 flex-wrap">
+        <div>
+          <h2 className="text-[22px] font-bold" style={{ color: c.heading }}>Legacy vs NorbieLink</h2>
+          <p className="text-[12.5px] mt-1" style={{ color: c.muted }}>
+            Side-by-side look at today&apos;s dashboard, the new NorbieLink portal, and what ProSuite layers on top.
+          </p>
+        </div>
+        {/* Compact legend */}
+        <div className="flex items-center gap-4 text-[11px]" style={{ color: c.muted }}>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="inline-flex items-center justify-center rounded-full" style={{ width: 14, height: 14, background: isDark ? "rgba(166,20,195,0.14)" : "rgba(166,20,195,0.10)" }}>
+              <Check className="w-2 h-2" style={{ color: "#A614C3" }} strokeWidth={3} />
+            </span>
+            Available
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="inline-flex items-center justify-center rounded-full" style={{ width: 14, height: 14, background: isDark ? "rgba(255,255,255,0.06)" : "#F3F4F6" }}>
+              <Minus className="w-2 h-2" style={{ color: c.subtle }} strokeWidth={3} />
+            </span>
+            Not available
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span style={{ display: "inline-block", width: 10, height: 2, borderRadius: 2, background: c.subtle }} />
+            Same as NorbieLink
+          </span>
+        </div>
+      </div>
+
+      <div className="rounded-2xl overflow-hidden" style={{ background: c.cardBg, border: `1px solid ${c.border}` }}>
+        {/* Column header row — tier names get their own color + icon
+            treatment so the three tiers read as distinct products
+            before the body copy loads. */}
+        <div className="grid gap-0" style={{ gridTemplateColumns: colTemplate, borderBottom: `1px solid ${c.border}` }}>
+          <div style={{ padding: "18px 20px", fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: c.muted }}>
+            Experience
+          </div>
+          <div style={{ padding: "18px 20px", background: legacyBg, borderLeft: `1px solid ${c.border}` }}>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center justify-center rounded-md" style={{ width: 20, height: 20, background: isDark ? "rgba(255,255,255,0.06)" : "#E5E7EB" }}>
+                <Clock className="w-3 h-3" style={{ color: c.muted }} strokeWidth={2.25} />
+              </span>
+              <div style={{ fontSize: 13, fontWeight: 700, color: c.muted }}>Legacy</div>
+            </div>
+            <div className="text-[10.5px] mt-1" style={{ color: c.subtle, lineHeight: 1.4 }}>Today&apos;s dashboard</div>
+          </div>
+          <div style={{ padding: "18px 20px", borderLeft: `1px solid ${c.border}` }}>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center justify-center rounded-md" style={{ width: 20, height: 20, background: isDark ? "rgba(166,20,195,0.14)" : "rgba(166,20,195,0.10)" }}>
+                <Sparkles className="w-3 h-3" style={{ color: "#A614C3" }} strokeWidth={2.25} />
+              </span>
+              <div style={{ fontSize: 13, fontWeight: 700, color: c.heading }}>NorbieLink</div>
+            </div>
+            <div className="text-[10.5px] mt-1" style={{ color: c.muted, lineHeight: 1.4 }}>The new portal</div>
+          </div>
+          <div style={{ padding: "18px 20px", background: proBg, borderLeft: `1px solid ${proBorder}` }}>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center justify-center rounded-md" style={{ width: 20, height: 20, background: btnGrad }}>
+                <Rocket className="w-3 h-3 text-white" strokeWidth={2.25} />
+              </span>
+              <div style={{ fontSize: 13, fontWeight: 700,
+                backgroundImage: "linear-gradient(88.54deg, #5C2ED4 0.1%, #A614C3 63.88%)",
+                backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+              }}>
+                NorbieLink + ProSuite
+              </div>
+            </div>
+            <div className="text-[10.5px] mt-1" style={{ color: c.muted, lineHeight: 1.4 }}>Everything in NorbieLink, plus upgrades</div>
+          </div>
+        </div>
+
+        {/* Sections — each section opens with a small eyebrow row that
+            spans the "Experience" column only, so the tier columns
+            keep flowing uninterrupted top-to-bottom. */}
+        {SECTIONS.map((section, sIdx) => (
+          <div key={section.title}>
+            <div className="grid gap-0" style={{ gridTemplateColumns: colTemplate, borderTop: sIdx === 0 ? "none" : `1px solid ${c.border}` }}>
+              <div style={{ padding: "14px 20px 6px", fontSize: 10.5, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#A614C3" }}>
+                {section.title}
+              </div>
+              <div style={{ background: legacyBg, borderLeft: `1px solid ${c.border}` }} />
+              <div style={{ borderLeft: `1px solid ${c.border}` }} />
+              <div style={{ background: proBg, borderLeft: `1px solid ${proBorder}` }} />
+            </div>
+            {section.rows.map((row, rIdx) => {
+              const isLast = sIdx === SECTIONS.length - 1 && rIdx === section.rows.length - 1;
+              return (
+                <div
+                  key={row.label}
+                  className="grid gap-0"
+                  style={{ gridTemplateColumns: colTemplate, borderTop: `1px solid ${c.border}`, alignItems: "stretch" }}
+                >
+                  <div style={{ padding: "14px 20px", fontSize: 13, fontWeight: 600, color: c.heading }}>{row.label}</div>
+                  <div style={{ padding: "14px 20px", background: legacyBg, display: "flex", gap: 8, borderLeft: `1px solid ${c.border}` }}>
+                    <Glyph kind={row.legacy.kind} tone="legacy" />
+                    <span style={cellTextStyle("legacy")}>{row.legacy.text ?? (row.legacy.kind === "no" ? "Not available" : "Same")}</span>
+                  </div>
+                  <div style={{ padding: "14px 20px", display: "flex", gap: 8, borderLeft: `1px solid ${c.border}` }}>
+                    <Glyph kind={row.nl.kind} tone="nl" />
+                    <span style={cellTextStyle("nl")}>{row.nl.text ?? (row.nl.kind === "no" ? "Not included" : "Same")}</span>
+                  </div>
+                  <div
+                    style={{
+                      padding: "14px 20px",
+                      background: proBg,
+                      borderLeft: `1px solid ${proBorder}`,
+                      display: "flex",
+                      gap: 8,
+                      borderBottomRightRadius: isLast ? 16 : 0,
+                    }}
+                  >
+                    <Glyph kind={row.pro.kind} tone="pro" />
+                    <span style={cellTextStyle("pro")}>{row.pro.text ?? "Same as NorbieLink"}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 

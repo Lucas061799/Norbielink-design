@@ -178,7 +178,10 @@ export default function Sidenav({ isDark = false, onToggleDark, activeItem = "Ma
     { label: "Admin",             icon: <UserCog    className="w-[18px] h-[18px]" /> },
     { label: "Agencies",          icon: <Building2  className="w-[18px] h-[18px]" /> },
     { label: "Website",           icon: <Globe      className="w-[18px] h-[18px]" /> },
-    { label: "Pricing",           icon: <Rocket     className="w-[18px] h-[18px]" /> },
+    { label: "Pricing",           icon: <Rocket     className="w-[18px] h-[18px]" />, hasChevron: true, children: [
+      { label: "Phase 1" },
+      { label: "Phase 2" },
+    ] },
   ];
 
   // Which parent nav is currently showing its children.

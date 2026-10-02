@@ -54,7 +54,10 @@ export default function DashboardShell({ children, pageTitle }: DashboardShellPr
       case "Endorsements":
         return <Endorsements isDark={darkMode} />;
       case "Pricing":
-        return <Pricing isDark={darkMode} />;
+      case "Pricing · Phase 2":
+        return <Pricing isDark={darkMode} phase={2} />;
+      case "Pricing · Phase 1":
+        return <Pricing isDark={darkMode} phase={1} />;
       default:
         // Un-routed / placeholder segments (Marketplace, Appetite Assistant, Make a
         // Payment, Accounting, Tools & Resources, Support, …) just render whatever
