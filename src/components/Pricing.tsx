@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Zap, Rocket, Clock, Sparkles, Minus } from "lucide-react";
+import { Check, Zap, Rocket, X, ShieldCheck, LayoutDashboard, FileText, Building2, List } from "lucide-react";
 
 interface PricingProps {
   isDark?: boolean;
@@ -235,13 +235,13 @@ export default function Pricing({ isDark = false, phase = 2 }: PricingProps) {
   );
 }
 
-/* ─── Legacy vs NorbieLink vs NorbieLink + ProSuite ────────────────────
-   Three-column feature compare grouped by workflow phase. Each tier
-   column has its own color treatment: Legacy = desaturated grey (the
-   past), NorbieLink = neutral card (the present), ProSuite = razz
-   gradient stripe (the upgrade). Row cells carry a status glyph
-   (check / minus / em-dash) so the eye can skim status before
-   reading the body copy. */
+/* ─── Platform Comparison ──────────────────────────────────────────────
+   Visual language mirrors the Pricing tier cards above: rounded-2xl
+   card wrapper, razz square icon + eyebrow for each section, DS-scale
+   spacing + radius, Inter-sized text. Status glyphs are the same
+   compact razz-tinted check used in TierCard's feature list, plus a
+   saturated razz circle for ProSuite-only rows and a muted-outline
+   circle for "not available". */
 function ComparisonChart({
   isDark, c, btnGrad,
 }: {
@@ -249,202 +249,265 @@ function ComparisonChart({
   c: { text: string; heading: string; muted: string; subtle: string; border: string; cardBg: string; hoverBg: string };
   btnGrad: string;
 }) {
-  type Cell = { kind: "yes" | "no" | "same"; text?: string };
-  type Row = { label: string; legacy: Cell; nl: Cell; pro: Cell };
+  type Status = "included" | "pro" | "none";
+  type Row = { label: string; legacy: Status; nl: Status; pro: Status };
   type Section = { title: string; rows: Row[] };
   const SECTIONS: Section[] = [
     {
+      title: "Included for every agent",
+      rows: [
+        { label: "Access to 8+ product lines (GL, WC, Auto, Bonds, etc.)", legacy: "included", nl: "included", pro: "included" },
+        { label: "Multiple carrier quotes from one application",            legacy: "included", nl: "included", pro: "included" },
+        { label: "Live BTIS support (no phone trees)",                      legacy: "included", nl: "included", pro: "included" },
+        { label: "Expert underwriting guidance",                            legacy: "included", nl: "included", pro: "included" },
+        { label: "Competitive commissions",                                 legacy: "included", nl: "included", pro: "included" },
+        { label: "Exclusive contractor programs",                           legacy: "included", nl: "included", pro: "included" },
+      ],
+    },
+    {
       title: "Your workspace",
       rows: [
-        { label: "Overall experience", legacy: { kind: "yes", text: "Dated agent dashboard" }, nl: { kind: "yes", text: "Modern, streamlined workspace" }, pro: { kind: "yes", text: "Full ProSuite apps embedded" } },
-        { label: "Navigation",         legacy: { kind: "yes", text: "Top nav, extra clicks" }, nl: { kind: "yes", text: "Streamlined side navigation" }, pro: { kind: "yes", text: "ProSuite tools in the same nav" } },
-        { label: "Search",             legacy: { kind: "yes", text: "Limited search" },         nl: { kind: "yes", text: "Global search across quotes, policies, bonds" }, pro: { kind: "yes", text: "AI-powered quote comparison" } },
-        { label: "Personalization",    legacy: { kind: "no" },                                  nl: { kind: "yes", text: "Light & dark mode" },           pro: { kind: "same" } },
+        { label: "Modern, streamlined workspace",                           legacy: "none", nl: "included", pro: "included" },
+        { label: "Streamlined side navigation",                             legacy: "none", nl: "included", pro: "included" },
+        { label: "Global search across quotes, policies, bonds",            legacy: "none", nl: "included", pro: "included" },
+        { label: "Light & dark mode",                                       legacy: "none", nl: "included", pro: "included" },
+        { label: "Full ProSuite apps embedded",                             legacy: "none", nl: "none",     pro: "pro" },
       ],
     },
     {
       title: "Quoting & servicing",
       rows: [
-        { label: "Quotes & policies",  legacy: { kind: "yes", text: "Right-click menus, cluttered views" }, nl: { kind: "yes", text: "Easy-to-scan views, clear statuses" }, pro: { kind: "yes", text: "AI quote comparison across carriers" } },
-        { label: "Certificates",       legacy: { kind: "yes", text: "Call BTIS Support" },                   nl: { kind: "yes", text: "Download existing certs" },           pro: { kind: "yes", text: "Self-service, 24/7 (NowCerts)" } },
-        { label: "Endorsements",       legacy: { kind: "yes", text: "Submitted through email" },             nl: { kind: "yes", text: "Guided in-portal workflow" },         pro: { kind: "same" } },
-        { label: "Lead generation",    legacy: { kind: "no" },                                               nl: { kind: "no" },                                              pro: { kind: "yes", text: "Real-time commercial leads" } },
+        { label: "Easy-to-scan views, clear statuses",                      legacy: "none", nl: "included", pro: "included" },
+        { label: "Download existing certificates",                          legacy: "none", nl: "included", pro: "included" },
+        { label: "Guided in-portal endorsement workflow",                   legacy: "none", nl: "included", pro: "included" },
+        { label: "AI quote comparison across carriers",                     legacy: "none", nl: "none",     pro: "pro" },
+        { label: "Self-service certificates, 24/7 (NowCerts)",              legacy: "none", nl: "none",     pro: "pro" },
+        { label: "Real-time commercial leads",                              legacy: "none", nl: "none",     pro: "pro" },
       ],
     },
     {
       title: "Running your agency",
       rows: [
-        { label: "Agency administration", legacy: { kind: "no" },                                            nl: { kind: "yes", text: "Self-service user mgmt + login resets" }, pro: { kind: "yes", text: "Agency-wide access for $99/yr" } },
-        { label: "Security",              legacy: { kind: "yes", text: "Existing login experience" },        nl: { kind: "yes", text: "MFA + self-service password recovery" }, pro: { kind: "same" } },
-        { label: "Compliance & CE",       legacy: { kind: "yes", text: "Manual tracking" },                  nl: { kind: "yes", text: "Knowledge base + compliance resources" }, pro: { kind: "yes", text: "CE discounts + compliance tracking" } },
-        { label: "Agent support",         legacy: { kind: "yes", text: "Routine tasks need BTIS Support" },  nl: { kind: "yes", text: "Self-service reduces calls" },           pro: { kind: "yes", text: "1:1 Agency growth & strategy" } },
+        { label: "Self-service user management + login resets",             legacy: "none", nl: "included", pro: "included" },
+        { label: "MFA + self-service password recovery",                    legacy: "none", nl: "included", pro: "included" },
+        { label: "Knowledge base + compliance resources",                   legacy: "none", nl: "included", pro: "included" },
+        { label: "Agency-wide access for $99/year",                         legacy: "none", nl: "none",     pro: "pro" },
+        { label: "CE discounts + compliance tracking",                      legacy: "none", nl: "none",     pro: "pro" },
+        { label: "1:1 Agency growth & strategy support",                    legacy: "none", nl: "none",     pro: "pro" },
       ],
     },
   ];
 
-  const colTemplate = "minmax(170px, 1.1fr) minmax(170px, 1fr) minmax(170px, 1fr) minmax(170px, 1fr)";
-  const legacyBg = isDark ? "rgba(255,255,255,0.015)" : "#F9FAFB";
-  const proBg    = isDark ? "rgba(166,20,195,0.10)" : "rgba(166,20,195,0.055)";
-  const proBorder = isDark ? "rgba(166,20,195,0.35)" : "rgba(166,20,195,0.20)";
+  // Grid: let the status columns take a real share of the width
+  // (equal to the label column) so the row doesn't have a dead gap
+  // between the feature text and the first checkmark.
+  const colTemplate = "minmax(0, 1fr) minmax(100px, 180px) minmax(100px, 180px) minmax(100px, 180px)";
+  // Subtle razz-tint stripe behind the whole ProSuite column anchors
+  // the premium tier as the visual focal point of the chart.
+  const proColBg = isDark ? "rgba(166,20,195,0.06)" : "rgba(166,20,195,0.035)";
 
-  // Status glyph — compact badge that leads every data cell.
-  const Glyph = ({ kind, tone }: { kind: Cell["kind"]; tone: "legacy" | "nl" | "pro" }) => {
-    if (kind === "same") {
+  // Status glyph. Minimalist like the Shopify-style reference:
+  // "Not available" is just a muted em-dash — no circle, no X.
+  // "Included" is a small razz-tint circle check (same palette as
+  // the section header icon chips above). "ProSuite exclusive"
+  // bumps up to the solid razz gradient so the premium bits read
+  // first across the chart.
+  const Glyph = ({ status }: { status: Status }) => {
+    if (status === "none") {
       return (
-        <span className="inline-flex items-center justify-center flex-shrink-0 mt-0.5" style={{ width: 16, height: 16 }}>
-          <span style={{ display: "block", width: 10, height: 2, borderRadius: 2, background: c.subtle }} />
+        <span
+          aria-label="Not available"
+          className="inline-flex items-center justify-center rounded-full flex-shrink-0"
+          style={{ width: 20, height: 20, background: isDark ? "rgba(255,255,255,0.06)" : "#F3F4F6" }}
+        >
+          <span style={{ display: "block", width: 10, height: 1.5, borderRadius: 1, background: c.subtle }} />
         </span>
       );
     }
-    if (kind === "no") {
+    if (status === "pro") {
       return (
-        <span className="inline-flex items-center justify-center flex-shrink-0 mt-0.5 rounded-full"
-          style={{ width: 16, height: 16, background: isDark ? "rgba(255,255,255,0.06)" : "#F3F4F6" }}>
-          <Minus className="w-2.5 h-2.5" style={{ color: c.subtle }} strokeWidth={3} />
+        <span
+          aria-label="ProSuite exclusive"
+          className="inline-flex items-center justify-center rounded-full flex-shrink-0"
+          style={{ width: 20, height: 20, background: btnGrad }}
+        >
+          <Check className="w-3 h-3" style={{ color: "#FFFFFF" }} strokeWidth={3} />
         </span>
       );
     }
-    const checkColor = tone === "pro" ? "#A614C3" : tone === "nl" ? "#A614C3" : (isDark ? "#8B8FA8" : "#9CA3AF");
-    const checkBg = tone === "pro"
-      ? (isDark ? "rgba(166,20,195,0.22)" : "rgba(166,20,195,0.12)")
-      : tone === "nl"
-      ? (isDark ? "rgba(166,20,195,0.14)" : "rgba(166,20,195,0.10)")
-      : (isDark ? "rgba(255,255,255,0.06)" : "#F3F4F6");
     return (
-      <span className="inline-flex items-center justify-center flex-shrink-0 mt-0.5 rounded-full"
-        style={{ width: 16, height: 16, background: checkBg }}>
-        <Check className="w-2.5 h-2.5" style={{ color: checkColor }} strokeWidth={3} />
+      <span
+        aria-label="Included"
+        className="inline-flex items-center justify-center rounded-full flex-shrink-0"
+        style={{ width: 20, height: 20, background: isDark ? "rgba(166,20,195,0.18)" : "rgba(166,20,195,0.10)" }}
+      >
+        <Check className="w-3 h-3" style={{ color: "#A614C3" }} strokeWidth={3} />
       </span>
     );
   };
 
-  const cellTextStyle = (tone: "legacy" | "nl" | "pro"): React.CSSProperties => ({
-    fontSize: 12.5,
-    lineHeight: 1.5,
-    color: tone === "legacy" ? c.muted : c.text,
-    fontWeight: tone === "pro" ? 500 : 400,
-  });
+  // Section-head icon + one-liner, each icon chosen to telegraph the
+  // workflow phase: ShieldCheck for baseline membership, dashboard /
+  // doc / building for the three workflow stages.
+  const SECTION_META: Record<string, { icon: typeof Zap; one: string }> = {
+    "Included for every agent": { icon: ShieldCheck,     one: "The baseline every BTIS agent gets" },
+    "Your workspace":            { icon: LayoutDashboard, one: "What the day-to-day looks like" },
+    "Quoting & servicing":       { icon: FileText,        one: "From appetite to bind" },
+    "Running your agency":       { icon: Building2,       one: "Admin, security, and growth" },
+  };
 
   return (
     <section className="pb-16">
-      <div className="mb-5 flex items-end justify-between gap-6 flex-wrap">
-        <div>
-          <h2 className="text-[22px] font-bold" style={{ color: c.heading }}>Legacy vs NorbieLink</h2>
-          <p className="text-[12.5px] mt-1" style={{ color: c.muted }}>
-            Side-by-side look at today&apos;s dashboard, the new NorbieLink portal, and what ProSuite layers on top.
-          </p>
-        </div>
-        {/* Compact legend */}
-        <div className="flex items-center gap-4 text-[11px]" style={{ color: c.muted }}>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="inline-flex items-center justify-center rounded-full" style={{ width: 14, height: 14, background: isDark ? "rgba(166,20,195,0.14)" : "rgba(166,20,195,0.10)" }}>
-              <Check className="w-2 h-2" style={{ color: "#A614C3" }} strokeWidth={3} />
-            </span>
-            Available
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="inline-flex items-center justify-center rounded-full" style={{ width: 14, height: 14, background: isDark ? "rgba(255,255,255,0.06)" : "#F3F4F6" }}>
-              <Minus className="w-2 h-2" style={{ color: c.subtle }} strokeWidth={3} />
-            </span>
-            Not available
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <span style={{ display: "inline-block", width: 10, height: 2, borderRadius: 2, background: c.subtle }} />
-            Same as NorbieLink
-          </span>
-        </div>
+      <div className="mb-6">
+        <h2 className="text-[22px] font-bold" style={{ color: c.heading }}>Platform comparison</h2>
+        <p className="text-[13px] mt-1" style={{ color: c.muted }}>
+          Side-by-side look at today&apos;s dashboard, the new NorbieLink portal, and what ProSuite layers on top.
+        </p>
       </div>
 
       <div className="rounded-2xl overflow-hidden" style={{ background: c.cardBg, border: `1px solid ${c.border}` }}>
-        {/* Column header row — tier names get their own color + icon
-            treatment so the three tiers read as distinct products
-            before the body copy loads. */}
-        <div className="grid gap-0" style={{ gridTemplateColumns: colTemplate, borderBottom: `1px solid ${c.border}` }}>
-          <div style={{ padding: "18px 20px", fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: c.muted }}>
-            Experience
+        {/* Column headers — plain tier names, no pills. Each tier
+            column separated by a 1px vertical divider that continues
+            through every row below so the eye can track down the
+            column cleanly. */}
+        <div
+          className="grid items-stretch"
+          style={{
+            gridTemplateColumns: colTemplate,
+            borderBottom: `1px solid ${c.border}`,
+          }}
+        >
+          <div className="text-[13px] font-semibold flex items-center" style={{ color: c.muted, padding: "18px 24px" }}>
+            Features
           </div>
-          <div style={{ padding: "18px 20px", background: legacyBg, borderLeft: `1px solid ${c.border}` }}>
-            <div className="flex items-center gap-2">
-              <span className="inline-flex items-center justify-center rounded-md" style={{ width: 20, height: 20, background: isDark ? "rgba(255,255,255,0.06)" : "#E5E7EB" }}>
-                <Clock className="w-3 h-3" style={{ color: c.muted }} strokeWidth={2.25} />
-              </span>
-              <div style={{ fontSize: 13, fontWeight: 700, color: c.muted }}>Legacy</div>
-            </div>
-            <div className="text-[10.5px] mt-1" style={{ color: c.subtle, lineHeight: 1.4 }}>Today&apos;s dashboard</div>
+          <div className="text-[13px] font-semibold flex items-center justify-center" style={{ color: c.muted, padding: "18px 12px", borderLeft: `1px solid ${c.border}` }}>
+            Legacy
           </div>
-          <div style={{ padding: "18px 20px", borderLeft: `1px solid ${c.border}` }}>
-            <div className="flex items-center gap-2">
-              <span className="inline-flex items-center justify-center rounded-md" style={{ width: 20, height: 20, background: isDark ? "rgba(166,20,195,0.14)" : "rgba(166,20,195,0.10)" }}>
-                <Sparkles className="w-3 h-3" style={{ color: "#A614C3" }} strokeWidth={2.25} />
-              </span>
-              <div style={{ fontSize: 13, fontWeight: 700, color: c.heading }}>NorbieLink</div>
-            </div>
-            <div className="text-[10.5px] mt-1" style={{ color: c.muted, lineHeight: 1.4 }}>The new portal</div>
+          <div className="text-[13px] font-semibold flex items-center justify-center" style={{ color: c.heading, padding: "18px 12px", borderLeft: `1px solid ${c.border}` }}>
+            NorbieLink
           </div>
-          <div style={{ padding: "18px 20px", background: proBg, borderLeft: `1px solid ${proBorder}` }}>
-            <div className="flex items-center gap-2">
-              <span className="inline-flex items-center justify-center rounded-md" style={{ width: 20, height: 20, background: btnGrad }}>
-                <Rocket className="w-3 h-3 text-white" strokeWidth={2.25} />
-              </span>
-              <div style={{ fontSize: 13, fontWeight: 700,
+          <div
+            className="text-[13px] font-semibold flex items-center justify-center"
+            style={{
+              padding: "18px 12px",
+              borderLeft: `1px solid ${c.border}`,
+              background: proColBg,
+            }}
+          >
+            <span
+              style={{
                 backgroundImage: "linear-gradient(88.54deg, #5C2ED4 0.1%, #A614C3 63.88%)",
-                backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-              }}>
-                NorbieLink + ProSuite
-              </div>
-            </div>
-            <div className="text-[10.5px] mt-1" style={{ color: c.muted, lineHeight: 1.4 }}>Everything in NorbieLink, plus upgrades</div>
+                backgroundClip: "text",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+              }}
+            >
+              NorbieLink + ProSuite
+            </span>
           </div>
         </div>
 
-        {/* Sections — each section opens with a small eyebrow row that
-            spans the "Experience" column only, so the tier columns
-            keep flowing uninterrupted top-to-bottom. */}
-        {SECTIONS.map((section, sIdx) => (
-          <div key={section.title}>
-            <div className="grid gap-0" style={{ gridTemplateColumns: colTemplate, borderTop: sIdx === 0 ? "none" : `1px solid ${c.border}` }}>
-              <div style={{ padding: "14px 20px 6px", fontSize: 10.5, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#A614C3" }}>
-                {section.title}
-              </div>
-              <div style={{ background: legacyBg, borderLeft: `1px solid ${c.border}` }} />
-              <div style={{ borderLeft: `1px solid ${c.border}` }} />
-              <div style={{ background: proBg, borderLeft: `1px solid ${proBorder}` }} />
-            </div>
-            {section.rows.map((row, rIdx) => {
-              const isLast = sIdx === SECTIONS.length - 1 && rIdx === section.rows.length - 1;
-              return (
-                <div
-                  key={row.label}
-                  className="grid gap-0"
-                  style={{ gridTemplateColumns: colTemplate, borderTop: `1px solid ${c.border}`, alignItems: "stretch" }}
-                >
-                  <div style={{ padding: "14px 20px", fontSize: 13, fontWeight: 600, color: c.heading }}>{row.label}</div>
-                  <div style={{ padding: "14px 20px", background: legacyBg, display: "flex", gap: 8, borderLeft: `1px solid ${c.border}` }}>
-                    <Glyph kind={row.legacy.kind} tone="legacy" />
-                    <span style={cellTextStyle("legacy")}>{row.legacy.text ?? (row.legacy.kind === "no" ? "Not available" : "Same")}</span>
-                  </div>
-                  <div style={{ padding: "14px 20px", display: "flex", gap: 8, borderLeft: `1px solid ${c.border}` }}>
-                    <Glyph kind={row.nl.kind} tone="nl" />
-                    <span style={cellTextStyle("nl")}>{row.nl.text ?? (row.nl.kind === "no" ? "Not included" : "Same")}</span>
-                  </div>
-                  <div
+        {/* Sections */}
+        {SECTIONS.map((section, sIdx) => {
+          const meta = SECTION_META[section.title] ?? { icon: Zap, one: "" };
+          const SectionIcon = meta.icon;
+          return (
+            <div key={section.title}>
+              <div
+                className="grid items-stretch"
+                style={{
+                  gridTemplateColumns: colTemplate,
+                  borderTop: sIdx === 0 ? "none" : `1px solid ${c.border}`,
+                }}
+              >
+                <div className="flex items-center gap-3" style={{ padding: "20px 24px 12px" }}>
+                  <span
+                    className="inline-flex items-center justify-center rounded-md flex-shrink-0"
                     style={{
-                      padding: "14px 20px",
-                      background: proBg,
-                      borderLeft: `1px solid ${proBorder}`,
-                      display: "flex",
-                      gap: 8,
-                      borderBottomRightRadius: isLast ? 16 : 0,
+                      width: 24, height: 24,
+                      background: isDark ? "rgba(166,20,195,0.20)" : "rgba(166,20,195,0.10)",
                     }}
                   >
-                    <Glyph kind={row.pro.kind} tone="pro" />
-                    <span style={cellTextStyle("pro")}>{row.pro.text ?? "Same as NorbieLink"}</span>
+                    <SectionIcon className="w-3 h-3" style={{ color: "#A614C3" }} strokeWidth={2.5} />
+                  </span>
+                  <div className="text-[11px] font-semibold uppercase" style={{ color: c.muted, letterSpacing: "0.1em" }}>
+                    {section.title}
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        ))}
+                <div style={{ borderLeft: `1px solid ${c.border}` }} />
+                <div style={{ borderLeft: `1px solid ${c.border}` }} />
+                <div style={{ borderLeft: `1px solid ${c.border}`, background: proColBg }} />
+              </div>
+              {section.rows.map(row => {
+                const rowBorder = `1px solid ${isDark ? "rgba(255,255,255,0.04)" : "#F3F4F6"}`;
+                return (
+                  <div
+                    key={row.label}
+                    className="grid items-stretch"
+                    style={{ gridTemplateColumns: colTemplate }}
+                  >
+                    <div className="text-[13px] flex items-center" style={{ color: c.text, padding: "12px 24px", borderTop: rowBorder }}>
+                      {row.label}
+                    </div>
+                    <div className="flex justify-center items-center" style={{ padding: "12px 0", borderTop: rowBorder, borderLeft: `1px solid ${c.border}` }}>
+                      <Glyph status={row.legacy} />
+                    </div>
+                    <div className="flex justify-center items-center" style={{ padding: "12px 0", borderTop: rowBorder, borderLeft: `1px solid ${c.border}` }}>
+                      <Glyph status={row.nl} />
+                    </div>
+                    <div className="flex justify-center items-center" style={{ padding: "12px 0", borderTop: rowBorder, borderLeft: `1px solid ${c.border}`, background: proColBg }}>
+                      <Glyph status={row.pro} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Legend — card wrapper matches the chart's rounded card style
+          above, left-aligned to the same gutter. ProSuite exclusive
+          leads so the differentiating value lands first; second line
+          calls out what the "Included for every agent" band means. */}
+      <div
+        className="mt-4 rounded-2xl flex flex-wrap items-center gap-x-6 gap-y-3 text-[12px]"
+        style={{
+          color: c.muted,
+          background: isDark ? "rgba(255,255,255,0.03)" : "#FAFAFB",
+          border: `1px solid ${c.border}`,
+          padding: "14px 20px",
+        }}
+      >
+        <span className="inline-flex items-center gap-2">
+          <span className="inline-flex items-center justify-center rounded-full flex-shrink-0" style={{ width: 18, height: 18, background: btnGrad }}>
+            <Check className="w-2.5 h-2.5" style={{ color: "#FFFFFF" }} strokeWidth={3} />
+          </span>
+          ProSuite exclusive
+        </span>
+        <span className="inline-flex items-center gap-2">
+          <span className="inline-flex items-center justify-center rounded-full flex-shrink-0" style={{ width: 18, height: 18, background: isDark ? "rgba(166,20,195,0.18)" : "rgba(166,20,195,0.10)" }}>
+            <Check className="w-2.5 h-2.5" style={{ color: "#A614C3" }} strokeWidth={3} />
+          </span>
+          Included
+        </span>
+        <span className="inline-flex items-center gap-2">
+          <span className="inline-flex items-center justify-center rounded-full flex-shrink-0" style={{ width: 18, height: 18, background: isDark ? "rgba(255,255,255,0.06)" : "#F3F4F6" }}>
+            <span style={{ display: "block", width: 10, height: 1.5, borderRadius: 1, background: c.subtle }} />
+          </span>
+          Not available
+        </span>
+        <span className="basis-full text-[11px]" style={{ color: c.muted }}>
+          <strong style={{
+            backgroundImage: "linear-gradient(88.54deg, #5C2ED4 0.1%, #A614C3 63.88%)",
+            backgroundClip: "text",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+            textTransform: "uppercase",
+            letterSpacing: "0.08em",
+          }}>Included for every agent</strong>
+          &nbsp;= features every BTIS agent gets, regardless of platform.
+        </span>
       </div>
     </section>
   );
