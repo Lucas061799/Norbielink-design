@@ -271,7 +271,7 @@ function ComparisonChart({
         { label: "Streamlined side navigation",                             legacy: "none", nl: "included", pro: "included" },
         { label: "Global search across quotes, policies, bonds",            legacy: "none", nl: "included", pro: "included" },
         { label: "Light & dark mode",                                       legacy: "none", nl: "included", pro: "included" },
-        { label: "Full ProSuite apps embedded",                             legacy: "none", nl: "none",     pro: "pro" },
+        { label: "Select ProSuite apps embedded for easy access",           legacy: "none", nl: "none",     pro: "pro" },
       ],
     },
     {
@@ -290,7 +290,7 @@ function ComparisonChart({
       rows: [
         { label: "Self-service user management + login resets",             legacy: "none", nl: "included", pro: "included" },
         { label: "MFA + self-service password recovery",                    legacy: "none", nl: "included", pro: "included" },
-        { label: "Knowledge base + compliance resources",                   legacy: "none", nl: "included", pro: "included" },
+        { label: "Knowledge base + compliance resources",                   legacy: "included", nl: "included", pro: "included" },
         { label: "Agency-wide access for $99/year",                         legacy: "none", nl: "none",     pro: "pro" },
         { label: "CE discounts + compliance tracking",                      legacy: "none", nl: "none",     pro: "pro" },
         { label: "1:1 Agency growth & strategy support",                    legacy: "none", nl: "none",     pro: "pro" },
@@ -306,12 +306,14 @@ function ComparisonChart({
   // the premium tier as the visual focal point of the chart.
   const proColBg = isDark ? "rgba(166,20,195,0.06)" : "rgba(166,20,195,0.035)";
 
-  // Status glyph. Minimalist like the Shopify-style reference:
-  // "Not available" is just a muted em-dash — no circle, no X.
-  // "Included" is a small razz-tint circle check (same palette as
-  // the section header icon chips above). "ProSuite exclusive"
-  // bumps up to the solid razz gradient so the premium bits read
-  // first across the chart.
+  // Status glyphs. Both "Included" and "ProSuite exclusive" are
+  // saturated filled circles so the checks pop against the subtle
+  // em-dash used for "Not available":
+  //   • Included        — razz-filled circle (the brand default)
+  //   • ProSuite only   — teal-filled circle (a secondary brand
+  //     accent that still stands out from the razz tier stripe
+  //     and keeps the two "yes" states visually distinct)
+  //   • Not available   — grey-tint circle + em-dash
   const Glyph = ({ status }: { status: Status }) => {
     if (status === "none") {
       return (
@@ -329,7 +331,7 @@ function ComparisonChart({
         <span
           aria-label="ProSuite exclusive"
           className="inline-flex items-center justify-center rounded-full flex-shrink-0"
-          style={{ width: 20, height: 20, background: btnGrad }}
+          style={{ width: 20, height: 20, background: "#73C9B7" }}
         >
           <Check className="w-3 h-3" style={{ color: "#FFFFFF" }} strokeWidth={3} />
         </span>
@@ -339,9 +341,9 @@ function ComparisonChart({
       <span
         aria-label="Included"
         className="inline-flex items-center justify-center rounded-full flex-shrink-0"
-        style={{ width: 20, height: 20, background: isDark ? "rgba(166,20,195,0.18)" : "rgba(166,20,195,0.10)" }}
+        style={{ width: 20, height: 20, background: "#A614C3" }}
       >
-        <Check className="w-3 h-3" style={{ color: "#A614C3" }} strokeWidth={3} />
+        <Check className="w-3 h-3" style={{ color: "#FFFFFF" }} strokeWidth={3} />
       </span>
     );
   };
