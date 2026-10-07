@@ -10,7 +10,7 @@ import loginN from "@/assets/login-n.svg";
 
 const FONT = "var(--font-montserrat), Montserrat, sans-serif";
 
-type Step = "login" | "mfa" | "addphone" | "signup" | "verify" | "create" | "reset";
+type Step = "login" | "mfa" | "addphone" | "signup" | "verify" | "create" | "reset" | "unlocked";
 type MfaMethod = "email" | "phone";
 
 interface WebsiteProps {
@@ -47,6 +47,16 @@ export default function Website({ isDark = false }: WebsiteProps) {
   const font = { fontFamily: FONT } as React.CSSProperties;
   const btnGrad = isDark
     ? "radial-gradient(171.32% 99.33% at 33.13% -9%, #282550 0%, #191735 55.82%, rgba(0,0,0,0.3) 74%, rgba(0,0,0,0) 100%), linear-gradient(88.34deg, #5C2ED4 0.11%, #A614C3 63.8%)"
+    : "linear-gradient(90deg,#5C2ED4 0%,#A614C3 65%)";
+  // Separate gradient for background-clip:text spots. The dark-mode
+  // `btnGrad` stacks a near-black radial on top of the razz linear so
+  // dark-mode BUTTONS get a tactile sheen — but when the same string
+  // fills text, the radial dims the glyphs into the navy background.
+  // `textGrad` keeps brand razz and lifts both stops in dark mode so
+  // headlines like "NorbieLink!" / "Verification Method" read cleanly
+  // on #0F1120, without changing how the dark-mode buttons look.
+  const textGrad = isDark
+    ? "linear-gradient(90deg,#C9A6FF 0%,#E68BF2 65%)"
     : "linear-gradient(90deg,#5C2ED4 0%,#A614C3 65%)";
 
   const inputStyle: React.CSSProperties = {
@@ -139,7 +149,7 @@ export default function Website({ isDark = false }: WebsiteProps) {
         >
         {/* Step indicator (top-right) — clickable for demo navigation */}
         <div className="absolute top-6 right-8 flex items-center gap-2">
-          {(["login", "mfa", "addphone", "signup", "verify", "create", "reset"] as Step[]).map((s, i) => (
+          {(["login", "mfa", "addphone", "signup", "verify", "create", "reset", "unlocked"] as Step[]).map((s, i) => (
             <button
               key={s}
               onClick={() => setStep(s)}
@@ -161,7 +171,7 @@ export default function Website({ isDark = false }: WebsiteProps) {
               without resizing every individual element. `transformOrigin: center` keeps it
               vertically and horizontally centered as it shrinks. */}
           <div className="w-full" style={{ maxWidth: step === "signup" ? 760 : 520, transform: "scale(0.85)", transformOrigin: "center" }}>
-            {step === "login"  && <LoginView  c={c} font={font} inputStyle={inputStyle} labelStyle={labelStyle} primaryBtnStyle={primaryBtnStyle} btnGrad={btnGrad}
+            {step === "login"  && <LoginView  c={c} font={font} inputStyle={inputStyle} labelStyle={labelStyle} primaryBtnStyle={primaryBtnStyle} btnGrad={btnGrad} textGrad={textGrad}
               onContinue={() => {
                 // Users with a phone on file → MFA method picker.
                 // Users with only email → "add phone" reminder page, from
@@ -203,18 +213,18 @@ export default function Website({ isDark = false }: WebsiteProps) {
                 setStep("reset");
               }}
             />}
-            {step === "mfa" && <MfaMethodView c={c} font={font} primaryBtnStyle={primaryBtnStyle} btnGrad={btnGrad}
+            {step === "mfa" && <MfaMethodView c={c} font={font} primaryBtnStyle={primaryBtnStyle} btnGrad={btnGrad} textGrad={textGrad} isDark={isDark}
               onSelect={(m) => { setMfaMethod(m); setStep("verify"); }}
               onBack={() => setStep("login")}
             />}
-            {step === "addphone" && <AddPhoneView c={c} font={font} primaryBtnStyle={primaryBtnStyle} btnGrad={btnGrad}
+            {step === "addphone" && <AddPhoneView c={c} font={font} primaryBtnStyle={primaryBtnStyle} btnGrad={btnGrad} textGrad={textGrad} isDark={isDark}
               onContinueEmail={() => { setMfaMethod("email"); setStep("verify"); }}
               onBack={() => setStep("login")}
             />}
-            {step === "signup" && <SignupView c={c} font={font} inputStyle={inputStyle} labelStyle={labelStyle} primaryBtnStyle={primaryBtnStyle} btnGrad={btnGrad} isDark={isDark} onContinue={() => setStep("verify")} onSignInClicked={() => setStep("login")} />}
-            {step === "verify" && <VerifyView c={c} font={font} primaryBtnStyle={primaryBtnStyle} btnGrad={btnGrad} method={mfaMethod} onVerify={() => setStep("create")} />}
-            {step === "create" && <CreateView c={c} font={font} inputStyle={inputStyle} labelStyle={labelStyle} primaryBtnStyle={primaryBtnStyle} btnGrad={btnGrad} isDark={isDark} onContinue={() => setStep("login")} />}
-            {step === "reset"  && <ResetPasswordView c={c} font={font} inputStyle={inputStyle} labelStyle={labelStyle} primaryBtnStyle={primaryBtnStyle} btnGrad={btnGrad} isDark={isDark} onContinue={() => setStep("login")} />}
+            {step === "signup" && <SignupView c={c} font={font} inputStyle={inputStyle} labelStyle={labelStyle} primaryBtnStyle={primaryBtnStyle} btnGrad={btnGrad} textGrad={textGrad} isDark={isDark} onContinue={() => setStep("verify")} onSignInClicked={() => setStep("login")} />}
+            {step === "verify" && <VerifyView c={c} font={font} primaryBtnStyle={primaryBtnStyle} btnGrad={btnGrad} textGrad={textGrad} method={mfaMethod} onVerify={() => setStep("create")} />}
+            {step === "create" && <CreateView c={c} font={font} inputStyle={inputStyle} labelStyle={labelStyle} primaryBtnStyle={primaryBtnStyle} btnGrad={btnGrad} textGrad={textGrad} isDark={isDark} onContinue={() => setStep("login")} />}
+            {step === "reset"  && <ResetPasswordView c={c} font={font} inputStyle={inputStyle} labelStyle={labelStyle} primaryBtnStyle={primaryBtnStyle} btnGrad={btnGrad} textGrad={textGrad} isDark={isDark} onContinue={() => setStep("login")} />}
           </div>
 
           {/* Toast — top-right of the form panel, below the step indicator */}
@@ -266,13 +276,14 @@ export default function Website({ isDark = false }: WebsiteProps) {
 }
 
 /* ──────────────────────────── LOGIN ──────────────────────────── */
-function LoginView({ c, font, inputStyle, labelStyle, primaryBtnStyle, btnGrad, onContinue, onResetLinkClicked, onCreateLinkClicked, onResetEmailSent, onAgencyCodeDetected }: {
+function LoginView({ c, font, inputStyle, labelStyle, primaryBtnStyle, btnGrad, textGrad, onContinue, onResetLinkClicked, onCreateLinkClicked, onResetEmailSent, onAgencyCodeDetected }: {
   c: Record<string, string>;
   font: React.CSSProperties;
   inputStyle: React.CSSProperties;
   labelStyle: React.CSSProperties;
   primaryBtnStyle: (enabled: boolean) => React.CSSProperties;
   btnGrad: string;
+    textGrad: string;
   onContinue: () => void;
   onResetLinkClicked: () => void;
   onCreateLinkClicked: () => void;
@@ -305,7 +316,7 @@ function LoginView({ c, font, inputStyle, labelStyle, primaryBtnStyle, btnGrad, 
         Welcome to{" "}
         <span
           style={{
-            background: btnGrad,
+            background: textGrad,
             WebkitBackgroundClip: "text",
             WebkitTextFillColor: "transparent",
             backgroundClip: "text",
@@ -388,7 +399,7 @@ function LoginView({ c, font, inputStyle, labelStyle, primaryBtnStyle, btnGrad, 
           onClick={() => setResetOpen(true)}
           className="underline cursor-pointer"
           style={{
-            background: btnGrad,
+            background: textGrad,
             WebkitBackgroundClip: "text",
             WebkitTextFillColor: "transparent",
             backgroundClip: "text",
@@ -411,7 +422,7 @@ function LoginView({ c, font, inputStyle, labelStyle, primaryBtnStyle, btnGrad, 
           onClick={onCreateLinkClicked}
           className="underline cursor-pointer"
           style={{
-            background: btnGrad,
+            background: textGrad,
             WebkitBackgroundClip: "text",
             WebkitTextFillColor: "transparent",
             backgroundClip: "text",
@@ -433,7 +444,7 @@ function LoginView({ c, font, inputStyle, labelStyle, primaryBtnStyle, btnGrad, 
           font={font}
           inputStyle={inputStyle}
           labelStyle={labelStyle}
-          btnGrad={btnGrad}
+          btnGrad={btnGrad} textGrad={textGrad}
           onClose={() => setResetOpen(false)}
           onSimulateEmailClick={() => { setResetOpen(false); onResetLinkClicked(); }}
           onEmailSent={(email, mode) => { setResetOpen(false); onResetEmailSent(email, mode); }}
@@ -447,12 +458,13 @@ function LoginView({ c, font, inputStyle, labelStyle, primaryBtnStyle, btnGrad, 
 type ResetMode = "password" | "both";
 type ResetStep = "choose" | "form" | "done";
 
-function ResetModal({ c, font, inputStyle, labelStyle, btnGrad, onClose, onSimulateEmailClick, onEmailSent }: {
+function ResetModal({ c, font, inputStyle, labelStyle, btnGrad, textGrad, onClose, onSimulateEmailClick, onEmailSent }: {
   c: Record<string, string>;
   font: React.CSSProperties;
   inputStyle: React.CSSProperties;
   labelStyle: React.CSSProperties;
   btnGrad: string;
+    textGrad: string;
   onClose: () => void;
   onSimulateEmailClick: () => void;
   onEmailSent: (email: string, mode: ResetMode) => void;
@@ -568,7 +580,7 @@ function ResetModal({ c, font, inputStyle, labelStyle, btnGrad, onClose, onSimul
 
   const titleNode = step === "choose"
     ? <>Reset Your <span style={{
-        background: btnGrad,
+        background: textGrad,
         WebkitBackgroundClip: "text",
         WebkitTextFillColor: "transparent",
         backgroundClip: "text",
@@ -732,11 +744,13 @@ function ResetModal({ c, font, inputStyle, labelStyle, btnGrad, onClose, onSimul
 // Shown between login and verify only when the returning user has both an
 // email AND a phone on file. Email-only users skip straight to the verify
 // screen with the code pre-sent to their inbox.
-function MfaMethodView({ c, font, primaryBtnStyle, btnGrad, onSelect, onBack }: {
+function MfaMethodView({ c, font, primaryBtnStyle, btnGrad, textGrad, isDark, onSelect, onBack }: {
   c: Record<string, string>;
   font: React.CSSProperties;
   primaryBtnStyle: (enabled: boolean) => React.CSSProperties;
   btnGrad: string;
+    textGrad: string;
+  isDark: boolean;
   onSelect: (method: MfaMethod) => void;
   onBack: () => void;
 }) {
@@ -745,13 +759,18 @@ function MfaMethodView({ c, font, primaryBtnStyle, btnGrad, onSelect, onBack }: 
     { key: "email", icon: Mail,          title: "Email me a code",     detail: "l***********e@amyntagroup.com" },
     { key: "phone", icon: MessageSquare, title: "Text me a code",      detail: "(•••) •••-4102" },
   ];
+  // Icon-chip palette for the method tiles. In dark mode the stock
+  // razz-tint (rgba(166,20,195,0.10)) with #A614C3 glyph blends into
+  // #0F1120 — bump both to the brighter razz we use elsewhere in dark.
+  const chipBg = isDark ? "rgba(201,166,255,0.22)" : "rgba(166,20,195,0.10)";
+  const chipFg = isDark ? "#E6B8FF" : "#A614C3";
   return (
     <>
       <h1 className="mb-3" style={{ ...font, fontSize: 28, fontWeight: 600, lineHeight: "34px", color: c.text, whiteSpace: "nowrap" }}>
         Choose your{" "}
         <span
           style={{
-            background: btnGrad,
+            background: textGrad,
             WebkitBackgroundClip: "text",
             WebkitTextFillColor: "transparent",
             backgroundClip: "text",
@@ -788,8 +807,8 @@ function MfaMethodView({ c, font, primaryBtnStyle, btnGrad, onSelect, onBack }: 
                 className="flex-shrink-0 flex items-center justify-center"
                 style={{
                   width: 36, height: 36, borderRadius: 10,
-                  background: "rgba(166,20,195,0.10)",
-                  color: "#A614C3",
+                  background: chipBg,
+                  color: chipFg,
                 }}
               >
                 <Icon className="w-4 h-4" />
@@ -825,15 +844,23 @@ function MfaMethodView({ c, font, primaryBtnStyle, btnGrad, onSelect, onBack }: 
 }
 
 /* ──────────────────────────── ADD PHONE (nudge, shown when only email is on file) ──────────────────────────── */
-function AddPhoneView({ c, font, primaryBtnStyle, btnGrad, onContinueEmail, onBack }: {
+function AddPhoneView({ c, font, primaryBtnStyle, btnGrad, textGrad, isDark, onContinueEmail, onBack }: {
   c: Record<string, string>;
   font: React.CSSProperties;
   primaryBtnStyle: (enabled: boolean) => React.CSSProperties;
   btnGrad: string;
+    textGrad: string;
+  isDark: boolean;
   onContinueEmail: () => void;
   onBack: () => void;
 }) {
   void primaryBtnStyle;
+  // Same icon-chip palette logic as MfaMethodView — see note there.
+  // Plus a muted disabled variant that's actually visible on #0F1120
+  // instead of the near-invisible rgba(0,0,0,0.05) fallback.
+  const chipBg = isDark ? "rgba(201,166,255,0.22)" : "rgba(166,20,195,0.10)";
+  const chipFg = isDark ? "#E6B8FF" : "#A614C3";
+  const chipBgDisabled = isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.05)";
   // Same shape as MfaMethodView options — but here "phone" is unavailable
   // (no mobile on file) so it renders as a disabled row.
   const options: { key: MfaMethod; icon: typeof Mail; title: string; detail: string; disabled: boolean }[] = [
@@ -846,7 +873,7 @@ function AddPhoneView({ c, font, primaryBtnStyle, btnGrad, onContinueEmail, onBa
         Choose your{" "}
         <span
           style={{
-            background: btnGrad,
+            background: textGrad,
             WebkitBackgroundClip: "text",
             WebkitTextFillColor: "transparent",
             backgroundClip: "text",
@@ -886,8 +913,8 @@ function AddPhoneView({ c, font, primaryBtnStyle, btnGrad, onContinueEmail, onBa
                   className="flex-shrink-0 flex items-center justify-center"
                   style={{
                     width: 36, height: 36, borderRadius: 10,
-                    background: disabled ? (c.hoverBg || "rgba(0,0,0,0.05)") : "rgba(166,20,195,0.10)",
-                    color: disabled ? c.muted : "#A614C3",
+                    background: disabled ? chipBgDisabled : chipBg,
+                    color: disabled ? c.muted : chipFg,
                   }}
                 >
                   <Icon className="w-4 h-4" />
@@ -958,11 +985,12 @@ function AddPhoneView({ c, font, primaryBtnStyle, btnGrad, onContinueEmail, onBa
 }
 
 /* ──────────────────────────── VERIFY ──────────────────────────── */
-function VerifyView({ c, font, primaryBtnStyle, btnGrad, onVerify, method = "email" }: {
+function VerifyView({ c, font, primaryBtnStyle, btnGrad, textGrad, onVerify, method = "email" }: {
   c: Record<string, string>;
   font: React.CSSProperties;
   primaryBtnStyle: (enabled: boolean) => React.CSSProperties;
   btnGrad: string;
+    textGrad: string;
   onVerify: () => void;
   method?: MfaMethod;
 }) {
@@ -997,7 +1025,7 @@ function VerifyView({ c, font, primaryBtnStyle, btnGrad, onVerify, method = "ema
         Verify Your{" "}
         <span
           style={{
-            background: btnGrad,
+            background: textGrad,
             WebkitBackgroundClip: "text",
             WebkitTextFillColor: "transparent",
             backgroundClip: "text",
@@ -1063,7 +1091,7 @@ function VerifyView({ c, font, primaryBtnStyle, btnGrad, onVerify, method = "ema
           onClick={() => setSeconds(594)}
           className="underline cursor-pointer"
           style={{
-            background: btnGrad,
+            background: textGrad,
             WebkitBackgroundClip: "text",
             WebkitTextFillColor: "transparent",
             backgroundClip: "text",
@@ -1083,13 +1111,14 @@ function VerifyView({ c, font, primaryBtnStyle, btnGrad, onVerify, method = "ema
 }
 
 /* ──────────────────────────── CREATE PASSWORD ──────────────────────────── */
-function SignupView({ c, font, inputStyle, labelStyle, primaryBtnStyle, btnGrad, isDark, onContinue, onSignInClicked }: {
+function SignupView({ c, font, inputStyle, labelStyle, primaryBtnStyle, btnGrad, textGrad, isDark, onContinue, onSignInClicked }: {
   c: Record<string, string>;
   font: React.CSSProperties;
   inputStyle: React.CSSProperties;
   labelStyle: React.CSSProperties;
   primaryBtnStyle: (enabled: boolean) => React.CSSProperties;
   btnGrad: string;
+    textGrad: string;
   isDark: boolean;
   onContinue: () => void;
   onSignInClicked: () => void;
@@ -1116,7 +1145,7 @@ function SignupView({ c, font, inputStyle, labelStyle, primaryBtnStyle, btnGrad,
 
   // Reuse the underlined gradient link pattern used by "Reset" on the login page.
   const linkStyle: React.CSSProperties = {
-    background: btnGrad,
+    background: textGrad,
     WebkitBackgroundClip: "text",
     WebkitTextFillColor: "transparent",
     backgroundClip: "text",
@@ -1134,7 +1163,7 @@ function SignupView({ c, font, inputStyle, labelStyle, primaryBtnStyle, btnGrad,
         Welcome to{" "}
         <span
           style={{
-            background: btnGrad,
+            background: textGrad,
             WebkitBackgroundClip: "text",
             WebkitTextFillColor: "transparent",
             backgroundClip: "text",
@@ -1192,7 +1221,7 @@ function SignupView({ c, font, inputStyle, labelStyle, primaryBtnStyle, btnGrad,
         New!{" "}
         <span
           style={{
-            background: btnGrad,
+            background: textGrad,
             WebkitBackgroundClip: "text",
             WebkitTextFillColor: "transparent",
             backgroundClip: "text",
@@ -1310,13 +1339,14 @@ function SignupView({ c, font, inputStyle, labelStyle, primaryBtnStyle, btnGrad,
   );
 }
 
-function CreateView({ c, font, inputStyle, labelStyle, primaryBtnStyle, btnGrad, isDark, onContinue }: {
+function CreateView({ c, font, inputStyle, labelStyle, primaryBtnStyle, btnGrad, textGrad, isDark, onContinue }: {
   c: Record<string, string>;
   font: React.CSSProperties;
   inputStyle: React.CSSProperties;
   labelStyle: React.CSSProperties;
   primaryBtnStyle: (enabled: boolean) => React.CSSProperties;
   btnGrad: string;
+    textGrad: string;
   isDark: boolean;
   onContinue: () => void;
 }) {
@@ -1342,7 +1372,7 @@ function CreateView({ c, font, inputStyle, labelStyle, primaryBtnStyle, btnGrad,
         Create{" "}
         <span
           style={{
-            background: btnGrad,
+            background: textGrad,
             WebkitBackgroundClip: "text",
             WebkitTextFillColor: "transparent",
             backgroundClip: "text",
@@ -1431,7 +1461,7 @@ function CreateView({ c, font, inputStyle, labelStyle, primaryBtnStyle, btnGrad,
           type="button"
           className="underline cursor-pointer"
           style={{
-            background: btnGrad,
+            background: textGrad,
             WebkitBackgroundClip: "text",
             WebkitTextFillColor: "transparent",
             backgroundClip: "text",
@@ -1451,13 +1481,14 @@ function CreateView({ c, font, inputStyle, labelStyle, primaryBtnStyle, btnGrad,
 }
 
 /* ──────────────────────────── RESET PASSWORD (landing page from email link) ──────────────────────────── */
-function ResetPasswordView({ c, font, inputStyle, labelStyle, primaryBtnStyle, btnGrad, isDark, onContinue }: {
+function ResetPasswordView({ c, font, inputStyle, labelStyle, primaryBtnStyle, btnGrad, textGrad, isDark, onContinue }: {
   c: Record<string, string>;
   font: React.CSSProperties;
   inputStyle: React.CSSProperties;
   labelStyle: React.CSSProperties;
   primaryBtnStyle: (enabled: boolean) => React.CSSProperties;
   btnGrad: string;
+    textGrad: string;
   isDark: boolean;
   onContinue: () => void;
 }) {
@@ -1492,7 +1523,7 @@ function ResetPasswordView({ c, font, inputStyle, labelStyle, primaryBtnStyle, b
         <h1 className="mb-3" style={{ ...font, fontSize: 28, fontWeight: 600, lineHeight: "34px", color: c.text }}>
           Password{" "}
           <span style={{
-            background: btnGrad,
+            background: textGrad,
             WebkitBackgroundClip: "text",
             WebkitTextFillColor: "transparent",
             backgroundClip: "text",
@@ -1514,7 +1545,7 @@ function ResetPasswordView({ c, font, inputStyle, labelStyle, primaryBtnStyle, b
         Reset Your{" "}
         <span
           style={{
-            background: btnGrad,
+            background: textGrad,
             WebkitBackgroundClip: "text",
             WebkitTextFillColor: "transparent",
             backgroundClip: "text",
@@ -1576,7 +1607,12 @@ function ResetPasswordView({ c, font, inputStyle, labelStyle, primaryBtnStyle, b
             onChange={e => setConfirm(e.target.value)}
             placeholder="Re-enter the new password"
             style={{ ...inputStyle, paddingRight: 40,
-              borderColor: confirm.length > 0 && !passwordsMatch ? "#EF4444" : (inputStyle.borderColor as string) }}
+              // Override just the border COLOR for the mismatch state;
+              // inputStyle sets `border` as a shorthand (no borderColor
+              // property) so we can't read it back — hard-code to c.border
+              // instead and the browser's default #E5E7EB won't bleed
+              // through in dark mode.
+              borderColor: confirm.length > 0 && !passwordsMatch ? "#EF4444" : c.border }}
           />
           <button type="button" onClick={() => setShowConfirm(s => !s)}
             className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer"
