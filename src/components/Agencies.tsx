@@ -860,7 +860,28 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
   // editor + reason so Accounting has a paper trail.
   const [rejectingKey, setRejectingKey] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState<string>("");
-  const closePendingItc = () => { setPendingItcOpen(false); setPendingOverrides({}); setRejectingKey(null); setRejectReason(""); };
+  // Close-confirmation for the Pending Updates modal. If the admin has
+  // staged edits in the NEW column but hasn't clicked Push to ITC, closing
+  // would silently discard them — so we intercept with a small confirm
+  // offering Save for later (keep pendingOverrides for next open) vs
+  // Discard changes (full reset, current behavior).
+  const [pendingCloseConfirm, setPendingCloseConfirm] = useState(false);
+  const closePendingItc = () => { setPendingItcOpen(false); setPendingOverrides({}); setRejectingKey(null); setRejectReason(""); setPendingCloseConfirm(false); };
+  // Default escape from the close-confirmation — dismisses the confirm and
+  // leaves the admin back in the Pending Updates modal with their inline
+  // edits intact. Wired to the X in the confirm's top-right.
+  const keepEditingPendingItc = () => setPendingCloseConfirm(false);
+  // Soft close — closes the Pending Updates modal but preserves
+  // pendingOverrides so the same edits reappear next time the admin
+  // opens the modal, ready to review + push.
+  const saveForLaterPendingItc = () => { setPendingItcOpen(false); setRejectingKey(null); setRejectReason(""); setPendingCloseConfirm(false); };
+  // Intercepts both the X button and the backdrop click. If there's
+  // nothing staged we close straight through — the confirm is only here
+  // to protect accidental loss of in-progress work.
+  const requestClosePendingItc = () => {
+    if (Object.keys(pendingOverrides).length > 0) setPendingCloseConfirm(true);
+    else closePendingItc();
+  };
   // Sub-tabs within the Accounting tab — same segmented-control pattern
   // as the Documents toolbar so users don't have to scroll to switch
   // between the ITC record and the monthly statements archive.
@@ -6493,7 +6514,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                     to ITC applies the agency values field-by-field. */}
                 {pendingItcOpen && record && (
                   <>
-                    <div className="fixed inset-0 z-40" style={{ background: "rgba(0,0,0,0.35)" }} onClick={closePendingItc} />
+                    <div className="fixed inset-0 z-40" style={{ background: "rgba(0,0,0,0.35)" }} onClick={requestClosePendingItc} />
                     {/* When the supporting-doc preview slides in on the right,
                         park the pending-updates modal on the left half so the
                         reviewer can compare field-for-field without flipping
@@ -6518,7 +6539,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                           </p>
                         </div>
                         <button
-                          onClick={closePendingItc}
+                          onClick={requestClosePendingItc}
                           title="Close — I'll review this later"
                           aria-label="Close"
                           className="flex-shrink-0 p-1.5 rounded-md transition-colors"
@@ -6552,118 +6573,175 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                               : null;
                             return (
                               <div key={bIdx} className="py-4" style={{ borderTop: `1px solid ${c.border}` }}>
-                                {bucket.items.map((p, iIdx) => {
-                                  const k = p.key as string;
-                                  const editedValue = pendingOverrides[k] ?? p.agencyValue;
-                                  const overrideKey = OVERRIDE_KEY_FOR_ITC[k];
-                                  const isRejecting = rejectingKey === k;
-                                  if (isRejecting) {
-                                    return (
-                                      <div key={k}
-                                        className="rounded-lg p-3"
-                                        style={{ background: isDark ? "rgba(220,38,38,0.10)" : "rgba(220,38,38,0.05)", border: `1px solid ${isDark ? "rgba(248,113,113,0.35)" : "rgba(220,38,38,0.28)"}`, marginTop: iIdx === 0 ? 0 : 16 }}>
-                                        <div className="flex items-center justify-between mb-2">
-                                          <p className="text-[12px] font-semibold" style={{ ...font, color: isDark ? "#FCA5A5" : "#B91C1C" }}>
-                                            Reject this change
-                                          </p>
-                                          <button onClick={() => { setRejectingKey(null); setRejectReason(""); }}
-                                            title="Cancel"
-                                            className="p-1 rounded transition-colors"
-                                            style={{ color: c.muted }}
-                                            onMouseEnter={e => { e.currentTarget.style.background = c.hoverBg; e.currentTarget.style.color = c.text; }}
-                                            onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = c.muted; }}>
-                                            <X className="w-3.5 h-3.5" />
-                                          </button>
-                                        </div>
-                                        <p className="text-[11px] mb-2" style={{ ...font, color: c.muted }}>
-                                          {p.label}: <span style={{ textDecoration: "line-through" }}>{p.agencyValue}</span> → reverts to <span className="font-semibold" style={{ color: c.text }}>{p.itcValue || "—"}</span>. The agency contact (<span className="font-semibold" style={{ color: c.text }}>{effectiveAgency.contactEmail || "—"}</span>) will be notified and the reason logged for audit.
-                                        </p>
-                                        <textarea
-                                          value={rejectReason}
-                                          onChange={e => setRejectReason(e.target.value)}
-                                          placeholder="Reason for rejection (e.g. address doesn't match uploaded W-9)…"
-                                          rows={2}
-                                          className="w-full text-[12px] outline-none resize-none"
-                                          style={{ ...font, color: c.text, background: c.cardBg, border: `1px solid ${c.border}`, borderRadius: 6, padding: "6px 8px" }}
-                                        />
-                                        <div className="flex justify-end gap-2 mt-2">
-                                          <button onClick={() => { setRejectingKey(null); setRejectReason(""); }}
-                                            className="px-3 py-1.5 rounded-md text-[11px] font-semibold transition-colors"
-                                            style={{ ...font, color: c.text, border: `1px solid ${c.borderStrong}`, background: "transparent" }}
-                                            onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
-                                            onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-                                            Cancel
-                                          </button>
-                                          <button
-                                            disabled={!rejectReason.trim()}
-                                            onClick={() => {
-                                              const reason = rejectReason.trim();
-                                              if (!reason) return;
-                                              if (overrideKey) {
-                                                setAgencyFieldOverride(prev => {
+                                {(() => {
+                                  // Within a bucket, further group fields that belong to the
+                                  // same logical artifact (full street address, license block)
+                                  // so ONE Reject covers the whole block instead of showing
+                                  // four separate "Reject" buttons for one address edit.
+                                  const groupKey = (k: string): string => {
+                                    if (k === "address" || k === "city" || k === "state" || k === "zip") return "address";
+                                    if (k === "licenseNo" || k === "licenseExpires") return "license";
+                                    return `solo:${k}`;
+                                  };
+                                  const GROUP_TITLE: Record<string, string> = { address: "Address", license: "License" };
+                                  // Sub-row eyebrow for the primary street line inside the
+                                  // address block — avoids "Address › Address · Current"
+                                  // reading as a duplicate.
+                                  const SUB_LABEL: Record<string, string> = { address: "Street" };
+                                  type SubGroup = { gid: string; items: typeof bucket.items };
+                                  const subs: SubGroup[] = [];
+                                  for (const p of bucket.items) {
+                                    const gid = groupKey(p.key as string);
+                                    const last = subs[subs.length - 1];
+                                    if (last && last.gid === gid) last.items.push(p);
+                                    else subs.push({ gid, items: [p] });
+                                  }
+                                  return subs.map((sub, sIdx) => {
+                                    const isGroup = sub.items.length > 1;
+                                    const gid = sub.gid;
+                                    const groupTitle = isGroup ? (GROUP_TITLE[gid] ?? sub.items[0].label) : sub.items[0].label;
+                                    const targetId = isGroup ? `grp:${gid}` : (sub.items[0].key as string);
+                                    const isRejecting = rejectingKey === targetId;
+                                    if (isRejecting) {
+                                      return (
+                                        <div key={targetId}
+                                          className="rounded-lg p-3"
+                                          style={{ background: isDark ? "rgba(220,38,38,0.10)" : "rgba(220,38,38,0.05)", border: `1px solid ${isDark ? "rgba(248,113,113,0.35)" : "rgba(220,38,38,0.28)"}`, marginTop: sIdx === 0 ? 0 : 16 }}>
+                                          <div className="flex items-center justify-between mb-2">
+                                            <p className="text-[12px] font-semibold" style={{ ...font, color: isDark ? "#FCA5A5" : "#B91C1C" }}>
+                                              Reject {isGroup ? "these changes" : "this change"}
+                                            </p>
+                                            <button onClick={() => { setRejectingKey(null); setRejectReason(""); }}
+                                              title="Cancel"
+                                              className="p-1 rounded transition-colors"
+                                              style={{ color: c.muted }}
+                                              onMouseEnter={e => { e.currentTarget.style.background = c.hoverBg; e.currentTarget.style.color = c.text; }}
+                                              onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = c.muted; }}>
+                                              <X className="w-3.5 h-3.5" />
+                                            </button>
+                                          </div>
+                                          {isGroup ? (
+                                            <div className="text-[11px] mb-2" style={{ ...font, color: c.muted }}>
+                                              <p className="mb-1.5">
+                                                All {sub.items.length} {groupTitle.toLowerCase()} fields will revert to their ITC values:
+                                              </p>
+                                              <ul className="space-y-0.5 pl-3">
+                                                {sub.items.map(i => (
+                                                  <li key={i.key as string}>
+                                                    <span className="font-medium" style={{ color: c.text }}>{SUB_LABEL[i.key as string] ?? i.label}</span>: <span style={{ textDecoration: "line-through" }}>{i.agencyValue}</span> → <span className="font-semibold" style={{ color: c.text }}>{i.itcValue || "—"}</span>
+                                                  </li>
+                                                ))}
+                                              </ul>
+                                              <p className="mt-1.5">
+                                                The agency contact (<span className="font-semibold" style={{ color: c.text }}>{effectiveAgency.contactEmail || "—"}</span>) will be notified and the reason logged for audit.
+                                              </p>
+                                            </div>
+                                          ) : (
+                                            <p className="text-[11px] mb-2" style={{ ...font, color: c.muted }}>
+                                              {sub.items[0].label}: <span style={{ textDecoration: "line-through" }}>{sub.items[0].agencyValue}</span> → reverts to <span className="font-semibold" style={{ color: c.text }}>{sub.items[0].itcValue || "—"}</span>. The agency contact (<span className="font-semibold" style={{ color: c.text }}>{effectiveAgency.contactEmail || "—"}</span>) will be notified and the reason logged for audit.
+                                            </p>
+                                          )}
+                                          <textarea
+                                            value={rejectReason}
+                                            onChange={e => setRejectReason(e.target.value)}
+                                            placeholder={isGroup ? `Reason for rejection (e.g. ${groupTitle.toLowerCase()} doesn't match uploaded W-9)…` : "Reason for rejection (e.g. address doesn't match uploaded W-9)…"}
+                                            rows={2}
+                                            className="w-full text-[12px] outline-none resize-none"
+                                            style={{ ...font, color: c.text, background: c.cardBg, border: `1px solid ${c.border}`, borderRadius: 6, padding: "6px 8px" }}
+                                          />
+                                          <div className="flex justify-end gap-2 mt-2">
+                                            <button onClick={() => { setRejectingKey(null); setRejectReason(""); }}
+                                              className="px-3 py-1.5 rounded-md text-[11px] font-semibold transition-colors"
+                                              style={{ ...font, color: c.text, border: `1px solid ${c.borderStrong}`, background: "transparent" }}
+                                              onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+                                              onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                                              Cancel
+                                            </button>
+                                            <button
+                                              disabled={!rejectReason.trim()}
+                                              onClick={() => {
+                                                const reason = rejectReason.trim();
+                                                if (!reason) return;
+                                                const keys = sub.items.map(i => i.key as string);
+                                                const overrideKeys = keys.map(kk => OVERRIDE_KEY_FOR_ITC[kk]).filter(Boolean) as Array<keyof AgencyFieldOverride>;
+                                                if (overrideKeys.length > 0) {
+                                                  setAgencyFieldOverride(prev => {
+                                                    const next = { ...prev };
+                                                    overrideKeys.forEach(ok => { delete next[ok]; });
+                                                    return next;
+                                                  });
+                                                }
+                                                setPendingOverrides(prev => {
                                                   const next = { ...prev };
-                                                  delete next[overrideKey];
+                                                  keys.forEach(kk => { delete next[kk]; });
                                                   return next;
                                                 });
-                                              }
-                                              setPendingOverrides(prev => {
-                                                const next = { ...prev };
-                                                delete next[k];
-                                                return next;
-                                              });
-                                              setRejectingKey(null);
-                                              setRejectReason("");
-                                              showToast({
-                                                title: "Change rejected",
-                                                description: "The agency contact has been notified.",
-                                              });
-                                            }}
-                                            className="px-3 py-1.5 rounded-md text-[11px] font-semibold text-white transition-all"
-                                            style={{ ...font, background: "#DC2626", opacity: rejectReason.trim() ? 1 : 0.5, cursor: rejectReason.trim() ? "pointer" : "not-allowed" }}
-                                            onMouseEnter={e => { if (rejectReason.trim()) e.currentTarget.style.filter = "brightness(1.10)"; }}
-                                            onMouseLeave={e => (e.currentTarget.style.filter = "none")}>
-                                            Reject change
-                                          </button>
+                                                setRejectingKey(null);
+                                                setRejectReason("");
+                                                showToast({
+                                                  title: isGroup ? `${groupTitle} changes rejected` : "Change rejected",
+                                                  description: "The agency contact has been notified.",
+                                                });
+                                              }}
+                                              className="px-3 py-1.5 rounded-md text-[11px] font-semibold text-white transition-all"
+                                              style={{ ...font, background: "#DC2626", opacity: rejectReason.trim() ? 1 : 0.5, cursor: rejectReason.trim() ? "pointer" : "not-allowed" }}
+                                              onMouseEnter={e => { if (rejectReason.trim()) e.currentTarget.style.filter = "brightness(1.10)"; }}
+                                              onMouseLeave={e => (e.currentTarget.style.filter = "none")}>
+                                              {isGroup ? "Reject all" : "Reject change"}
+                                            </button>
+                                          </div>
                                         </div>
+                                      );
+                                    }
+                                    const hasAnyOverride = sub.items.some(i => Boolean(OVERRIDE_KEY_FOR_ITC[i.key as string]));
+                                    return (
+                                      <div key={gid + sIdx} style={{ marginTop: sIdx === 0 ? 0 : 16 }}>
+                                        <div className="flex items-center justify-between mb-2">
+                                          <p className="text-[13px] font-semibold" style={{ ...font, color: c.text }}>{groupTitle}</p>
+                                          {hasAnyOverride && (
+                                            <button
+                                              title={`Reject — revert ${isGroup ? `all ${groupTitle} fields` : groupTitle} to the ITC value and notify the agency`}
+                                              onClick={() => { setRejectingKey(targetId); setRejectReason(""); }}
+                                              className="flex items-center gap-1 text-[11px] font-medium transition-colors px-2 py-1 rounded-md"
+                                              style={{ ...font, color: c.muted }}
+                                              onMouseEnter={e => { e.currentTarget.style.background = c.hoverBg; e.currentTarget.style.color = "#DC2626"; }}
+                                              onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = c.muted; }}
+                                            >
+                                              <X className="w-3 h-3" />Reject{isGroup ? " all" : ""}
+                                            </button>
+                                          )}
+                                        </div>
+                                        {sub.items.map((p, rIdx) => {
+                                          const k = p.key as string;
+                                          const editedValue = pendingOverrides[k] ?? p.agencyValue;
+                                          const subLabel = isGroup ? (SUB_LABEL[k] ?? p.label) : null;
+                                          return (
+                                            <div key={k} className="flex items-center gap-3" style={{ marginTop: rIdx === 0 ? 0 : 10 }}>
+                                              <div className="flex-1 min-w-0">
+                                                <p className="text-[10px] uppercase tracking-wider mb-1" style={{ ...font, color: c.muted, letterSpacing: "0.06em" }}>
+                                                  {isGroup ? `${subLabel} · Current` : "Current"}
+                                                </p>
+                                                <p className="text-[13px] truncate" style={{ ...font, color: c.muted, textDecoration: "line-through" }}>{p.itcValue || "—"}</p>
+                                              </div>
+                                              <ArrowRight className="w-3.5 h-3.5 flex-shrink-0 mt-4" style={{ color: c.muted }} />
+                                              <div className="flex-1 min-w-0">
+                                                <p className="text-[10px] uppercase tracking-wider mb-1" style={{ ...font, color: c.muted, letterSpacing: "0.06em" }}>
+                                                  {isGroup ? `${subLabel} · New` : "New"}
+                                                </p>
+                                                <input
+                                                  value={editedValue}
+                                                  onChange={e => setPendingOverrides(prev => ({ ...prev, [k]: e.target.value }))}
+                                                  className="w-full text-[13px] font-semibold"
+                                                  style={{ ...font, color: c.text, background: c.cardBg, border: `1px solid ${c.border}`, borderRadius: 6, padding: "5px 8px", outline: "none" }}
+                                                />
+                                              </div>
+                                            </div>
+                                          );
+                                        })}
                                       </div>
                                     );
-                                  }
-                                  return (
-                                    <div key={k} style={{ marginTop: iIdx === 0 ? 0 : 16 }}>
-                                      <div className="flex items-center justify-between mb-2">
-                                        <p className="text-[13px] font-semibold" style={{ ...font, color: c.text }}>{p.label}</p>
-                                        {overrideKey && (
-                                          <button
-                                            title={`Reject — revert ${p.label} to the ITC value and notify the agency`}
-                                            onClick={() => { setRejectingKey(k); setRejectReason(""); }}
-                                            className="flex items-center gap-1 text-[11px] font-medium transition-colors px-2 py-1 rounded-md"
-                                            style={{ ...font, color: c.muted }}
-                                            onMouseEnter={e => { e.currentTarget.style.background = c.hoverBg; e.currentTarget.style.color = "#DC2626"; }}
-                                            onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = c.muted; }}
-                                          >
-                                            <X className="w-3 h-3" />Reject
-                                          </button>
-                                        )}
-                                      </div>
-                                      <div className="flex items-center gap-3">
-                                        <div className="flex-1 min-w-0">
-                                          <p className="text-[10px] uppercase tracking-wider mb-1" style={{ ...font, color: c.muted, letterSpacing: "0.06em" }}>Current</p>
-                                          <p className="text-[13px] truncate" style={{ ...font, color: c.muted, textDecoration: "line-through" }}>{p.itcValue || "—"}</p>
-                                        </div>
-                                        <ArrowRight className="w-3.5 h-3.5 flex-shrink-0 mt-4" style={{ color: c.muted }} />
-                                        <div className="flex-1 min-w-0">
-                                          <p className="text-[10px] uppercase tracking-wider mb-1" style={{ ...font, color: c.muted, letterSpacing: "0.06em" }}>New</p>
-                                          <input
-                                            value={editedValue}
-                                            onChange={e => setPendingOverrides(prev => ({ ...prev, [k]: e.target.value }))}
-                                            className="w-full text-[13px] font-semibold"
-                                            style={{ ...font, color: c.text, background: c.cardBg, border: `1px solid ${c.border}`, borderRadius: 6, padding: "5px 8px", outline: "none" }}
-                                          />
-                                        </div>
-                                      </div>
-                                    </div>
-                                  );
-                                })}
+                                  });
+                                })()}
                                 {supportingDoc && (
                                   <div className="mt-3 flex items-center gap-2 px-3 py-2 rounded-lg"
                                     style={{ background: isDark ? "rgba(255,255,255,0.03)" : "#F9FAFB", border: `1px solid ${c.border}` }}>
@@ -6720,6 +6798,72 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                         </button>
                       </div>
                     </div>
+                    {/* Close-confirmation. Sits on top of the Pending Updates
+                        modal (z-[55]) so Save for later / Discard are the only
+                        way out — backdrop click here is intentionally inert to
+                        avoid a second accidental discard. */}
+                    {pendingCloseConfirm && (() => {
+                      const stagedCount = Object.keys(pendingOverrides).length;
+                      return (
+                        <>
+                          <div className="fixed inset-0 z-[55]" style={{ background: "rgba(0,0,0,0.45)" }} />
+                          <div
+                            role="dialog"
+                            aria-modal="true"
+                            aria-labelledby="pending-close-title"
+                            className="fixed top-1/2 left-1/2 z-[60] rounded-2xl shadow-2xl"
+                            style={{
+                              transform: "translate(-50%, -50%)",
+                              background: c.cardBg,
+                              border: `1px solid ${c.border}`,
+                              width: "min(420px, 90vw)",
+                            }}
+                          >
+                            <div className="p-5 pb-3 flex items-start justify-between gap-4">
+                              <div className="min-w-0">
+                                <h4 id="pending-close-title" className="text-[14px] font-bold mb-1.5" style={{ ...font, color: c.text }}>
+                                  Unpushed changes
+                                </h4>
+                                <p className="text-[12.5px] leading-relaxed" style={{ ...font, color: c.muted }}>
+                                  You have <span className="font-semibold" style={{ color: c.text }}>{stagedCount}</span> accepted {stagedCount === 1 ? "change" : "changes"} that {stagedCount === 1 ? "hasn't" : "haven't"} been pushed to ITC yet. Save {stagedCount === 1 ? "it" : "them"} for later, or discard?
+                                </p>
+                              </div>
+                              <button
+                                onClick={keepEditingPendingItc}
+                                title="Keep editing"
+                                aria-label="Keep editing"
+                                className="flex-shrink-0 p-1.5 rounded-md transition-colors"
+                                style={{ color: c.muted }}
+                                onMouseEnter={e => { e.currentTarget.style.background = c.hoverBg; e.currentTarget.style.color = c.text; }}
+                                onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = c.muted; }}
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                            <div className="px-5 pb-5 flex items-center justify-between gap-2">
+                              <button
+                                onClick={saveForLaterPendingItc}
+                                className="px-3 py-1.5 rounded-md text-[12px] font-semibold transition-colors"
+                                style={{ ...font, color: c.text, background: "transparent", border: `1px solid ${c.border}` }}
+                                onMouseEnter={e => { e.currentTarget.style.background = c.hoverBg; }}
+                                onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
+                              >
+                                Save for later
+                              </button>
+                              <button
+                                onClick={closePendingItc}
+                                className="px-3 py-1.5 rounded-md text-[12px] font-semibold text-white transition-all"
+                                style={{ ...font, background: "#DC2626" }}
+                                onMouseEnter={e => { e.currentTarget.style.filter = "brightness(1.10)"; }}
+                                onMouseLeave={e => { e.currentTarget.style.filter = "none"; }}
+                              >
+                                Discard changes
+                              </button>
+                            </div>
+                          </div>
+                        </>
+                      );
+                    })()}
                   </>
                 )}
 
