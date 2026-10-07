@@ -171,7 +171,7 @@ export default function Website({ isDark = false }: WebsiteProps) {
               without resizing every individual element. `transformOrigin: center` keeps it
               vertically and horizontally centered as it shrinks. */}
           <div className="w-full" style={{ maxWidth: step === "signup" ? 760 : 520, transform: "scale(0.85)", transformOrigin: "center" }}>
-            {step === "login"  && <LoginView  c={c} font={font} inputStyle={inputStyle} labelStyle={labelStyle} primaryBtnStyle={primaryBtnStyle} btnGrad={btnGrad} textGrad={textGrad}
+            {step === "login"  && <LoginView  c={c} font={font} inputStyle={inputStyle} labelStyle={labelStyle} primaryBtnStyle={primaryBtnStyle} btnGrad={btnGrad} textGrad={textGrad} isDark={isDark}
               onContinue={() => {
                 // Users with a phone on file → MFA method picker.
                 // Users with only email → "add phone" reminder page, from
@@ -251,8 +251,8 @@ export default function Website({ isDark = false }: WebsiteProps) {
                   const Icon = isWarning ? AlertCircle : Mail;
                   return (
                     <span className="flex items-center justify-center flex-shrink-0"
-                      style={{ width: 32, height: 32, borderRadius: 9, background: "rgba(166,20,195,0.08)" }}>
-                      <Icon className="w-4 h-4" style={{ color: "#A614C3" }} strokeWidth={1.75} />
+                      style={{ width: 32, height: 32, borderRadius: 9, background: isDark ? "rgba(201,166,255,0.22)" : "rgba(166,20,195,0.08)" }}>
+                      <Icon className="w-4 h-4" style={{ color: isDark ? "#E6B8FF" : "#A614C3" }} strokeWidth={1.75} />
                     </span>
                   );
                 })()}
@@ -276,7 +276,7 @@ export default function Website({ isDark = false }: WebsiteProps) {
 }
 
 /* ──────────────────────────── LOGIN ──────────────────────────── */
-function LoginView({ c, font, inputStyle, labelStyle, primaryBtnStyle, btnGrad, textGrad, onContinue, onResetLinkClicked, onCreateLinkClicked, onResetEmailSent, onAgencyCodeDetected }: {
+function LoginView({ c, font, inputStyle, labelStyle, primaryBtnStyle, btnGrad, textGrad, isDark, onContinue, onResetLinkClicked, onCreateLinkClicked, onResetEmailSent, onAgencyCodeDetected }: {
   c: Record<string, string>;
   font: React.CSSProperties;
   inputStyle: React.CSSProperties;
@@ -284,6 +284,7 @@ function LoginView({ c, font, inputStyle, labelStyle, primaryBtnStyle, btnGrad, 
   primaryBtnStyle: (enabled: boolean) => React.CSSProperties;
   btnGrad: string;
     textGrad: string;
+  isDark: boolean;
   onContinue: () => void;
   onResetLinkClicked: () => void;
   onCreateLinkClicked: () => void;
@@ -445,6 +446,7 @@ function LoginView({ c, font, inputStyle, labelStyle, primaryBtnStyle, btnGrad, 
           inputStyle={inputStyle}
           labelStyle={labelStyle}
           btnGrad={btnGrad} textGrad={textGrad}
+          isDark={isDark}
           onClose={() => setResetOpen(false)}
           onSimulateEmailClick={() => { setResetOpen(false); onResetLinkClicked(); }}
           onEmailSent={(email, mode) => { setResetOpen(false); onResetEmailSent(email, mode); }}
@@ -458,13 +460,14 @@ function LoginView({ c, font, inputStyle, labelStyle, primaryBtnStyle, btnGrad, 
 type ResetMode = "password" | "both";
 type ResetStep = "choose" | "form" | "done";
 
-function ResetModal({ c, font, inputStyle, labelStyle, btnGrad, textGrad, onClose, onSimulateEmailClick, onEmailSent }: {
+function ResetModal({ c, font, inputStyle, labelStyle, btnGrad, textGrad, isDark, onClose, onSimulateEmailClick, onEmailSent }: {
   c: Record<string, string>;
   font: React.CSSProperties;
   inputStyle: React.CSSProperties;
   labelStyle: React.CSSProperties;
   btnGrad: string;
     textGrad: string;
+  isDark: boolean;
   onClose: () => void;
   onSimulateEmailClick: () => void;
   onEmailSent: (email: string, mode: ResetMode) => void;
@@ -558,9 +561,9 @@ function ResetModal({ c, font, inputStyle, labelStyle, btnGrad, textGrad, onClos
         <span className="flex items-center justify-center flex-shrink-0"
           style={{
             width: 34, height: 34, borderRadius: 9,
-            background: "rgba(166,20,195,0.08)",
+            background: isDark ? "rgba(201,166,255,0.22)" : "rgba(166,20,195,0.08)",
           }}>
-          <Icon className="w-[18px] h-[18px]" style={{ color: "#A614C3" }} strokeWidth={1.75} />
+          <Icon className="w-[18px] h-[18px]" style={{ color: isDark ? "#E6B8FF" : "#A614C3" }} strokeWidth={1.75} />
         </span>
         <div className="flex-1 min-w-0">
           <div style={{ fontSize: 13, fontWeight: 600, color: c.text, lineHeight: "18px" }}>{label}</div>
@@ -675,8 +678,8 @@ function ResetModal({ c, font, inputStyle, labelStyle, btnGrad, textGrad, onClos
           {step === "done" && (
             <div className="flex flex-col items-center text-center py-4">
               <div className="flex items-center justify-center"
-                style={{ width: 56, height: 56, borderRadius: 28, background: "rgba(166,20,195,0.08)", marginBottom: 14 }}>
-                <Mail className="w-6 h-6" style={{ color: "#A614C3" }} strokeWidth={2} />
+                style={{ width: 56, height: 56, borderRadius: 28, background: isDark ? "rgba(201,166,255,0.22)" : "rgba(166,20,195,0.08)", marginBottom: 14 }}>
+                <Mail className="w-6 h-6" style={{ color: isDark ? "#E6B8FF" : "#A614C3" }} strokeWidth={2} />
               </div>
               <div style={{ ...font, fontSize: 12, color: c.muted, maxWidth: 360, marginBottom: 10 }}>
                 Didn&apos;t get it? Check spam, or try again in a minute.
@@ -1517,8 +1520,8 @@ function ResetPasswordView({ c, font, inputStyle, labelStyle, primaryBtnStyle, b
     return (
       <div className="flex flex-col items-center text-center">
         <div className="flex items-center justify-center mb-5"
-          style={{ width: 64, height: 64, borderRadius: 32, background: "rgba(166,20,195,0.08)" }}>
-          <Check className="w-7 h-7" style={{ color: "#A614C3" }} strokeWidth={2.5} />
+          style={{ width: 64, height: 64, borderRadius: 32, background: isDark ? "rgba(201,166,255,0.22)" : "rgba(166,20,195,0.08)" }}>
+          <Check className="w-7 h-7" style={{ color: isDark ? "#E6B8FF" : "#A614C3" }} strokeWidth={2.5} />
         </div>
         <h1 className="mb-3" style={{ ...font, fontSize: 28, fontWeight: 600, lineHeight: "34px", color: c.text }}>
           Password{" "}
@@ -1567,8 +1570,8 @@ function ResetPasswordView({ c, font, inputStyle, labelStyle, primaryBtnStyle, b
           background: isDark ? "rgba(255,255,255,0.03)" : "#F9FAFB",
         }}>
         <span className="flex items-center justify-center flex-shrink-0"
-          style={{ width: 36, height: 36, borderRadius: 10, background: "rgba(166,20,195,0.08)" }}>
-          <IdCard className="w-[18px] h-[18px]" style={{ color: "#A614C3" }} strokeWidth={1.75} />
+          style={{ width: 36, height: 36, borderRadius: 10, background: isDark ? "rgba(201,166,255,0.22)" : "rgba(166,20,195,0.08)" }}>
+          <IdCard className="w-[18px] h-[18px]" style={{ color: isDark ? "#E6B8FF" : "#A614C3" }} strokeWidth={1.75} />
         </span>
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline gap-2 flex-wrap">
