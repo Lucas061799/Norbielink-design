@@ -6,7 +6,8 @@ import Image from "next/image";
 import { Eye, EyeOff, X, Check, Lock, IdCard, HelpCircle, Mail, MessageSquare, AlertCircle, ChevronRight } from "lucide-react";
 import norbielinkLogoDark from "@/assets/norbielink-logo-dark.png";
 import btisLogoDark from "@/assets/btislogo-dark.png";
-import loginN from "@/assets/login-n.svg";
+import norbieface from "@/assets/norbieface.png";
+import norbieWelcome from "@/assets/norbie-welcome.webp";
 
 const FONT = "var(--font-montserrat), Montserrat, sans-serif";
 
@@ -36,6 +37,16 @@ export default function Website({ isDark = false }: WebsiteProps) {
     const t = setTimeout(() => setToast(null), 6000);
     return () => clearTimeout(t);
   }, [toast]);
+
+  // "Need help?" launcher (bottom-right, every auth step) → slide-up
+  // panel branded as Norbie. Lets the user pick a common issue and/or
+  // type a description, then submits to a success toast. Prototype
+  // doesn't actually send; the receipt uses the same toast chrome as
+  // the Reset email flow so the demo stays visually consistent.
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [helpTopic, setHelpTopic] = useState<string | null>(null);
+  const [helpText, setHelpText] = useState("");
+  const closeHelp = () => { setHelpOpen(false); setHelpTopic(null); setHelpText(""); };
 
   const c = {
     text:    isDark ? "#F9FAFB" : "#1F2937",
@@ -124,13 +135,17 @@ export default function Website({ isDark = false }: WebsiteProps) {
           </div>
         </div>
 
-        {/* N graphic anchored bottom-left */}
+        {/* Welcome mascot — transparent composite of Norbie + the N
+            artwork. Sits over the panel's purple gradient; anchored
+            bottom-left at full width. No clip-path needed — the PNG's
+            own alpha channel handles masking. */}
         <Image
-          src={loginN}
-          alt="N Logo"
+          src={norbieWelcome}
+          alt="Norbie"
           className="absolute pointer-events-none select-none"
           sizes="33vw"
-          style={{ left: 0, bottom: 0, width: "100%", height: "auto", maxHeight: "70%" }}
+          style={{ left: 0, bottom: 0, width: "100%", height: "auto" }}
+          priority
         />
       </div>
 
@@ -265,6 +280,237 @@ export default function Website({ isDark = false }: WebsiteProps) {
                   style={{ background: "transparent", border: "none", color: c.muted, cursor: "pointer", padding: 2 }}
                   aria-label="Dismiss">
                   <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Need help? — floating Norbie launcher + slide-up panel.
+              Sits bottom-right of the right pane across every auth step
+              so users with login trouble have one obvious place to go. */}
+          {!helpOpen && (
+            <button
+              type="button"
+              onClick={() => setHelpOpen(true)}
+              className="absolute flex items-center gap-2.5 transition-all"
+              style={{
+                bottom: 24,
+                right: 32,
+                padding: "6px 14px 6px 6px",
+                borderRadius: 999,
+                fontFamily: FONT,
+                background: isDark ? "rgba(255,255,255,0.06)" : "#FFFFFF",
+                border: `1.5px solid ${isDark ? "rgba(255,255,255,0.14)" : "#E5E7EB"}`,
+                cursor: "pointer",
+                boxShadow: isDark ? "0 6px 20px rgba(0,0,0,0.40)" : "0 4px 14px rgba(17,24,39,0.08)",
+                zIndex: 40,
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.borderColor = isDark ? "rgba(255,255,255,0.28)" : "#D1D5DB";
+                e.currentTarget.style.background = isDark ? "rgba(255,255,255,0.10)" : "#F9FAFB";
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.borderColor = isDark ? "rgba(255,255,255,0.14)" : "#E5E7EB";
+                e.currentTarget.style.background = isDark ? "rgba(255,255,255,0.06)" : "#FFFFFF";
+              }}
+              aria-label="Need help signing in?"
+            >
+              <Image src={norbieface} alt="Norbie" className="w-8 h-8 rounded-full object-cover" />
+              <span className="text-[12.5px] font-semibold" style={{ color: isDark ? "#F9FAFB" : "#2D3653" }}>
+                Need help?
+              </span>
+            </button>
+          )}
+
+          {/* Backdrop. The panel sits above the form; without a soft
+              dim the overlap looks like a stray floating card and the
+              half-visible form above feels truncated. Dim fades the
+              form so the panel reads as the current focus. */}
+          {helpOpen && (
+            <div
+              className="absolute inset-0"
+              style={{
+                background: isDark ? "rgba(15,17,32,0.55)" : "rgba(17,24,39,0.18)",
+                backdropFilter: "blur(2px)",
+                WebkitBackdropFilter: "blur(2px)",
+                zIndex: 35,
+                animation: "fadeIn 0.2s ease-out",
+              }}
+              onClick={closeHelp}
+            />
+          )}
+
+          {helpOpen && (
+            <div
+              className="absolute flex flex-col"
+              role="dialog"
+              aria-label="Need help signing in?"
+              style={{
+                bottom: 24,
+                right: 32,
+                width: 380,
+                maxHeight: "80vh",
+                fontFamily: FONT,
+                background: c.cardBg,
+                border: `1px solid ${c.border}`,
+                borderRadius: 16,
+                boxShadow: "0 20px 50px rgba(0,0,0,0.25)",
+                animation: "slideInRight 0.2s ease-out",
+                overflow: "hidden",
+                zIndex: 40,
+              }}
+            >
+              {/* Header. Subtle razz-tint wash backdrops the Norbie
+                  intro so the panel reads as a branded support slot
+                  rather than a plain modal. Avatar sits in a razz-ring
+                  with a tiny green online dot for personality; "Norbie"
+                  is the textGrad so it's the single razz-colored word
+                  the eye lands on. */}
+              <div
+                className="flex items-center gap-3 px-4 pt-4 pb-3.5 relative"
+              >
+                <span
+                  className="relative flex-shrink-0"
+                  style={{
+                    padding: 2,
+                    borderRadius: 999,
+                    background: isDark
+                      ? "linear-gradient(135deg, rgba(201,166,255,0.45), rgba(201,166,255,0.15))"
+                      : "linear-gradient(135deg, rgba(166,20,195,0.35), rgba(166,20,195,0.10))",
+                  }}
+                >
+                  <Image src={norbieface} alt="Norbie" className="w-10 h-10 rounded-full object-cover" />
+                  <span
+                    className="absolute"
+                    aria-hidden="true"
+                    style={{
+                      bottom: 1,
+                      right: 1,
+                      width: 10,
+                      height: 10,
+                      borderRadius: 999,
+                      background: "#22C55E",
+                      border: `2px solid ${c.cardBg}`,
+                    }}
+                  />
+                </span>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[13px] font-bold" style={{ color: c.text }}>
+                    Hi, I&apos;m{" "}
+                    <span
+                      style={{
+                        background: textGrad,
+                        WebkitBackgroundClip: "text",
+                        WebkitTextFillColor: "transparent",
+                        backgroundClip: "text",
+                      }}
+                    >
+                      Norbie
+                    </span>
+                  </div>
+                  <div className="text-[11.5px] whitespace-nowrap" style={{ color: c.muted, marginTop: 1 }}>
+                    Trouble signing in? I&apos;ll loop in support.
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeHelp}
+                  aria-label="Close help"
+                  className="rounded-md transition-colors self-start"
+                  style={{ background: "transparent", border: "none", color: c.muted, cursor: "pointer", padding: 4, flexShrink: 0 }}
+                  onMouseEnter={e => { e.currentTarget.style.background = isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.04)"; e.currentTarget.style.color = c.text; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = c.muted; }}
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Inset dividers — same lighter token used in Sidenav
+                  (gray-100 / 8% white) with horizontal margin so the
+                  rule doesn't bleed into the panel's outer border. */}
+              <div style={{ height: 1, background: isDark ? "rgba(255,255,255,0.08)" : "#F3F4F6", marginLeft: 16, marginRight: 16 }} />
+
+              <div className="p-4 overflow-y-auto" style={{ flex: "1 1 auto" }}>
+                <div className="text-[10px] font-semibold mb-2 uppercase" style={{ color: c.muted, letterSpacing: "0.08em" }}>
+                  Common issues
+                </div>
+                <div className="flex flex-wrap gap-1.5 mb-4">
+                  {[
+                    "Forgot my password",
+                    "Didn't get my code",
+                    "User ID isn't working",
+                    "Something else",
+                  ].map(label => {
+                    const active = helpTopic === label;
+                    return (
+                      <button
+                        key={label}
+                        type="button"
+                        onClick={() => setHelpTopic(active ? null : label)}
+                        className="text-[11.5px] font-medium transition-colors"
+                        style={{
+                          padding: "5px 10px",
+                          borderRadius: 999,
+                          background: active ? (isDark ? "rgba(201,166,255,0.22)" : "rgba(166,20,195,0.08)") : "transparent",
+                          color: active ? (isDark ? "#E6B8FF" : "#A614C3") : c.muted,
+                          border: `1px solid ${active ? (isDark ? "rgba(201,166,255,0.40)" : "#A614C3") : c.border}`,
+                          cursor: "pointer",
+                        }}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <label className="text-[10px] font-semibold uppercase block mb-1.5" style={{ color: c.muted, letterSpacing: "0.08em" }}>
+                  What&apos;s going on?
+                </label>
+                <textarea
+                  value={helpText}
+                  onChange={e => setHelpText(e.target.value)}
+                  placeholder="Describe your issue in a sentence or two…"
+                  rows={4}
+                  className="w-full text-[13px] outline-none resize-none"
+                  style={{
+                    background: c.inputBg,
+                    border: `1px solid ${c.border}`,
+                    color: c.text,
+                    padding: "10px 12px",
+                    borderRadius: 10,
+                    fontFamily: FONT,
+                  }}
+                />
+              </div>
+
+              <div style={{ height: 1, background: isDark ? "rgba(255,255,255,0.08)" : "#F3F4F6", marginLeft: 16, marginRight: 16 }} />
+
+              <div className="p-4">
+                <button
+                  type="button"
+                  disabled={!helpText.trim() && !helpTopic}
+                  onClick={() => {
+                    closeHelp();
+                    setToast({
+                      kind: "email",
+                      title: "Thanks — Norbie's on it",
+                      description: "A rep will follow up in 24 hours.",
+                    });
+                  }}
+                  style={{
+                    width: "100%",
+                    padding: "10px 14px",
+                    borderRadius: 10,
+                    background: btnGrad,
+                    color: "#fff",
+                    fontWeight: 600,
+                    fontSize: 13,
+                    border: "none",
+                    cursor: (helpText.trim() || helpTopic) ? "pointer" : "not-allowed",
+                    opacity: (helpText.trim() || helpTopic) ? 1 : 0.5,
+                    fontFamily: FONT,
+                  }}
+                >
+                  Send to support
                 </button>
               </div>
             </div>
