@@ -1253,6 +1253,16 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
 
   /* ── users tab state ── */
   const [importUsersOpen, setImportUsersOpen] = useState(false);
+  // Legacy BTIS import flow — separate from the CSV/XLSX bulk upload.
+  // When this agency has a legacy BTIS admin page with existing users,
+  // we offer to copy them straight over instead of making the admin
+  // re-enter 100+ users by hand. Two entry points: an auto-detect
+  // banner on first visit to the Users tab, and an "Import from
+  // Legacy" button in the toolbar for later re-opens.
+  const [legacyImportOpen, setLegacyImportOpen] = useState(false);
+  const [legacyBannerDismissed, setLegacyBannerDismissed] = useState(false);
+  const [legacyImportSearch, setLegacyImportSearch] = useState("");
+  const [legacyImportSelected, setLegacyImportSelected] = useState<Set<string>>(new Set());
   // The Bulk Upload modal phases:
   //   "empty"    — paperclip prompt, click/drag to upload
   //   "mapping"  — file uploaded but at least one column didn't auto-match; user maps unmatched columns manually
@@ -2095,6 +2105,56 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
     });
   const inactiveCount = mockAgencyUsers.filter(u => u.agencyId === agency.id && !removedUserIds.has(u.id) && inactiveUserIds.has(u.id)).length;
   const activeCount = mockAgencyUsers.filter(u => u.agencyId === agency.id && !removedUserIds.has(u.id) && !inactiveUserIds.has(u.id)).length;
+
+  // Mock roster that the legacy BTIS admin page would return for this
+  // agency. In production this comes from a legacy sync; here we fake
+  // ~18 brokers so the demo looks like a real import. Pre-flag
+  // duplicates against the current NL roster (same email → already in
+  // NorbieLink; skipped by default).
+  const legacyRoster: Array<{ id: string; name: string; email: string; isAdmin: boolean }> = [
+    { id: "l1",  name: "Adriana Padilla",   email: "adriana.padilla@btis.com",    isAdmin: true  },
+    { id: "l2",  name: "Alena Groth",       email: "alena.groth@btis.com",         isAdmin: false },
+    { id: "l3",  name: "Allyson Woody",     email: "allyson.woody@btis.com",       isAdmin: true  },
+    { id: "l4",  name: "Alyssa Mulder",     email: "alyssa.mulder@btis.com",       isAdmin: false },
+    { id: "l5",  name: "Amit K Gupta",      email: "amit.gupta@btis.com",          isAdmin: true  },
+    { id: "l6",  name: "Amy Allen",         email: "amy.allen@btis.com",           isAdmin: false },
+    { id: "l7",  name: "Amy Hadrick",       email: "amy.hadrick@btis.com",         isAdmin: false },
+    { id: "l8",  name: "Andrew Schultz",    email: "andrew.schultz@btis.com",      isAdmin: false },
+    { id: "l9",  name: "Angelica Calvo",    email: "angelica.calvo@btis.com",      isAdmin: true  },
+    { id: "l10", name: "Anil Kumar",        email: "anil.kumar@btis.com",          isAdmin: false },
+    { id: "l11", name: "Ben Carter",        email: "ben.carter@btis.com",          isAdmin: false },
+    { id: "l12", name: "Caroline Ng",       email: "caroline.ng@btis.com",         isAdmin: true  },
+    { id: "l13", name: "David Rossi",       email: "david.rossi@btis.com",         isAdmin: false },
+    { id: "l14", name: "Elena Vargas",      email: "elena.vargas@btis.com",        isAdmin: false },
+    { id: "l15", name: "Frank Oduya",       email: "frank.oduya@btis.com",         isAdmin: false },
+    { id: "l16", name: "Grace Liu",         email: "grace.liu@btis.com",           isAdmin: true  },
+    { id: "l17", name: "Henry Okafor",      email: "henry.okafor@btis.com",        isAdmin: false },
+    { id: "l18", name: "Ivy Robinson",      email: "ivy.robinson@btis.com",        isAdmin: false },
+    // "Jason Smith" matches the existing agency 1 Principal — same
+    // email, so the import flow flags it as a duplicate.
+    { id: "l19", name: "Jason Smith",       email: "jason@acmeins.com",            isAdmin: true  },
+  ];
+  const existingEmails = new Set(mockAgencyUsers.filter(u => u.agencyId === agency.id && !removedUserIds.has(u.id)).map(u => u.email.toLowerCase()));
+  const legacyRosterTagged = legacyRoster.map(u => ({ ...u, duplicate: existingEmails.has(u.email.toLowerCase()) }));
+  const legacyNewCount = legacyRosterTagged.filter(u => !u.duplicate).length;
+  const legacyDupCount = legacyRosterTagged.length - legacyNewCount;
+  const legacyRosterFiltered = legacyRosterTagged.filter(u => {
+    if (!legacyImportSearch) return true;
+    const q = legacyImportSearch.toLowerCase();
+    return u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
+  });
+  const openLegacyImport = () => {
+    // Default-select every non-duplicate user — the common path is "pull them all in".
+    setLegacyImportSelected(new Set(legacyRosterTagged.filter(u => !u.duplicate).map(u => u.id)));
+    setLegacyImportSearch("");
+    setLegacyImportOpen(true);
+  };
+  const closeLegacyImport = () => { setLegacyImportOpen(false); setLegacyImportSearch(""); };
+  const toggleLegacyUser = (id: string) => setLegacyImportSelected(prev => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
 
   const fmtDate = (ts: string) => {
     const d = new Date(ts);
@@ -6377,8 +6437,10 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                     <svg className="w-5 h-5 flex-shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                       <defs>
                         <linearGradient id="alert-razz-pending" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="24" y2="0">
-                          <stop offset="0%" stopColor="#5C2ED4" />
-                          <stop offset="100%" stopColor="#A614C3" />
+                          {/* Dark-mode razz needs lighter stops so the
+                              gradient doesn't disappear into #0F1120. */}
+                          <stop offset="0%" stopColor={isDark ? "#C9A6FF" : "#5C2ED4"} />
+                          <stop offset="100%" stopColor={isDark ? "#E68BF2" : "#A614C3"} />
                         </linearGradient>
                       </defs>
                       <circle cx="12" cy="12" r="10" stroke="url(#alert-razz-pending)" />
@@ -6388,7 +6450,9 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                     <div className="flex-1 min-w-0">
                       <div className="text-[13px] font-semibold" style={{
                         ...font,
-                        backgroundImage: "linear-gradient(88.54deg, #5C2ED4 0.1%, #A614C3 63.88%)",
+                        backgroundImage: isDark
+                          ? "linear-gradient(88.54deg, #C9A6FF 0.1%, #E68BF2 63.88%)"
+                          : "linear-gradient(88.54deg, #5C2ED4 0.1%, #A614C3 63.88%)",
                         backgroundClip: "text",
                         WebkitBackgroundClip: "text",
                         WebkitTextFillColor: "transparent",
@@ -7787,6 +7851,67 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
         {/* ── Users tab ── */}
         {detailTab === "users" && (
           <div className="flex flex-col" onClick={() => { setUserMenuId(null); setUserMenuPos(null); setJobTitleOpen(false); }}>
+            {/* Legacy BTIS auto-detect banner — shown when there are new
+                users on the legacy admin page that haven't been copied
+                to NorbieLink yet. External-admin only (clientMode); the
+                internal super-admin surface doesn't own user migration
+                for an agency, so this banner would just be noise there.
+                Matches the "Pending updates" banner style (neutral card
+                + razz-gradient title + razz-stroked icon) so it reads
+                as one of the standard alert rows. */}
+            {viewMode === "client" && !legacyBannerDismissed && legacyNewCount > 0 && (
+              <div className="rounded-xl p-4 mb-4 flex items-start gap-3"
+                style={{
+                  background: isDark ? "rgba(255,255,255,0.04)" : "#F9FAFB",
+                  border: `1px solid ${c.border}`,
+                }}>
+                <svg className="w-5 h-5 flex-shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <defs>
+                    <linearGradient id="legacy-import-razz" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="24" y2="0">
+                      <stop offset="0%" stopColor={isDark ? "#C9A6FF" : "#5C2ED4"} />
+                      <stop offset="100%" stopColor={isDark ? "#E68BF2" : "#A614C3"} />
+                    </linearGradient>
+                  </defs>
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke="url(#legacy-import-razz)" />
+                  <polyline points="7 10 12 15 17 10" stroke="url(#legacy-import-razz)" />
+                  <line x1="12" x2="12" y1="15" y2="3" stroke="url(#legacy-import-razz)" />
+                </svg>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[13px] font-semibold"
+                    style={{
+                      ...font,
+                      backgroundImage: isDark
+                        ? "linear-gradient(88.54deg, #C9A6FF 0.1%, #E68BF2 63.88%)"
+                        : "linear-gradient(88.54deg, #5C2ED4 0.1%, #A614C3 63.88%)",
+                      backgroundClip: "text",
+                      WebkitBackgroundClip: "text",
+                      WebkitTextFillColor: "transparent",
+                    }}>
+                    We found {legacyRosterTagged.length} users in your legacy BTIS account
+                  </div>
+                  <div className="text-[12px] mt-0.5" style={{ ...font, color: c.muted }}>
+                    {legacyNewCount} haven&apos;t been added to NorbieLink yet
+                    {legacyDupCount > 0 ? ` (${legacyDupCount} already exist here)` : ""}. Import them in one click instead of re-entering by hand.
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <button onClick={() => setLegacyBannerDismissed(true)}
+                    className="px-3 py-1.5 text-[12px] font-semibold rounded-lg transition-colors whitespace-nowrap"
+                    style={{ ...font, color: c.text, background: isDark ? "rgba(255,255,255,0.04)" : "#FFFFFF", border: `1px solid ${c.border}` }}
+                    onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+                    onMouseLeave={e => (e.currentTarget.style.background = isDark ? "rgba(255,255,255,0.04)" : "#FFFFFF")}>
+                    Not now
+                  </button>
+                  <button onClick={openLegacyImport}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold text-white rounded-lg transition-all whitespace-nowrap"
+                    style={{ ...font, background: btnGrad }}
+                    onMouseEnter={e => (e.currentTarget.style.filter = "brightness(1.08)")}
+                    onMouseLeave={e => (e.currentTarget.style.filter = "none")}>
+                    Review & import
+                  </button>
+                </div>
+              </div>
+            )}
             {/* Toolbar */}
             <div className="flex items-center gap-2 mb-4 flex-shrink-0">
               <div className="flex items-stretch overflow-hidden transition-all"
@@ -7820,6 +7945,27 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                   : "linear-gradient(180deg, rgba(255,255,255,0.1) -0.44%, rgba(192,192,192,0.1) 49.45%, rgba(172,172,172,0.1) 99.33%), #FFFFFF")}
                 onClick={e=>{e.stopPropagation();setImportUsersOpen(true);}}>
                 <Upload className="w-3.5 h-3.5" style={{ color: teal }} />Import Users
+              </button>
+              {/* Legacy import button — available in BOTH views so super
+                  admin can still migrate on behalf of an agency. The
+                  auto-detect BANNER stays client-only (less useful as a
+                  nudge for internal staff), but the manual entry point
+                  is universal. */}
+              <button className="flex items-center gap-[10px] text-[12px] font-semibold transition-all flex-shrink-0"
+                style={{ fontFamily:FONT, height:37, padding:"9px 16px", borderRadius:"5.58px",
+                  border: isDark ? "1.04px solid rgba(255,255,255,0.15)" : "1.04px solid #E5E7EB",
+                  background: isDark
+                    ? "linear-gradient(180deg, rgba(255,255,255,0.10) -0.44%, rgba(192,192,192,0.10) 49.45%, rgba(172,172,172,0.10) 99.33%)"
+                    : "linear-gradient(180deg, rgba(255,255,255,0.1) -0.44%, rgba(192,192,192,0.1) 49.45%, rgba(172,172,172,0.1) 99.33%), #FFFFFF",
+                  color: c.text, boxSizing:"border-box" as const }}
+                onMouseEnter={e=>(e.currentTarget.style.background = isDark
+                  ? "linear-gradient(180deg, rgba(255,255,255,0.18) -0.44%, rgba(192,192,192,0.18) 49.45%, rgba(172,172,172,0.18) 99.33%)"
+                  : "linear-gradient(180deg, rgba(255,255,255,0.15) -0.44%, rgba(192,192,192,0.15) 49.45%, rgba(172,172,172,0.15) 99.33%), #F9FAFB")}
+                onMouseLeave={e=>(e.currentTarget.style.background = isDark
+                  ? "linear-gradient(180deg, rgba(255,255,255,0.10) -0.44%, rgba(192,192,192,0.10) 49.45%, rgba(172,172,172,0.10) 99.33%)"
+                  : "linear-gradient(180deg, rgba(255,255,255,0.1) -0.44%, rgba(192,192,192,0.1) 49.45%, rgba(172,172,172,0.1) 99.33%), #FFFFFF")}
+                onClick={e=>{e.stopPropagation(); openLegacyImport();}}>
+                <Download className="w-3.5 h-3.5" style={{ color: "#A614C3" }} />Import from Legacy
               </button>
               <div className="ml-auto flex items-center gap-2">
                 {/* Archive toggle removed — the "Deactivate User" action now permanently removes
@@ -8816,6 +8962,161 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
             </div>
           </div>
         </div>
+        );
+      })()}
+
+      {/* ── Import from Legacy Modal ── */}
+      {legacyImportOpen && (() => {
+        const selectableIds = legacyRosterTagged.filter(u => !u.duplicate).map(u => u.id);
+        const allSelected = selectableIds.length > 0 && selectableIds.every(id => legacyImportSelected.has(id));
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.45)" }} onClick={closeLegacyImport}>
+            <div className="rounded-2xl w-[720px] max-w-[95vw] max-h-[85vh] overflow-hidden flex flex-col"
+              style={{ background: isDark ? "#1E2240" : "#fff", boxShadow: "0 20px 60px rgba(0,0,0,0.3)" }}
+              onClick={e => e.stopPropagation()}>
+              {/* Header */}
+              <div className="flex items-center justify-between px-6 pt-6 pb-4">
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className="flex items-center justify-center flex-shrink-0 rounded-lg"
+                    style={{ width: 48, height: 48, background: isDark ? "rgba(201,166,255,0.22)" : "rgba(166,20,195,0.10)" }}>
+                    <Download className="w-[22px] h-[22px]" style={{ color: isDark ? "#E6B8FF" : "#A614C3" }} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-[18px] font-bold" style={{ ...font, color: c.text }}>Import users from legacy BTIS</h3>
+                    <p className="text-[12.5px] mt-0.5" style={{ ...font, color: c.muted }}>
+                      Pulled users from <span className="font-semibold" style={{ color: c.text }}>BTIS Internal · {agency.code}</span>. Select who to copy over.
+                    </p>
+                  </div>
+                </div>
+                <button onClick={closeLegacyImport} className="p-1.5 rounded-md transition-colors flex-shrink-0" style={{ color: c.muted }}
+                  onMouseEnter={e => { e.currentTarget.style.background = c.hoverBg; e.currentTarget.style.color = c.text; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = c.muted; }}>
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Inset divider — stops short of the modal edges on both
+                  sides so the rule doesn't look soldered to the frame. */}
+              <div style={{ height: 1, background: isDark ? "rgba(255,255,255,0.08)" : "#F3F4F6", marginLeft: 24, marginRight: 24 }} />
+
+              {/* Search + select-all row. Both controls are forced to the
+                  same 34px height so the input and button line up. */}
+              <div className="flex items-center gap-3 px-6 py-3">
+                <div className="flex-1 relative" style={{ height: 34 }}>
+                  <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2" style={{ color: c.muted }} />
+                  <input value={legacyImportSearch} onChange={e => setLegacyImportSearch(e.target.value)}
+                    placeholder="Search name or email…"
+                    className="w-full outline-none text-[13px]"
+                    style={{ ...font, color: c.text, background: isDark ? "rgba(255,255,255,0.04)" : "#F9FAFB", border: `1px solid ${c.border}`, borderRadius: 8, padding: "0 10px 0 32px", height: 34, boxSizing: "border-box" }} />
+                </div>
+                <button onClick={() => setLegacyImportSelected(allSelected ? new Set() : new Set(selectableIds))}
+                  className="text-[12px] font-semibold px-4 rounded-md transition-all whitespace-nowrap"
+                  style={{
+                    ...font,
+                    color: isDark ? "#E6B8FF" : "#A614C3",
+                    border: isDark ? "1.04px solid rgba(255,255,255,0.15)" : "1.04px solid #E5E7EB",
+                    background: isDark
+                      ? "linear-gradient(180deg, rgba(255,255,255,0.10) -0.44%, rgba(192,192,192,0.10) 49.45%, rgba(172,172,172,0.10) 99.33%)"
+                      : "linear-gradient(180deg, rgba(255,255,255,0.1) -0.44%, rgba(192,192,192,0.1) 49.45%, rgba(172,172,172,0.1) 99.33%), #FFFFFF",
+                    height: 34,
+                    boxSizing: "border-box",
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.background = isDark
+                    ? "linear-gradient(180deg, rgba(255,255,255,0.18) -0.44%, rgba(192,192,192,0.18) 49.45%, rgba(172,172,172,0.18) 99.33%)"
+                    : "linear-gradient(180deg, rgba(255,255,255,0.15) -0.44%, rgba(192,192,192,0.15) 49.45%, rgba(172,172,172,0.15) 99.33%), #F9FAFB")}
+                  onMouseLeave={e => (e.currentTarget.style.background = isDark
+                    ? "linear-gradient(180deg, rgba(255,255,255,0.10) -0.44%, rgba(192,192,192,0.10) 49.45%, rgba(172,172,172,0.10) 99.33%)"
+                    : "linear-gradient(180deg, rgba(255,255,255,0.1) -0.44%, rgba(192,192,192,0.1) 49.45%, rgba(172,172,172,0.1) 99.33%), #FFFFFF")}>
+                  {allSelected ? "Clear all" : "Select all new"}
+                </button>
+              </div>
+
+              <div style={{ height: 1, background: isDark ? "rgba(255,255,255,0.08)" : "#F3F4F6", marginLeft: 24, marginRight: 24 }} />
+
+              {/* List */}
+              <div className="overflow-y-auto flex-1" style={{ minHeight: 0 }}>
+                {legacyRosterFiltered.length === 0 ? (
+                  <div className="py-12 text-center text-[13px]" style={{ ...font, color: c.muted }}>No users match &ldquo;{legacyImportSearch}&rdquo;.</div>
+                ) : legacyRosterFiltered.map((u, i, arr) => {
+                  const checked = legacyImportSelected.has(u.id);
+                  const disabled = u.duplicate;
+                  const isLast = i === arr.length - 1;
+                  return (
+                    <label key={u.id}
+                      className={`flex items-center gap-3 px-6 py-3 transition-colors ${disabled ? "" : "cursor-pointer"}`}
+                      style={{
+                        // Inset bottom border — skipped on the last row
+                        // so the list doesn't double up against the
+                        // footer divider.
+                        boxShadow: isLast ? "none" : `inset 0 -1px 0 ${isDark ? "rgba(255,255,255,0.08)" : "#F3F4F6"}`,
+                        marginLeft: 24, marginRight: 24, paddingLeft: 0, paddingRight: 0,
+                        background: disabled ? (isDark ? "rgba(255,255,255,0.02)" : "#FAFAFA") : "transparent",
+                        opacity: disabled ? 0.6 : 1,
+                      }}
+                      onMouseEnter={e => { if (!disabled) e.currentTarget.style.background = isDark ? "rgba(255,255,255,0.03)" : "#FAFAFB"; }}
+                      onMouseLeave={e => { if (!disabled) e.currentTarget.style.background = "transparent"; }}>
+                      <Checkbox checked={checked} onClick={() => { if (!disabled) toggleLegacyUser(u.id); }} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[13px] font-semibold truncate" style={{ ...font, color: c.text }}>{u.name}</span>
+                          {u.isAdmin && (
+                            <span className="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded"
+                              style={{ ...font, color: isDark ? "#86EFAC" : "#15803D", background: isDark ? "rgba(34,197,94,0.18)" : "rgba(34,197,94,0.10)" }}>
+                              Admin
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11.5px] truncate" style={{ ...font, color: c.muted }}>{u.email}</div>
+                      </div>
+                      {u.duplicate && (
+                        <span className="text-[11px] font-medium px-2 py-1 rounded flex items-center gap-1 flex-shrink-0"
+                          style={{ ...font, color: c.muted, background: isDark ? "rgba(255,255,255,0.05)" : "#F3F4F6" }}>
+                          <Check className="w-3 h-3" strokeWidth={2.5} />
+                          Already in NorbieLink
+                        </span>
+                      )}
+                    </label>
+                  );
+                })}
+              </div>
+
+              <div style={{ height: 1, background: isDark ? "rgba(255,255,255,0.08)" : "#F3F4F6", marginLeft: 24, marginRight: 24 }} />
+
+              {/* Footer */}
+              <div className="px-6 py-4 flex items-center justify-between flex-shrink-0">
+                <span className="text-[12px]" style={{ ...font, color: c.muted }}>
+                  <span className="font-semibold" style={{ color: c.text }}>{legacyImportSelected.size}</span> of {legacyNewCount} selected
+                  {legacyDupCount > 0 ? ` · ${legacyDupCount} duplicate${legacyDupCount === 1 ? "" : "s"} skipped` : ""}
+                </span>
+                <div className="flex items-center gap-2">
+                  <button onClick={closeLegacyImport}
+                    className="px-4 py-2 text-[12px] font-semibold rounded-md transition-colors"
+                    style={{ ...font, color: c.text, background: "transparent", border: `1px solid ${c.border}` }}
+                    onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+                    onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                    Cancel
+                  </button>
+                  <button
+                    disabled={legacyImportSelected.size === 0}
+                    onClick={() => {
+                      const count = legacyImportSelected.size;
+                      closeLegacyImport();
+                      setLegacyBannerDismissed(true);
+                      showToast({
+                        title: `${count} ${count === 1 ? "user" : "users"} imported`,
+                        description: `Each will receive an invite email to finish setting up their NorbieLink account.`,
+                      });
+                    }}
+                    className="px-4 py-2 text-[12px] font-semibold text-white rounded-md transition-all"
+                    style={{ ...font, background: btnGrad, opacity: legacyImportSelected.size === 0 ? 0.5 : 1, cursor: legacyImportSelected.size === 0 ? "not-allowed" : "pointer" }}
+                    onMouseEnter={e => { if (legacyImportSelected.size > 0) e.currentTarget.style.filter = "brightness(1.08)"; }}
+                    onMouseLeave={e => (e.currentTarget.style.filter = "none")}>
+                    Import {legacyImportSelected.size || ""} {legacyImportSelected.size === 1 ? "user" : "users"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         );
       })()}
 
