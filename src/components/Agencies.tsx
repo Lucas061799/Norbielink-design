@@ -324,6 +324,10 @@ interface ITCRecord {
   appointmentDate: string;   // MM/DD/YYYY
   licenseNo: string;
   licenseExpires: string;
+  // Shannon's note: our NPN column maps onto the ITC "License Number"
+  // field at push time — the backend translation happens there. We keep
+  // it under its own key here so the Pending Updates diff reads cleanly.
+  npn: string;
   eoPolicyNo: string;
   eoPolicyExpires: string;
   taxId: string;
@@ -359,7 +363,7 @@ const INITIAL_ITC_RECORDS: Record<string, ITCRecord | null> = {
     address: "980 Cherry Ave", city: "Des Moines", state: "IA", zip: "50314",
     telephone: "5152220999", email: "jason@acmeins.com", accountingEmail: "d.kim@acmeins.com", statementEmail: "d.kim@acmeins.com",
     appointmentDate: "03/24/2026", licenseNo: "LC-88210", licenseExpires: "03/24/2028",
-    eoPolicyNo: "EO-4421", eoPolicyExpires: "03/24/2027", taxId: "121222334455", tax1099Type: "LLC", tax1099Name: "Acme Insurance Agency LLC",
+    npn: "", eoPolicyNo: "EO-4421", eoPolicyExpires: "03/24/2027", taxId: "121222334455", tax1099Type: "LLC", tax1099Name: "Acme Insurance Agency LLC",
     emailStatements: true, directDeposits: true, directDepositsCommissionOnly: false,
     farmersAgent: false, smartChoiceAgent: true, piibAgent: false,
     useConsolidatedBillingId: false, consolidatedBillingId: "", isConsolidatedBillingProducer: false,
@@ -370,7 +374,7 @@ const INITIAL_ITC_RECORDS: Record<string, ITCRecord | null> = {
     address: "200 N Michigan", city: "Chicago", state: "IL", zip: "60601",
     telephone: "3125550100", email: "m.chen@summitsol.com", accountingEmail: "billing@summitsol.com", statementEmail: "billing@summitsol.com",
     appointmentDate: "01/12/2024", licenseNo: "LC-22110", licenseExpires: "01/15/2027",
-    eoPolicyNo: "EO-1120", eoPolicyExpires: "01/15/2027", taxId: "930011223", tax1099Type: "Corporation", tax1099Name: "Summit Solutions Inc",
+    npn: "", eoPolicyNo: "EO-1120", eoPolicyExpires: "01/15/2027", taxId: "930011223", tax1099Type: "Corporation", tax1099Name: "Summit Solutions Inc",
     emailStatements: true, directDeposits: false, directDepositsCommissionOnly: false,
     farmersAgent: false, smartChoiceAgent: false, piibAgent: false,
     useConsolidatedBillingId: false, consolidatedBillingId: "", isConsolidatedBillingProducer: true,
@@ -382,7 +386,7 @@ const INITIAL_ITC_RECORDS: Record<string, ITCRecord | null> = {
     address: "820 Lakefront Blvd", city: "Denver", state: "CO", zip: "80203",
     telephone: "3035551010", email: "o.bennett@lakefrontcov.com", accountingEmail: "", statementEmail: "",
     appointmentDate: "08/02/2023", licenseNo: "LC-11245", licenseExpires: "08/02/2027",
-    eoPolicyNo: "EO-9911", eoPolicyExpires: "08/02/2026", taxId: "845123765", tax1099Type: "Corporation", tax1099Name: "Lakefront Coverage",
+    npn: "", eoPolicyNo: "EO-9911", eoPolicyExpires: "08/02/2026", taxId: "845123765", tax1099Type: "Corporation", tax1099Name: "Lakefront Coverage",
     emailStatements: true, directDeposits: true, directDepositsCommissionOnly: true,
     farmersAgent: false, smartChoiceAgent: false, piibAgent: true,
     useConsolidatedBillingId: false, consolidatedBillingId: "", isConsolidatedBillingProducer: false,
@@ -393,7 +397,7 @@ const INITIAL_ITC_RECORDS: Record<string, ITCRecord | null> = {
     address: "445 Ridgeway Dr", city: "Des Moines", state: "IA", zip: "50310",
     telephone: "5155552020", email: "n.avery@ridgelineins.com", accountingEmail: "n.avery@ridgelineins.com", statementEmail: "n.avery@ridgelineins.com",
     appointmentDate: "11/15/2022", licenseNo: "LC-33902", licenseExpires: "11/15/2026",
-    eoPolicyNo: "EO-2210", eoPolicyExpires: "11/15/2025", taxId: "223456781", tax1099Type: "Individual", tax1099Name: "Nicole Avery",
+    npn: "", eoPolicyNo: "EO-2210", eoPolicyExpires: "11/15/2025", taxId: "223456781", tax1099Type: "Individual", tax1099Name: "Nicole Avery",
     emailStatements: true, directDeposits: true, directDepositsCommissionOnly: false,
     farmersAgent: true, smartChoiceAgent: false, piibAgent: false,
     useConsolidatedBillingId: false, consolidatedBillingId: "", isConsolidatedBillingProducer: false,
@@ -405,7 +409,7 @@ const INITIAL_ITC_RECORDS: Record<string, ITCRecord | null> = {
     address: "77 Main St", city: "Wichita", state: "KS", zip: "67202",
     telephone: "3165550707", email: "contact@midlandins.com", accountingEmail: "", statementEmail: "",
     appointmentDate: "04/01/2026", licenseNo: "LC-77801", licenseExpires: "04/01/2028",
-    eoPolicyNo: "EO-4408", eoPolicyExpires: "04/01/2027", taxId: "556789012", tax1099Type: "LLC", tax1099Name: "Midland Insurance Partners LLC",
+    npn: "", eoPolicyNo: "EO-4408", eoPolicyExpires: "04/01/2027", taxId: "556789012", tax1099Type: "LLC", tax1099Name: "Midland Insurance Partners LLC",
     emailStatements: false, directDeposits: false, directDepositsCommissionOnly: false,
     farmersAgent: false, smartChoiceAgent: true, piibAgent: false,
     useConsolidatedBillingId: false, consolidatedBillingId: "", isConsolidatedBillingProducer: false,
@@ -417,7 +421,7 @@ const INITIAL_ITC_RECORDS: Record<string, ITCRecord | null> = {
     address: "500 Congress Ave", city: "Austin", state: "TX", zip: "78701",
     telephone: "5125559090", email: "b.carlson@apexrisk.com", accountingEmail: "billing@apexrisk.com", statementEmail: "billing@apexrisk.com",
     appointmentDate: "06/14/2024", licenseNo: "LC-55621", licenseExpires: "06/14/2027",
-    eoPolicyNo: "EO-8801", eoPolicyExpires: "06/14/2027", taxId: "743210987", tax1099Type: "Corporation", tax1099Name: "Apex Risk Advisors",
+    npn: "", eoPolicyNo: "EO-8801", eoPolicyExpires: "06/14/2027", taxId: "743210987", tax1099Type: "Corporation", tax1099Name: "Apex Risk Advisors",
     emailStatements: true, directDeposits: true, directDepositsCommissionOnly: false,
     farmersAgent: false, smartChoiceAgent: false, piibAgent: false,
     useConsolidatedBillingId: true, consolidatedBillingId: "CB-9902", isConsolidatedBillingProducer: false,
@@ -428,7 +432,7 @@ const INITIAL_ITC_RECORDS: Record<string, ITCRecord | null> = {
     address: "18 Market St", city: "Philadelphia", state: "PA", zip: "19107",
     telephone: "2155551045", email: "ops@keystone-uw.com", accountingEmail: "", statementEmail: "",
     appointmentDate: "09/03/2023", licenseNo: "LC-90112", licenseExpires: "09/03/2026",
-    eoPolicyNo: "EO-6620", eoPolicyExpires: "09/03/2026", taxId: "334567890", tax1099Type: "Corporation", tax1099Name: "Keystone Underwriters",
+    npn: "", eoPolicyNo: "EO-6620", eoPolicyExpires: "09/03/2026", taxId: "334567890", tax1099Type: "Corporation", tax1099Name: "Keystone Underwriters",
     emailStatements: true, directDeposits: false, directDepositsCommissionOnly: false,
     farmersAgent: false, smartChoiceAgent: false, piibAgent: false,
     useConsolidatedBillingId: false, consolidatedBillingId: "", isConsolidatedBillingProducer: false,
@@ -440,7 +444,7 @@ const INITIAL_ITC_RECORDS: Record<string, ITCRecord | null> = {
     address: "9 Founders Way", city: "Boston", state: "MA", zip: "02110",
     telephone: "6175551212", email: "info@ironbridge.com", accountingEmail: "acct@ironbridge.com", statementEmail: "acct@ironbridge.com",
     appointmentDate: "02/28/2025", licenseNo: "LC-44412", licenseExpires: "02/28/2028",
-    eoPolicyNo: "EO-3341", eoPolicyExpires: "02/28/2027", taxId: "998765432", tax1099Type: "LLC", tax1099Name: "Ironbridge Insurance Group LLC",
+    npn: "", eoPolicyNo: "EO-3341", eoPolicyExpires: "02/28/2027", taxId: "998765432", tax1099Type: "LLC", tax1099Name: "Ironbridge Insurance Group LLC",
     emailStatements: true, directDeposits: true, directDepositsCommissionOnly: false,
     farmersAgent: false, smartChoiceAgent: false, piibAgent: true,
     useConsolidatedBillingId: false, consolidatedBillingId: "", isConsolidatedBillingProducer: false,
@@ -986,7 +990,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
   // sees the drift as pending updates the super admin can push. Keeps the
   // parent `agency` object unmodified — this is just the UI's local memory
   // of "what the agency should look like now."
-  type AgencyFieldOverride = Partial<Pick<AgencyDetail, "name" | "street" | "city" | "state" | "zip" | "phone" | "contactEmail" | "licenseNo" | "licenseExp">>;
+  type AgencyFieldOverride = Partial<Pick<AgencyDetail, "name" | "street" | "city" | "state" | "zip" | "phone" | "contactEmail" | "licenseNo" | "licenseExp" | "npn" | "eoPolicyNo" | "eoExp">>;
   // Concurrency model = last-write-wins by design. Save Changes always
   // overwrites the whole override object (see the Save handler below);
   // if two people submit against the same agency, the later Save wins
@@ -1010,6 +1014,12 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
     email: "contactEmail",
     licenseNo: "licenseNo",
     licenseExpires: "licenseExp",
+    // NPN added per Shannon's review. Backend note: ITC translates
+    // NPN into its own License Number column; prototype just stores
+    // under its own `npn` key so the diff reads cleanly in the modal.
+    npn: "npn",
+    eoPolicyNo: "eoPolicyNo",
+    eoPolicyExpires: "eoExp",
   };
   // Inline editing in the Pending Updates modal is available on every
   // field, including the doc-gated ones (Name / Address / City / State /
@@ -1017,17 +1027,19 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
   // is reviewing against the uploaded W-9 or License copy in the side
   // panel — if the submitter typed a typo, super admin corrects it here
   // to match the source doc, then Push to ITC.
-  // Small "Pending" pill shown next to any field that has an
+  // Small "In review" pill shown next to any field that has an
   // unpushed override, mirroring the Appointed / DreamTeam badge
   // language so a returning editor can spot at a glance which
-  // fields will move on the next ITC push.
+  // fields are staged for ITC review on the next push. (Previously
+  // worded "Pending" — Shannon preferred "In review" so the label
+  // matches the Pending Updates modal's "review" vocabulary.)
   const pendingTag = (keys: (keyof AgencyFieldOverride)[]) => {
     const isPending = keys.some(k => agencyFieldOverride[k] !== undefined);
     if (!isPending) return null;
     return (
       <span
         className="inline-flex items-center justify-center align-middle ml-2"
-        title="Edited — not yet pushed to ITC"
+        title="Edited — waiting for ITC review"
         style={{
           background: "linear-gradient(88.54deg, rgba(92,46,212,0.08) 0.1%, rgba(166,20,195,0.08) 63.88%)",
           borderRadius: 9999,
@@ -1046,7 +1058,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
             letterSpacing: "0.02em",
           }}
         >
-          Pending
+          In review
         </span>
       </span>
     );
@@ -3541,8 +3553,8 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
               <LabelValue label="Agency Name" value={agency.name} />
               <LabelValue label="Agency Code" value={agency.code} />
               <LabelValue label="Agency Type" value={<span style={{ color: c.text }}>{agency.agencyType}</span>} />
-              <LabelValue label="Agency Address" value={`${agency.street}, ${agency.city}, ${agency.state}, ${agency.zip}`} />
-              <LabelValue label="Mailing Address" value="Same as Agency Address" />
+              <LabelValue label="Mailing Address" value={`${agency.street}, ${agency.city}, ${agency.state}, ${agency.zip}`} />
+              <LabelValue label="Agency Address" value="Same as Mailing Address" />
               <div />
               <div>
                 <p className="text-[13px] font-semibold mb-2" style={{ ...font, color: c.text }}>Status:</p>
@@ -3805,7 +3817,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
               return (
             <>
             <div className="mb-4">
-              <label style={{ ...labelStyle, marginBottom: 12 }}>Agency Address:{pendingTag(["street", "city", "state", "zip"])}</label>
+              <label style={{ ...labelStyle, marginBottom: 12 }}>Mailing Address:{pendingTag(["street", "city", "state", "zip"])}</label>
               <div className="space-y-3">
                 <div className="grid grid-cols-3 gap-6">
                   <StyledSelect<Country>
@@ -3863,12 +3875,14 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
               </div>
             </div>
 
-            {/* Mailing Address */}
+            {/* Agency Address (secondary — can mirror the mailing address
+                via the "Same as Mailing Address" checkbox. The label block
+                above holds the primary mailing address.) */}
             <div className="mb-6">
-              <label style={{ ...labelStyle, marginBottom: 8 }}>Mailing Address:</label>
+              <label style={{ ...labelStyle, marginBottom: 8 }}>Agency Address:</label>
               <div className="flex items-center gap-2 mb-3">
                 <Checkbox checked={eSameAddr} onClick={() => setESameAddr(p => !p)} />
-                <span className="text-[13px] font-semibold" style={{ ...font, color: c.text }}>Same as Agency Address</span>
+                <span className="text-[13px] font-semibold" style={{ ...font, color: c.text }}>Same as Mailing Address</span>
               </div>
               <div className="space-y-3">
                 <div className="grid grid-cols-3 gap-6">
@@ -6374,15 +6388,21 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
               return s;
             };
             const ITC_AGENCY_MAP: Array<{ key: keyof ITCRecord; label: string; agencyValue: string }> = record ? [
-              { key: "name",           label: "Name",            agencyValue: effectiveAgency.name },
-              { key: "address",        label: "Address",         agencyValue: effectiveAgency.street },
-              { key: "city",           label: "City",            agencyValue: effectiveAgency.city },
-              { key: "state",          label: "State",           agencyValue: effectiveAgency.state },
-              { key: "zip",            label: "Zip",             agencyValue: effectiveAgency.zip },
-              { key: "telephone",      label: "Telephone",       agencyValue: effectiveAgency.phone },
-              { key: "email",          label: "Email",           agencyValue: effectiveAgency.contactEmail },
-              { key: "licenseNo",      label: "License No",      agencyValue: effectiveAgency.licenseNo },
-              { key: "licenseExpires", label: "License Expires", agencyValue: effectiveAgency.licenseExp },
+              { key: "name",            label: "Name",             agencyValue: effectiveAgency.name },
+              { key: "address",         label: "Address",          agencyValue: effectiveAgency.street },
+              { key: "city",            label: "City",             agencyValue: effectiveAgency.city },
+              { key: "state",           label: "State",            agencyValue: effectiveAgency.state },
+              { key: "zip",             label: "Zip",              agencyValue: effectiveAgency.zip },
+              { key: "telephone",       label: "Telephone",        agencyValue: effectiveAgency.phone },
+              { key: "email",           label: "Email",            agencyValue: effectiveAgency.contactEmail },
+              { key: "licenseNo",       label: "License No",       agencyValue: effectiveAgency.licenseNo },
+              { key: "licenseExpires",  label: "License Expires",  agencyValue: effectiveAgency.licenseExp },
+              // Added per Shannon's review pass. NPN also goes through
+              // review; backend translates it to the ITC License Number
+              // column on push (noted next to OVERRIDE_KEY_FOR_ITC).
+              { key: "npn",             label: "NPN",              agencyValue: effectiveAgency.npn },
+              { key: "eoPolicyNo",      label: "E&O Policy No",    agencyValue: effectiveAgency.eoPolicyNo },
+              { key: "eoPolicyExpires", label: "E&O Policy Expires", agencyValue: effectiveAgency.eoExp },
             ] : [];
             const pendingUpdates = record
               ? ITC_AGENCY_MAP
@@ -10453,19 +10473,20 @@ function AddAgencyForm({ isDark, onSaveForLater, onDiscard, initialDraft, c, btn
             </div>
           </div>
 
-          {/* Agency Address */}
+          {/* Mailing Address (primary — the address ITC uses for
+              statements / 1099s. Agency Address below can mirror it.) */}
           <div className="mb-4">
-            <label style={{ ...labelStyle, marginBottom: 12 }}>Agency Address:</label>
+            <label style={{ ...labelStyle, marginBottom: 12 }}>Mailing Address:</label>
             <AddressBlock prefix="a" vals={{ country, street, city, state: stateVal, zip }}
               setters={{ country: setCountry, street: setStreet, city: setCity, state: setStateVal, zip: setZip }} />
           </div>
 
-          {/* Mailing Address */}
+          {/* Agency Address */}
           <div className="mb-6">
-            <label style={{ ...labelStyle, marginBottom: 8 }}>Mailing Address:</label>
+            <label style={{ ...labelStyle, marginBottom: 8 }}>Agency Address:</label>
             <div className="flex items-center gap-2 mb-3">
               <Checkbox checked={sameAddress} onClick={() => setSameAddress(p => !p)} />
-              <span className="text-[13px] font-semibold" style={{ ...font, color: c.text }}>Same as Agency Address</span>
+              <span className="text-[13px] font-semibold" style={{ ...font, color: c.text }}>Same as Mailing Address</span>
             </div>
             <AddressBlock prefix="m" vals={sameAddress ? { country, street, city, state: stateVal, zip } : { country: mCountry, street: mStreet, city: mCity, state: mState, zip: mZip }}
               setters={{ country: setMCountry, street: setMStreet, city: setMCity, state: setMState, zip: setMZip }} />
