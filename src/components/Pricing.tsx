@@ -230,7 +230,7 @@ export default function Pricing({ isDark = false, phase = 2 }: PricingProps) {
           ProSuite upgrade adds on top of NorbieLink. Rendered below
           the tier grid on both phases so the value prop reads top
           (price cards) → bottom (feature-by-feature compare). */}
-      <ComparisonChart isDark={isDark} c={c} btnGrad={btnGrad} />
+      <ComparisonChart isDark={isDark} c={c} btnGrad={btnGrad} phase={phase} />
     </div>
   );
 }
@@ -243,11 +243,12 @@ export default function Pricing({ isDark = false, phase = 2 }: PricingProps) {
    saturated razz circle for ProSuite-only rows and a muted-outline
    circle for "not available". */
 function ComparisonChart({
-  isDark, c, btnGrad,
+  isDark, c, btnGrad, phase,
 }: {
   isDark: boolean;
   c: { text: string; heading: string; muted: string; subtle: string; border: string; cardBg: string; hoverBg: string };
   btnGrad: string;
+  phase: 1 | 2;
 }) {
   type Status = "included" | "pro" | "none";
   type Row = { label: string; legacy: Status; nl: Status; pro: Status };
@@ -297,6 +298,16 @@ function ComparisonChart({
       ],
     },
   ];
+
+  // Phase 1 scope — drop the two rows that aren't part of the Phase 1
+  // launch scope. (Phase 2 sees the full chart.)
+  const PHASE_1_HIDDEN = new Set<string>([
+    "Download existing certificates",
+    "Agency-wide access for $99/year",
+  ]);
+  const visibleSections: Section[] = phase === 1
+    ? SECTIONS.map(s => ({ ...s, rows: s.rows.filter(r => !PHASE_1_HIDDEN.has(r.label)) }))
+    : SECTIONS;
 
   // Grid: let the status columns take a real share of the width
   // (equal to the label column) so the row doesn't have a dead gap
@@ -410,7 +421,7 @@ function ComparisonChart({
         </div>
 
         {/* Sections */}
-        {SECTIONS.map((section, sIdx) => {
+        {visibleSections.map((section, sIdx) => {
           const meta = SECTION_META[section.title] ?? { icon: Zap, one: "" };
           const SectionIcon = meta.icon;
           return (
@@ -482,16 +493,16 @@ function ComparisonChart({
         }}
       >
         <span className="inline-flex items-center gap-2">
-          <span className="inline-flex items-center justify-center rounded-full flex-shrink-0" style={{ width: 18, height: 18, background: btnGrad }}>
+          <span className="inline-flex items-center justify-center rounded-full flex-shrink-0" style={{ width: 18, height: 18, background: "#A614C3" }}>
+            <Check className="w-2.5 h-2.5" style={{ color: "#FFFFFF" }} strokeWidth={3} />
+          </span>
+          Included
+        </span>
+        <span className="inline-flex items-center gap-2">
+          <span className="inline-flex items-center justify-center rounded-full flex-shrink-0" style={{ width: 18, height: 18, background: "#73C9B7" }}>
             <Check className="w-2.5 h-2.5" style={{ color: "#FFFFFF" }} strokeWidth={3} />
           </span>
           ProSuite exclusive
-        </span>
-        <span className="inline-flex items-center gap-2">
-          <span className="inline-flex items-center justify-center rounded-full flex-shrink-0" style={{ width: 18, height: 18, background: isDark ? "rgba(166,20,195,0.18)" : "rgba(166,20,195,0.10)" }}>
-            <Check className="w-2.5 h-2.5" style={{ color: "#A614C3" }} strokeWidth={3} />
-          </span>
-          Included
         </span>
         <span className="inline-flex items-center gap-2">
           <span className="inline-flex items-center justify-center rounded-full flex-shrink-0" style={{ width: 18, height: 18, background: isDark ? "rgba(255,255,255,0.06)" : "#F3F4F6" }}>
