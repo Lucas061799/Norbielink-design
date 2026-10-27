@@ -324,10 +324,9 @@ interface ITCRecord {
   appointmentDate: string;   // MM/DD/YYYY
   licenseNo: string;
   licenseExpires: string;
-  // Shannon's note: our NPN column maps onto the ITC "License Number"
-  // field at push time — the backend translation happens there. We keep
-  // it under its own key here so the Pending Updates diff reads cleanly.
-  npn: string;
+  // (NPN is NOT an ITC column — it lives in Norbielink's NASCP database,
+  // sourced from NIPR. We don't store or display it on the ITC Record
+  // surface; the agency's NPN is shown on the Overview tab only.)
   eoPolicyNo: string;
   eoPolicyExpires: string;
   taxId: string;
@@ -363,7 +362,7 @@ const INITIAL_ITC_RECORDS: Record<string, ITCRecord | null> = {
     address: "980 Cherry Ave", city: "Des Moines", state: "IA", zip: "50314",
     telephone: "5152220999", email: "jason@acmeins.com", accountingEmail: "d.kim@acmeins.com", statementEmail: "d.kim@acmeins.com",
     appointmentDate: "03/24/2026", licenseNo: "LC-88210", licenseExpires: "03/24/2028",
-    npn: "", eoPolicyNo: "EO-4421", eoPolicyExpires: "03/24/2027", taxId: "121222334455", tax1099Type: "LLC", tax1099Name: "Acme Insurance Agency LLC",
+    eoPolicyNo: "EO-4421", eoPolicyExpires: "03/24/2027", taxId: "121222334455", tax1099Type: "LLC", tax1099Name: "Acme Insurance Agency LLC",
     emailStatements: true, directDeposits: true, directDepositsCommissionOnly: false,
     farmersAgent: false, smartChoiceAgent: true, piibAgent: false,
     useConsolidatedBillingId: false, consolidatedBillingId: "", isConsolidatedBillingProducer: false,
@@ -374,7 +373,7 @@ const INITIAL_ITC_RECORDS: Record<string, ITCRecord | null> = {
     address: "200 N Michigan", city: "Chicago", state: "IL", zip: "60601",
     telephone: "3125550100", email: "m.chen@summitsol.com", accountingEmail: "billing@summitsol.com", statementEmail: "billing@summitsol.com",
     appointmentDate: "01/12/2024", licenseNo: "LC-22110", licenseExpires: "01/15/2027",
-    npn: "", eoPolicyNo: "EO-1120", eoPolicyExpires: "01/15/2027", taxId: "930011223", tax1099Type: "Corporation", tax1099Name: "Summit Solutions Inc",
+    eoPolicyNo: "EO-1120", eoPolicyExpires: "01/15/2027", taxId: "930011223", tax1099Type: "Corporation", tax1099Name: "Summit Solutions Inc",
     emailStatements: true, directDeposits: false, directDepositsCommissionOnly: false,
     farmersAgent: false, smartChoiceAgent: false, piibAgent: false,
     useConsolidatedBillingId: false, consolidatedBillingId: "", isConsolidatedBillingProducer: true,
@@ -386,7 +385,7 @@ const INITIAL_ITC_RECORDS: Record<string, ITCRecord | null> = {
     address: "820 Lakefront Blvd", city: "Denver", state: "CO", zip: "80203",
     telephone: "3035551010", email: "o.bennett@lakefrontcov.com", accountingEmail: "", statementEmail: "",
     appointmentDate: "08/02/2023", licenseNo: "LC-11245", licenseExpires: "08/02/2027",
-    npn: "", eoPolicyNo: "EO-9911", eoPolicyExpires: "08/02/2026", taxId: "845123765", tax1099Type: "Corporation", tax1099Name: "Lakefront Coverage",
+    eoPolicyNo: "EO-9911", eoPolicyExpires: "08/02/2026", taxId: "845123765", tax1099Type: "Corporation", tax1099Name: "Lakefront Coverage",
     emailStatements: true, directDeposits: true, directDepositsCommissionOnly: true,
     farmersAgent: false, smartChoiceAgent: false, piibAgent: true,
     useConsolidatedBillingId: false, consolidatedBillingId: "", isConsolidatedBillingProducer: false,
@@ -397,7 +396,7 @@ const INITIAL_ITC_RECORDS: Record<string, ITCRecord | null> = {
     address: "445 Ridgeway Dr", city: "Des Moines", state: "IA", zip: "50310",
     telephone: "5155552020", email: "n.avery@ridgelineins.com", accountingEmail: "n.avery@ridgelineins.com", statementEmail: "n.avery@ridgelineins.com",
     appointmentDate: "11/15/2022", licenseNo: "LC-33902", licenseExpires: "11/15/2026",
-    npn: "", eoPolicyNo: "EO-2210", eoPolicyExpires: "11/15/2025", taxId: "223456781", tax1099Type: "Individual", tax1099Name: "Nicole Avery",
+    eoPolicyNo: "EO-2210", eoPolicyExpires: "11/15/2025", taxId: "223456781", tax1099Type: "Individual", tax1099Name: "Nicole Avery",
     emailStatements: true, directDeposits: true, directDepositsCommissionOnly: false,
     farmersAgent: true, smartChoiceAgent: false, piibAgent: false,
     useConsolidatedBillingId: false, consolidatedBillingId: "", isConsolidatedBillingProducer: false,
@@ -409,7 +408,7 @@ const INITIAL_ITC_RECORDS: Record<string, ITCRecord | null> = {
     address: "77 Main St", city: "Wichita", state: "KS", zip: "67202",
     telephone: "3165550707", email: "contact@midlandins.com", accountingEmail: "", statementEmail: "",
     appointmentDate: "04/01/2026", licenseNo: "LC-77801", licenseExpires: "04/01/2028",
-    npn: "", eoPolicyNo: "EO-4408", eoPolicyExpires: "04/01/2027", taxId: "556789012", tax1099Type: "LLC", tax1099Name: "Midland Insurance Partners LLC",
+    eoPolicyNo: "EO-4408", eoPolicyExpires: "04/01/2027", taxId: "556789012", tax1099Type: "LLC", tax1099Name: "Midland Insurance Partners LLC",
     emailStatements: false, directDeposits: false, directDepositsCommissionOnly: false,
     farmersAgent: false, smartChoiceAgent: true, piibAgent: false,
     useConsolidatedBillingId: false, consolidatedBillingId: "", isConsolidatedBillingProducer: false,
@@ -421,7 +420,7 @@ const INITIAL_ITC_RECORDS: Record<string, ITCRecord | null> = {
     address: "500 Congress Ave", city: "Austin", state: "TX", zip: "78701",
     telephone: "5125559090", email: "b.carlson@apexrisk.com", accountingEmail: "billing@apexrisk.com", statementEmail: "billing@apexrisk.com",
     appointmentDate: "06/14/2024", licenseNo: "LC-55621", licenseExpires: "06/14/2027",
-    npn: "", eoPolicyNo: "EO-8801", eoPolicyExpires: "06/14/2027", taxId: "743210987", tax1099Type: "Corporation", tax1099Name: "Apex Risk Advisors",
+    eoPolicyNo: "EO-8801", eoPolicyExpires: "06/14/2027", taxId: "743210987", tax1099Type: "Corporation", tax1099Name: "Apex Risk Advisors",
     emailStatements: true, directDeposits: true, directDepositsCommissionOnly: false,
     farmersAgent: false, smartChoiceAgent: false, piibAgent: false,
     useConsolidatedBillingId: true, consolidatedBillingId: "CB-9902", isConsolidatedBillingProducer: false,
@@ -432,7 +431,7 @@ const INITIAL_ITC_RECORDS: Record<string, ITCRecord | null> = {
     address: "18 Market St", city: "Philadelphia", state: "PA", zip: "19107",
     telephone: "2155551045", email: "ops@keystone-uw.com", accountingEmail: "", statementEmail: "",
     appointmentDate: "09/03/2023", licenseNo: "LC-90112", licenseExpires: "09/03/2026",
-    npn: "", eoPolicyNo: "EO-6620", eoPolicyExpires: "09/03/2026", taxId: "334567890", tax1099Type: "Corporation", tax1099Name: "Keystone Underwriters",
+    eoPolicyNo: "EO-6620", eoPolicyExpires: "09/03/2026", taxId: "334567890", tax1099Type: "Corporation", tax1099Name: "Keystone Underwriters",
     emailStatements: true, directDeposits: false, directDepositsCommissionOnly: false,
     farmersAgent: false, smartChoiceAgent: false, piibAgent: false,
     useConsolidatedBillingId: false, consolidatedBillingId: "", isConsolidatedBillingProducer: false,
@@ -444,7 +443,7 @@ const INITIAL_ITC_RECORDS: Record<string, ITCRecord | null> = {
     address: "9 Founders Way", city: "Boston", state: "MA", zip: "02110",
     telephone: "6175551212", email: "info@ironbridge.com", accountingEmail: "acct@ironbridge.com", statementEmail: "acct@ironbridge.com",
     appointmentDate: "02/28/2025", licenseNo: "LC-44412", licenseExpires: "02/28/2028",
-    npn: "", eoPolicyNo: "EO-3341", eoPolicyExpires: "02/28/2027", taxId: "998765432", tax1099Type: "LLC", tax1099Name: "Ironbridge Insurance Group LLC",
+    eoPolicyNo: "EO-3341", eoPolicyExpires: "02/28/2027", taxId: "998765432", tax1099Type: "LLC", tax1099Name: "Ironbridge Insurance Group LLC",
     emailStatements: true, directDeposits: true, directDepositsCommissionOnly: false,
     farmersAgent: false, smartChoiceAgent: false, piibAgent: true,
     useConsolidatedBillingId: false, consolidatedBillingId: "", isConsolidatedBillingProducer: false,
@@ -482,7 +481,7 @@ interface AgencyDetail extends Agency {
 const mockDetails: Record<string, Partial<AgencyDetail>> = {
   "1": { website: "www.acmeins.com",      street: "1111 6th Ave",   zip: "50314", apptDate: "03/24/2026", contact: "Jason Smith",      contactPhone: "650-768-0850", contactEmail: "jason@acmeins.com",     bizType: "LLC",            taxId: "121222334455", phone: "515-222-1000", tollFree: "",             npn: "17482910", licenseNo: "LC-88210", licenseExp: "12/24/2027", eoPolicyNo: "EO-4421", eoExp: "03/24/2026", agencyBill: true,  directBill: true,  premiumFin: true,  agencyType: "Retail",     affiliations: ["AAA/ACG (AC364)", "Acrisure"], workersComp: ["AIG", "AmTrust"], badges: ["Strategic Partner", "VIP"] },
   "2": { website: "www.summitsol.com",    street: "200 N Michigan",  zip: "60601", apptDate: "01/15/2025", contact: "Maria Chen",       contactPhone: "312-555-0190", contactEmail: "m.chen@summitsol.com",  bizType: "Corporation",    taxId: "930011223",   phone: "312-555-0100", tollFree: "800-555-0100", npn: "20911345", licenseNo: "LC-22110", licenseExp: "01/15/2027", eoPolicyNo: "EO-1120", eoExp: "01/15/2027", agencyBill: true,  directBill: false, premiumFin: true,  agencyType: "Wholesale",  affiliations: ["Acrisure", "Acceptance"], workersComp: ["CNA"], badges: ["DreamTeam"] },
-  "3": { website: "",                     street: "",                zip: "",      apptDate: "06/01/2024", contact: "Tom Lawson",       contactPhone: "",             contactEmail: "",                      bizType: "Sole Proprietor",taxId: "456789012",   phone: "",             tollFree: "",             npn: "",         licenseNo: "LC-77001", licenseExp: "06/01/2026", eoPolicyNo: "EO-7701", eoExp: "06/01/2026", agencyBill: false, directBill: true,  premiumFin: false, agencyType: "Retail",     affiliations: ["Farmers", "ISU"], workersComp: ["GUARD", "Zenith"], badges: [] },
+  "3": { website: "",                     street: "",                zip: "",      apptDate: "06/01/2024", contact: "Tom Lawson",       contactPhone: "",             contactEmail: "",                      bizType: "Sole Proprietor",taxId: "456789012",   phone: "",             tollFree: "",             licenseNo: "LC-77001", licenseExp: "06/01/2026", eoPolicyNo: "EO-7701", eoExp: "06/01/2026", agencyBill: false, directBill: true,  premiumFin: false, agencyType: "Retail",     affiliations: ["Farmers", "ISU"], workersComp: ["GUARD", "Zenith"], badges: [] },
 };
 
 function getDetail(a: Agency): AgencyDetail {
@@ -1000,6 +999,16 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
   const [agencyFieldOverride, setAgencyFieldOverride] = useState<AgencyFieldOverride>({});
   const effectiveAgency: AgencyDetail = { ...agency, ...agencyFieldOverride };
   const hasPendingOverride = Object.keys(agencyFieldOverride).length > 0;
+
+  // (License-expired banner + Renew modal removed on 2026-10-27 after
+  // the Shannon + Kiran meeting. Phase 1 scope narrows this feature
+  // to a single thing: the Add Agency form checks the license through
+  // NIPR before letting Shannon save, and blocks expired licenses from
+  // being added in the first place. Everything else — the dashboard
+  // banner for existing expired agencies, 30/15-day notification
+  // emails, and the "needs action" flag on the agency list — belongs
+  // to phase 2 once the NIPR batch job is enabled and the data cleanup
+  // (~75k agencies) is complete.)
   // Map from ITC-record field key → agencyFieldOverride key. Used by
   // the Reject action in the Pending Updates modal to revert a single
   // field back to its ITC value without touching the other pending
@@ -1014,10 +1023,12 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
     email: "contactEmail",
     licenseNo: "licenseNo",
     licenseExpires: "licenseExp",
-    // NPN added per Shannon's review. Backend note: ITC translates
-    // NPN into its own License Number column; prototype just stores
-    // under its own `npn` key so the diff reads cleanly in the modal.
-    npn: "npn",
+    // NPN deliberately NOT here. Per Shannon + Kiran meeting on
+    // 2026-10-27: NPN is auto-populated from NIPR (two background API
+    // calls on agency registration — license#+state → NPN, then NPN →
+    // full detail), so neither agent nor Shannon's team edits it. It
+    // doesn't go through Pending Updates / ITC review. Treated like
+    // Agency Code: display-only on the UI.
     eoPolicyNo: "eoPolicyNo",
     eoPolicyExpires: "eoExp",
   };
@@ -3493,6 +3504,11 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
           </InfoCard>
         </div>
 
+        {/* (License-expired banner removed from this detail surface on
+            2026-10-27 — phase 1 only covers the Add Agency NIPR check.
+            The dashboard-wide banner for existing expired agencies is
+            phase 2 scope, once the daily NIPR batch job is live.) */}
+
         {/* Tab bar */}
         <div className="flex items-center gap-1 mb-5 flex-shrink-0" style={{ borderBottom: `1px solid ${c.border}` }}>
           {detailTabs.map(([key, label, icon]) => {
@@ -4117,9 +4133,12 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
               </div>
               <div>
                 <label style={labelStyle}>NPN:</label>
-                {clientLocked
-                  ? <LockedInput value={eNpn || "—"} />
-                  : <input value={eNpn} onChange={e => setENpn(e.target.value)} placeholder="National Producer Number" style={inputStyle} />}
+                {/* NPN is populated from NIPR on registration (two
+                    background calls — license#+state → NPN, then NPN →
+                    full detail). No one edits this on the UI, including
+                    Shannon's team — treated like Agency Code. Lock it
+                    for every viewer, not just clientMode. */}
+                <LockedInput value={eNpn || "—"} />
               </div>
             </div>
 
@@ -6397,10 +6416,10 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
               { key: "email",           label: "Email",            agencyValue: effectiveAgency.contactEmail },
               { key: "licenseNo",       label: "License No",       agencyValue: effectiveAgency.licenseNo },
               { key: "licenseExpires",  label: "License Expires",  agencyValue: effectiveAgency.licenseExp },
-              // Added per Shannon's review pass. NPN also goes through
-              // review; backend translates it to the ITC License Number
-              // column on push (noted next to OVERRIDE_KEY_FOR_ITC).
-              { key: "npn",             label: "NPN",              agencyValue: effectiveAgency.npn },
+              // NPN removed from the review flow per 2026-10-27 meeting:
+              // it's auto-populated from NIPR in the background, never
+              // edited by agent or Shannon, so it skips Pending Updates
+              // entirely. See OVERRIDE_KEY_FOR_ITC for the full note.
               { key: "eoPolicyNo",      label: "E&O Policy No",    agencyValue: effectiveAgency.eoPolicyNo },
               { key: "eoPolicyExpires", label: "E&O Policy Expires", agencyValue: effectiveAgency.eoExp },
             ] : [];
@@ -8985,6 +9004,8 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
         );
       })()}
 
+      {/* Renew License modal removed on 2026-10-27 — see state comment in AgencyDetailView for context. */}
+
       {/* ── Import from Legacy Modal ── */}
       {legacyImportOpen && (() => {
         const selectableIds = legacyRosterTagged.filter(u => !u.duplicate).map(u => u.id);
@@ -10056,6 +10077,72 @@ function AddAgencyForm({ isDark, onSaveForLater, onDiscard, initialDraft, c, btn
   const [licenseExp, setLicenseExp]   = useState(initialDraft?.licenseExp ?? "03/24/2026");
   const [eoPolicyNo, setEoPolicyNo]   = useState(initialDraft?.eoPolicyNo ?? "");
   const [eoExp, setEoExp]             = useState(initialDraft?.eoExp ?? "03/24/2026");
+  // ── NIPR verification (phase 1 Add Agency flow) ──────────────────
+  // Shannon enters License # + State → clicks "Verify with NIPR" →
+  // mock async check. If NIPR says the license is expired, block the
+  // Save button and show inline error. If valid, auto-populate NPN
+  // (NPN is NIPR-only — never user-typed) and the Expiration Date.
+  // Prototype mocks NIPR: license numbers ending in "0" come back
+  // expired; everything else comes back valid with a fresh +2y date.
+  type NiprState = "idle" | "checking" | "valid" | "expired";
+  const [niprState, setNiprState] = useState<NiprState>(initialDraft?.npn ? "valid" : "idle");
+  const [niprExpiredOn, setNiprExpiredOn] = useState<string>("");
+  // NIPR's first call needs Agency Name + License # + State per the
+  // 2026-10-27 meeting with Jatin — all three are required to look up
+  // the NPN. Button is disabled until the three fields are filled in.
+  const canVerifyNipr = agencyName.trim().length > 0
+    && licenseNo.trim().length > 0
+    && stateVal.trim().length > 0
+    && niprState !== "checking";
+  const verifyNipr = () => {
+    if (!canVerifyNipr) return;
+    setNiprState("checking");
+    setNiprExpiredOn("");
+    window.setTimeout(() => {
+      const trimmed = licenseNo.trim();
+      const isExpired = /0$/.test(trimmed);
+      if (isExpired) {
+        const past = new Date(); past.setDate(past.getDate() - 42);
+        const dateStr = `${String(past.getMonth() + 1).padStart(2, "0")}/${String(past.getDate()).padStart(2, "0")}/${past.getFullYear()}`;
+        setNiprState("expired");
+        setNiprExpiredOn(dateStr);
+        setNpn("");
+      } else {
+        const future = new Date(); future.setFullYear(future.getFullYear() + 2);
+        const dateStr = `${String(future.getMonth() + 1).padStart(2, "0")}/${String(future.getDate()).padStart(2, "0")}/${future.getFullYear()}`;
+        const mockNpn = String(Math.floor(10000000 + Math.random() * 90000000));
+        setNiprState("valid");
+        setLicenseExp(dateStr);
+        setNpn(mockNpn);
+      }
+    }, 700);
+  };
+  // Any edit to License # or State invalidates the NIPR verification
+  // and forces a re-check. Also wipes the NIPR-sourced NPN so the UI
+  // doesn't show stale data.
+  const invalidateNipr = () => {
+    if (niprState !== "idle") {
+      setNiprState("idle");
+      setNiprExpiredOn("");
+      setNpn("");
+    }
+  };
+  // Reset NIPR state when any of the three inputs feeding the NIPR
+  // call (Agency Name / License # / State) changes after verification.
+  // Covers the address-block state path which doesn't go through our
+  // input onChange.
+  const niprCheckedKeyRef = useRef<string>("");
+  useEffect(() => {
+    const currentKey = `${agencyName.trim()}|${licenseNo.trim()}|${stateVal.trim()}`;
+    if (niprState === "valid" || niprState === "expired") {
+      if (niprCheckedKeyRef.current && niprCheckedKeyRef.current !== currentKey) {
+        invalidateNipr();
+      }
+    } else if (niprState === "checking") {
+      niprCheckedKeyRef.current = currentKey;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agencyName, licenseNo, stateVal]);
   const [affiliations, setAffiliations] = useState<Set<string>>(new Set(initialDraft?.affiliations ?? ["AAA/ACG (AC364)"]));
   const [workersComp, setWorkersComp]   = useState<Set<string>>(new Set(initialDraft?.workersComp ?? ["AIG"]));
   const [badges, setBadges]             = useState<Set<string>>(new Set(initialDraft?.badges ?? []));
@@ -10604,24 +10691,83 @@ function AddAgencyForm({ isDark, onSaveForLater, onDiscard, initialDraft, c, btn
             <div />
           </div>
 
-          {/* License + Expiry + NPN */}
-          <div className="grid grid-cols-3 gap-6 mb-6">
+          {/* License + Expiry + NPN. Phase 1 NIPR flow: Shannon types
+              License # + chooses State → clicks "Verify with NIPR" →
+              Expiration Date and NPN get populated (expired licenses
+              block the Save button). */}
+          <div className="grid grid-cols-3 gap-6 mb-3">
             <div>
               <label style={labelStyle}>License Number:</label>
               <input value={licenseNo}
-                onChange={e => { setLicenseNo(e.target.value); runValidate("licenseNo", e.target.value); }}
+                onChange={e => { setLicenseNo(e.target.value); runValidate("licenseNo", e.target.value); invalidateNipr(); }}
                 style={{ ...inputStyle, ...errorStyleFor("licenseNo") }} />
               <ErrMsg k="licenseNo" />
             </div>
             <div>
               <label style={labelStyle}>Expiration Date:</label>
-              <DatePicker value={licenseExp} onChange={setLicenseExp} inputStyle={inputStyle} c={c as any} btnGrad={btnGrad} font={font} />
+              {/* NIPR-populated and locked once verified. Date picker
+                  only unlocks if the agent re-verifies after changing
+                  the license number. */}
+              {niprState === "valid"
+                ? (
+                  <div className="relative">
+                    <input value={licenseExp} readOnly aria-readonly="true" title="Populated from NIPR"
+                      style={{ ...inputStyle, paddingRight: 34, background: isDark ? "rgba(255,255,255,0.04)" : "#F9FAFB", color: c.muted, cursor: "not-allowed" }} />
+                    <Lock className="w-3.5 h-3.5 absolute pointer-events-none" style={{ right: 10, top: "50%", transform: "translateY(-50%)", color: c.muted }} />
+                  </div>
+                )
+                : <DatePicker value={licenseExp} onChange={setLicenseExp} inputStyle={inputStyle} c={c as any} btnGrad={btnGrad} font={font} />}
             </div>
             <div>
               <label style={labelStyle}>NPN:</label>
-              <input value={npn}
-                onChange={e => setNpn(e.target.value)}
-                placeholder="National Producer Number" style={inputStyle} inputMode="numeric" />
+              {/* NPN is always locked here — comes from NIPR after a
+                  successful verify, never typed. Agency Code pattern. */}
+              <div className="relative">
+                <input value={npn || "—"} readOnly aria-readonly="true" title="Populated from NIPR"
+                  style={{ ...inputStyle, paddingRight: 34, background: isDark ? "rgba(255,255,255,0.04)" : "#F9FAFB", color: c.muted, cursor: "not-allowed" }} />
+                <Lock className="w-3.5 h-3.5 absolute pointer-events-none" style={{ right: 10, top: "50%", transform: "translateY(-50%)", color: c.muted }} />
+              </div>
+            </div>
+          </div>
+
+          {/* NIPR verification row */}
+          <div className="mb-6">
+            <div className="flex items-center gap-3 flex-wrap">
+              <button type="button"
+                onClick={verifyNipr}
+                disabled={!canVerifyNipr}
+                className="flex items-center gap-1.5 text-[12px] font-semibold px-3 py-1.5 rounded-lg transition-all"
+                style={{
+                  ...font,
+                  background: canVerifyNipr ? btnGrad : (isDark ? "rgba(255,255,255,0.08)" : "#F3F4F6"),
+                  color: canVerifyNipr ? "#FFFFFF" : c.muted,
+                  border: "none",
+                  cursor: canVerifyNipr ? "pointer" : "not-allowed",
+                  opacity: canVerifyNipr ? 1 : 0.6,
+                }}
+                onMouseEnter={e => { if (canVerifyNipr) e.currentTarget.style.filter = "brightness(1.08)"; }}
+                onMouseLeave={e => (e.currentTarget.style.filter = "none")}>
+                {niprState === "checking"
+                  ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" />Checking NIPR…</>
+                  : niprState === "valid"
+                    ? <><Check className="w-3.5 h-3.5" />Re-verify with NIPR</>
+                    : <><RefreshCw className="w-3.5 h-3.5" />Verify with NIPR</>}
+              </button>
+              {niprState === "idle" && (
+                <span className="text-[11.5px]" style={{ ...font, color: c.muted }}>
+                  Fill in Agency Name, License Number, and State, then verify to look up NPN and expiration from NIPR.
+                </span>
+              )}
+              {niprState === "valid" && (
+                <span className="inline-flex items-center gap-1.5 text-[11.5px] font-medium" style={{ ...font, color: "#A614C3" }}>
+                  <Check className="w-3.5 h-3.5" />License is active per NIPR (expires {licenseExp}).
+                </span>
+              )}
+              {niprState === "expired" && (
+                <span className="inline-flex items-center gap-1.5 text-[11.5px] font-semibold" style={{ ...font, color: "#DC2626" }}>
+                  <AlertCircle className="w-3.5 h-3.5" />License expired on {niprExpiredOn} per NIPR. This agency can't be added until the license is renewed.
+                </span>
+              )}
             </div>
           </div>
 
@@ -10718,10 +10864,23 @@ function AddAgencyForm({ isDark, onSaveForLater, onDiscard, initialDraft, c, btn
               onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
               Discard
             </button>
-            <button onClick={handleSubmit}
+            {/* Submit is blocked when the license came back expired
+                from NIPR — phase 1 rule: don't let Shannon create an
+                agency whose license isn't currently active. */}
+            <button
+              onClick={() => { if (niprState !== "expired") handleSubmit(); }}
+              disabled={niprState === "expired"}
+              title={niprState === "expired" ? "Can't submit — the license is expired per NIPR." : undefined}
               className="text-[13px] font-semibold text-white transition-all"
-              style={{ ...font, background: btnGrad, padding:"10px 24px", borderRadius:"5.58px" }}
-              onMouseEnter={e => (e.currentTarget.style.filter = "brightness(1.10)")}
+              style={{
+                ...font,
+                background: btnGrad,
+                padding:"10px 24px",
+                borderRadius:"5.58px",
+                opacity: niprState === "expired" ? 0.5 : 1,
+                cursor: niprState === "expired" ? "not-allowed" : "pointer",
+              }}
+              onMouseEnter={e => { if (niprState !== "expired") e.currentTarget.style.filter = "brightness(1.10)"; }}
               onMouseLeave={e => (e.currentTarget.style.filter = "none")}>
               Submit
             </button>
