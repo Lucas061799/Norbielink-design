@@ -632,7 +632,7 @@ function LoginView({ c, font, inputStyle, labelStyle, primaryBtnStyle, btnGrad, 
         >
           {remember && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
         </span>
-        Remember me
+        Remember me for 30 days
       </label>
 
       <button type="button" disabled={!enabled} onClick={onContinue} style={primaryBtnStyle(enabled)}>
@@ -1566,7 +1566,7 @@ function SignupView({ c, font, inputStyle, labelStyle, primaryBtnStyle, btnGrad,
         >
           {remember && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
         </span>
-        Remember me
+        Remember me for 30 days
       </label>
 
       <button type="button" disabled={!allValid} onClick={onContinue} style={primaryBtnStyle(allValid)}>

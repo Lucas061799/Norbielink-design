@@ -128,6 +128,12 @@ export default function Sidenav({ isDark = false, onToggleDark, activeItem = "Ma
     return `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}`;
   };
   const userId = "johnsmith01"; // system-assigned, shown as @userId, never edited by the user
+  // The agency this external user belongs to. Mirrors mockAgencies[0] (Acme Insurance Agency)
+  // in Agencies.tsx, which is what clientMode pins the Agency detail view to.
+  const agencyName = "Acme Insurance Agency";
+  // Whether this user's agency is on the ProSuite plan. Gates the small razz PRO
+  // badge on the avatar — non-Pro users shouldn't see it (they're on the base plan).
+  const isProSuite = true;
   // Inline validation (required-field) for the User Name fields. Duplicates are allowed.
   const [userNameError, setUserNameError] = useState<string | null>(null);
   // Top-right success toast that appears after a successful profile save.
@@ -168,9 +174,10 @@ export default function Sidenav({ isDark = false, onToggleDark, activeItem = "Ma
     { label: "Clients",           icon: <Users      className="w-[18px] h-[18px]" /> },
     { label: "ProSuite",          icon: <Briefcase  className="w-[18px] h-[18px]" />, badge: "PRO", hasChevron: true },
     { label: "Make a Payment",    icon: <CreditCard className="w-[18px] h-[18px]" /> },
-    { label: "Payment Info",      icon: <Calculator className="w-[18px] h-[18px]" />, hasChevron: true, children: [
+    { label: "Accounting",        icon: <Calculator className="w-[18px] h-[18px]" />, hasChevron: true, children: [
       { label: "eCheck / Credit Authorization Form" },
       { label: "Payment Types" },
+      { label: "Statements" },
     ] },
     { label: "Endorsements",      icon: <FileEdit   className="w-[18px] h-[18px]" /> },
     { label: "Tools & Resources", icon: <Wrench     className="w-[18px] h-[18px]" />, hasChevron: true },
@@ -225,36 +232,65 @@ export default function Sidenav({ isDark = false, onToggleDark, activeItem = "Ma
           style={{ background: accountOpen ? (isDark ? "rgba(255,255,255,0.06)" : "#F9FAFB") : "transparent" }}
           onMouseEnter={e => { if (!accountOpen) e.currentTarget.style.background = isDark ? "rgba(255,255,255,0.06)" : "#F9FAFB"; }}
           onMouseLeave={e => { if (!accountOpen) e.currentTarget.style.background = "transparent"; }}>
-          <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden relative"
-            style={{
-              border: profilePreview ? `1px solid ${isDark ? "rgba(255,255,255,0.12)" : "#E5E7EB"}` : "2.5px solid #73C9B7",
-              background: profilePreview ? "transparent" : (isDark ? "rgba(115,201,183,0.18)" : "rgba(115,201,183,0.10)"),
-            }}>
-            {profilePreview ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={profilePreview} alt="Avatar"
-                className="absolute"
-                style={{
-                  left: "50%", top: "50%",
-                  transform: `translate(-50%, -50%) translate(${imageOffsetX * 0.22}px, ${imageOffsetY * 0.22}px) scale(${imageZoom})`,
-                  transformOrigin: "center",
-                  width: "100%", height: "100%",
-                  objectFit: "cover",
-                }} />
-            ) : (
+          {/* Avatar + corner PRO badge. The PRO pill sits as a crown-style badge
+              in the bottom-right of the avatar — same trick the TopBar bell uses
+              for unread count — so the plan tier is always visible without
+              competing with the name for horizontal space. */}
+          <div className="relative flex-shrink-0">
+            <div className="w-9 h-9 rounded-full flex items-center justify-center overflow-hidden relative"
+              style={{
+                border: profilePreview ? `1px solid ${isDark ? "rgba(255,255,255,0.12)" : "#E5E7EB"}` : "2.5px solid #73C9B7",
+                background: profilePreview ? "transparent" : (isDark ? "rgba(115,201,183,0.18)" : "rgba(115,201,183,0.10)"),
+              }}>
+              {profilePreview ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={profilePreview} alt="Avatar"
+                  className="absolute"
+                  style={{
+                    left: "50%", top: "50%",
+                    transform: `translate(-50%, -50%) translate(${imageOffsetX * 0.22}px, ${imageOffsetY * 0.22}px) scale(${imageZoom})`,
+                    transformOrigin: "center",
+                    width: "100%", height: "100%",
+                    objectFit: "cover",
+                  }} />
+              ) : (
+                <span
+                  style={{
+                    fontFamily: "var(--font-montserrat), Montserrat, sans-serif",
+                    fontSize: "13px",
+                    fontWeight: 600,
+                    letterSpacing: "0.02em",
+                    background: "linear-gradient(135deg, #73C9B7 0%, #4FA897 100%)",
+                    WebkitBackgroundClip: "text",
+                    WebkitTextFillColor: "transparent",
+                    backgroundClip: "text",
+                  }}
+                >
+                  {initials}
+                </span>
+              )}
+            </div>
+            {/* Razz-gradient PRO pill, anchored to the avatar's bottom-right.
+                Only rendered for ProSuite users — base-plan agencies shouldn't
+                see it. */}
+            {isProSuite && (
               <span
+                className="absolute pointer-events-none"
                 style={{
+                  bottom: -3, right: -6,
+                  padding: "1.5px 4.5px",
+                  borderRadius: 9999,
+                  background: "linear-gradient(to right, #5C2ED4 0%, #A614C3 65%)",
+                  color: "#FFFFFF",
                   fontFamily: "var(--font-montserrat), Montserrat, sans-serif",
-                  fontSize: "13px",
-                  fontWeight: 600,
-                  letterSpacing: "0.02em",
-                  background: "linear-gradient(135deg, #73C9B7 0%, #4FA897 100%)",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                  backgroundClip: "text",
+                  fontSize: 7.5,
+                  fontWeight: 700,
+                  letterSpacing: "0.1em",
+                  lineHeight: 1,
+                  boxShadow: `0 0 0 2px ${isDark ? "#0F1120" : "#FFFFFF"}, 0 1px 3px rgba(92,46,212,0.35)`,
                 }}
               >
-                {initials}
+                PRO
               </span>
             )}
           </div>
@@ -262,8 +298,9 @@ export default function Sidenav({ isDark = false, onToggleDark, activeItem = "Ma
             <div className="text-[13px] font-bold truncate leading-tight" style={{ color: isDark ? "#F9FAFB" : "#2D3653" }}>
               {displayName}
             </div>
-            <div className="text-[11px] leading-tight truncate" style={{ color: isDark ? "#8B8FA8" : "#9CA3AF" }}>
-              ProSuite Member
+            {/* Agency subtext — the practical "who am I acting as" context. */}
+            <div className="text-[11px] truncate mt-0.5 leading-tight" style={{ color: isDark ? "#D1D5DB" : "#6B7280", fontWeight: 500 }}>
+              {agencyName}
             </div>
           </div>
           <ChevronDown className={`w-3.5 h-3.5 flex-shrink-0 transition-transform ${accountOpen ? "rotate-180" : ""}`}
@@ -541,7 +578,7 @@ export default function Sidenav({ isDark = false, onToggleDark, activeItem = "Ma
                       <span style={{ fontWeight: 500, color: muted }}>User ID:</span> {userId}
                     </div>
                     <div className="text-[12px] mt-0.5" style={{ color: muted }}>
-                      {displayName} · ProSuite Member
+                      {displayName}{isProSuite ? " · ProSuite Member" : ""} · {agencyName}
                     </div>
                   </div>
 
@@ -882,7 +919,7 @@ export default function Sidenav({ isDark = false, onToggleDark, activeItem = "Ma
                       <div className="flex-1 min-w-0">
                         <div className="text-[14px] font-bold" style={{ color: text }}>{displayName}</div>
                         <div className="text-[12px]" style={{ color: muted, marginTop: 1 }}>
-                          <span style={{ fontWeight: 600 }}>User ID:</span> {userId} · ProSuite Member
+                          <span style={{ fontWeight: 600 }}>User ID:</span> {userId}{isProSuite ? " · ProSuite Member" : ""} · {agencyName}
                         </div>
                       </div>
                     </div>

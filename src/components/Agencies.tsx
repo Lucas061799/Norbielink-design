@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { AddressAutocomplete } from "./AddressAutocomplete";
 import { StyledSelect } from "./StyledSelect";
+import LicenseAlertBanner from "./LicenseAlertBanner";
 
 const FONT = "var(--font-montserrat), Montserrat, sans-serif";
 const AGENCY_PHONE = "+1 (888) 555-0188";
@@ -740,7 +741,7 @@ const StatusPill = ({ status, isDark }: { status: string; isDark: boolean }) => 
   </span>
 );
 
-function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleStar, inactiveUserIds, setInactiveUserIds, statusInactiveUserIds, setStatusInactiveUserIds, removedUserIds, setRemovedUserIds, bookRolled, setBookRolled, allAgencies, initialTab, onNavigateToAgency, viewMode = "internal", itcRecords, setItcRecords, isSuperAdmin = true }: {
+function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleStar, inactiveUserIds, setInactiveUserIds, statusInactiveUserIds, setStatusInactiveUserIds, removedUserIds, setRemovedUserIds, bookRolled, setBookRolled, allAgencies, initialTab, onNavigateToAgency, viewMode = "internal", itcRecords, setItcRecords, isSuperAdmin = true, pageTitleOverride }: {
   agency: AgencyDetail;
   isDark: boolean;
   onBack: () => void;
@@ -773,6 +774,10 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
   // the Edit button. Defaults to true so demo/mock use is unaffected until
   // real auth wires it up.
   isSuperAdmin?: boolean;
+  // Optional override for the h1 title at the top of the detail surface.
+  // Defaults to "Admin" (client view) / "Agencies" (internal). Used by the
+  // Accounting → Statements shortcut route so the header reads "Accounting".
+  pageTitleOverride?: string;
 }) {
   // Mock role toggle for the Admin (client) section. In production internal & client are
   // separate deployments and this flag would come from auth; here we let the demo user
@@ -3207,8 +3212,15 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
           default to admin, so the header renders the h1 alone as it did originally. */}
       <div className="flex flex-col justify-center flex-shrink-0 mb-12"
         style={{ height: 71, borderBottom: `0.87px solid ${isDark ? "rgba(255,255,255,0.08)" : "#E5E7EB"}` }}>
-        <h1 className="text-[22px] font-normal" style={{ ...font, color: c.text }}>{viewMode === "client" ? "Admin" : "Agencies"}</h1>
+        <h1 className="text-[22px] font-normal" style={{ ...font, color: c.text }}>{pageTitleOverride ?? (viewMode === "client" ? "Admin" : "Agencies")}</h1>
       </div>
+
+        {/* License alert — only in client view (the user's own Admin page where
+            they'd renew). Below the "Admin" page title bar, above the agency
+            hero. */}
+        {viewMode === "client" && (
+          <LicenseAlertBanner isDark={isDark} />
+        )}
 
         {/* Back link — only useful in the internal staff view (the list is one level up).
             Hidden in client view because there's no list to return to. */}
@@ -11013,7 +11025,7 @@ function AddAgencyForm({ isDark, onSaveForLater, onDiscard, initialDraft, c, btn
 }
 
 /* ─── Component ─────────────────────────────────────────────────────────── */
-export default function Agencies({ isDark, clientMode = false }: { isDark: boolean; clientMode?: boolean }) {
+export default function Agencies({ isDark, clientMode = false, initialTab, pageTitleOverride }: { isDark: boolean; clientMode?: boolean; initialTab?: DetailTab; pageTitleOverride?: string }) {
   const [search, setSearch]           = useState("");
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("All");
   // Per-tab card-selection state — used to visually pin the active stat card
@@ -11649,6 +11661,8 @@ export default function Agencies({ isDark, clientMode = false }: { isDark: boole
         agency={getDetail(mockAgencies[0])}
         isDark={isDark}
         viewMode="client"
+        initialTab={initialTab}
+        pageTitleOverride={pageTitleOverride}
         onBack={() => { /* no list to go back to */ }}
         c={c}
         btnGrad={btnGrad}

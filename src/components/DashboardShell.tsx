@@ -11,6 +11,7 @@ import Endorsements from "@/components/Endorsements";
 import Marketplace from "@/components/Marketplace";
 import Website from "@/components/Website";
 import Pricing from "@/components/Pricing";
+import LicenseAlertBanner from "@/components/LicenseAlertBanner";
 
 interface DashboardShellProps {
   children: React.ReactNode;
@@ -32,7 +33,7 @@ export default function DashboardShell({ children, pageTitle }: DashboardShellPr
   const renderPage = () => {
     switch (activePage) {
       case "Marketplace":
-        return <Marketplace isDark={darkMode} />;
+        return <Marketplace isDark={darkMode} onNavigateToLicense={() => setActivePage("Admin")} />;
       case "Clients":
         return <Clients isDark={darkMode} />;
       case "Agencies":
@@ -47,6 +48,11 @@ export default function DashboardShell({ children, pageTitle }: DashboardShellPr
         // External-client view: same Agency detail surface, scoped to the user's
         // own (mock) agency. Distinct `key` from the Agencies case — see above.
         return <Agencies key="agencies-client" isDark={darkMode} clientMode />;
+      case "Accounting · Statements":
+        // Reuses the external-client agency surface, scoped to the user's own
+        // agency, pinned to the Accounting tab so the user lands on their
+        // Commission Statements / Statement of Account.
+        return <Agencies key="agencies-statements" isDark={darkMode} clientMode initialTab="accounting" pageTitleOverride="Accounting" />;
       case "Quotes":
         return <Quotes isDark={darkMode} />;
       case "Policies":
@@ -79,10 +85,14 @@ export default function DashboardShell({ children, pageTitle }: DashboardShellPr
         onActiveChange={setActivePage}
       />
       <div className="flex-1 flex flex-col overflow-hidden">
-        <TopBar isDark={darkMode} activePage={activePage} />
+        <TopBar
+          isDark={darkMode}
+          activePage={activePage}
+          onNavigateToLicense={() => setActivePage("Admin")}
+        />
         <main
           className="flex-1 overflow-hidden transition-colors duration-300 px-12"
-          style={(() => { const fullHeightPages = ["Clients", "Agencies", "Admin", "Quotes", "Policies", "Endorsements"]; const isFullHeight = fullHeightPages.includes(activePage); return { background: darkMode ? "#0F1120" : "#ffffff", paddingTop: isFullHeight ? 0 : 24, paddingBottom: isFullHeight ? 48 : 24, display: isFullHeight ? "flex" : "block", flexDirection: "column" as const, overflowY: isFullHeight ? "hidden" : "auto", height: isFullHeight ? "100%" : "auto" }; })()}
+          style={(() => { const fullHeightPages = ["Clients", "Agencies", "Admin", "Quotes", "Policies", "Endorsements", "Accounting · Statements"]; const isFullHeight = fullHeightPages.includes(activePage); return { background: darkMode ? "#0F1120" : "#ffffff", paddingTop: isFullHeight ? 0 : 24, paddingBottom: isFullHeight ? 48 : 24, display: isFullHeight ? "flex" : "block", flexDirection: "column" as const, overflowY: isFullHeight ? "hidden" : "auto", height: isFullHeight ? "100%" : "auto" }; })()}
         >
           {renderPage()}
         </main>
