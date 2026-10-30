@@ -1,0 +1,361 @@
+"use client";
+
+import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { X, Search, Users, ChevronDown } from "lucide-react";
+
+// -----------------------------------------------------------------------------
+// First-run Team Setup modal.
+//
+// Trigger (mock): an agency has NO user flagged as Admin, or the agency was
+// just created. The current signed-in user picks who gets Admin permission and
+// confirms each person's Job Title.
+//
+// Three dismissal surfaces (owned by DashboardShell):
+//   1. This modal   — primary push on sign-in
+//   2. Banner       — fallback on the Marketplace home when the modal is X'd
+//   3. Bell entry   — final fallback when the banner is X'd
+//
+// Visual language matches Agencies > Add User modal: 2xl rounded card, 620px
+// wide, Montserrat throughout, razz-gradient primary CTA. The row-level
+// controls — Job Title dropdown + Admin toggle — are 1:1 with the Add User
+// counterparts so the two surfaces read as one system.
+// -----------------------------------------------------------------------------
+
+const FONT = "var(--font-montserrat), Montserrat, sans-serif";
+const RAZZ_GRAD = "linear-gradient(88.54deg, #5C2ED4 0.1%, #A614C3 63.88%)";
+const JOB_TITLES = ["Principal", "Producer", "CSR", "Accounting", "Account Manager"];
+
+type MockUser = {
+  id: string;
+  name: string;
+  email: string;
+  jobTitle: string;
+  isAdmin: boolean;
+};
+
+// Mock seed — matches the Acme Insurance Agency (agencyId=1) roster in
+// Agencies.tsx, EXCEPT nobody starts as admin. That's the whole point of the
+// prompt: the signed-in user needs to pick admins.
+const SEED_USERS: MockUser[] = [
+  { id: "u1",  name: "Jason Smith",  email: "jason@acmeins.com",   jobTitle: "Principal", isAdmin: false },
+  { id: "u3",  name: "Tom Garfield", email: "tom.g@acmeins.com",   jobTitle: "Producer",  isAdmin: false },
+  { id: "u4",  name: "Amy Chen",     email: "amy.chen@acmeins.com",jobTitle: "Producer",  isAdmin: false },
+  { id: "u5",  name: "Brian Nguyen", email: "b.nguyen@acmeins.com",jobTitle: "Producer",  isAdmin: false },
+  { id: "u6",  name: "Sandra Park",  email: "s.park@acmeins.com",  jobTitle: "",          isAdmin: false },
+  { id: "u7",  name: "Lisa Wong",    email: "l.wong@acmeins.com",  jobTitle: "CSR",       isAdmin: false },
+  { id: "u10", name: "Diane Kim",    email: "d.kim@acmeins.com",   jobTitle: "Accounting",isAdmin: false },
+];
+
+interface TeamSetupModalProps {
+  isDark: boolean;
+  open: boolean;
+  onClose: () => void;       // X or Cancel
+  onRemindLater: () => void; // "Remind me later" — same effect as X in the mock
+  onSave: (users: MockUser[]) => void;
+}
+
+export default function TeamSetupModal({ isDark, open, onClose, onRemindLater, onSave }: TeamSetupModalProps) {
+  const [users, setUsers] = useState<MockUser[]>(SEED_USERS);
+  const [query, setQuery] = useState("");
+  // One dropdown open at a time, keyed by user id ("" = none).
+  const [openTitleFor, setOpenTitleFor] = useState<string>("");
+  const titleId = useId();
+  const closeBtnRef = useRef<HTMLButtonElement | null>(null);
+
+  // Escape closes the modal — matches the DS Dialog convention. Only wired
+  // while the modal is open so stray listeners don't pile up.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  // Move keyboard focus into the dialog on open so Tab lands on in-dialog
+  // controls, not whatever was focused on the page behind the overlay.
+  useEffect(() => {
+    if (open) closeBtnRef.current?.focus();
+  }, [open]);
+
+  const bg          = isDark ? "#1E2240" : "#FFFFFF";
+  const text        = isDark ? "#F9FAFB" : "#1F2937";
+  const muted       = isDark ? "#9CA3AF" : "#6B7280";
+  const border      = isDark ? "rgba(255,255,255,0.10)" : "#E5E7EB";
+  const rowDivider  = isDark ? "rgba(255,255,255,0.06)" : "#F3F4F6";
+  const fieldBg     = isDark ? "rgba(255,255,255,0.04)" : "#FFFFFF";
+  const searchBg    = isDark ? "rgba(255,255,255,0.04)" : "#F9FAFB";
+  const togglePillBg= isDark ? "rgba(255,255,255,0.04)" : "#F8FAFC";
+
+  const hasPrincipal = useMemo(() => users.some(u => u.jobTitle === "Principal"), [users]);
+  const adminCount   = useMemo(() => users.filter(u => u.isAdmin).length, [users]);
+  const missingTitleCount = useMemo(() => users.filter(u => !u.jobTitle).length, [users]);
+
+  // Save only requires at least one admin — the whole point of the prompt is
+  // to gate the agency on having someone in charge. Job Titles are nice-to-
+  // have but NOT a save blocker: with 200+ users on a real agency, forcing
+  // every title at setup time is a show-stopper. Anything blank can be
+  // filled in later from the Users tab (per-row dropdown) or via Edit User.
+  const canSave = adminCount > 0;
+
+  const filteredIds = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return new Set(users.map(u => u.id));
+    return new Set(
+      users.filter(u => u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)).map(u => u.id),
+    );
+  }, [users, query]);
+
+  if (!open) return null;
+
+  const updateUser = (id: string, patch: Partial<MockUser>) =>
+    setUsers(prev => prev.map(u => (u.id === id ? { ...u, ...patch } : u)));
+
+  const toggleAdmin = (id: string) => {
+    const u = users.find(x => x.id === id);
+    if (!u) return;
+    updateUser(id, { isAdmin: !u.isAdmin });
+  };
+
+  const setTitle = (id: string, title: string) => {
+    updateUser(id, { jobTitle: title });
+    setOpenTitleFor("");
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[70] flex items-center justify-center"
+      style={{ background: "rgba(0,0,0,0.45)" }}
+      onClick={() => { setOpenTitleFor(""); onClose(); }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="rounded-2xl w-[640px] max-w-[95vw] max-h-[92vh] flex flex-col"
+        style={{ background: bg, boxShadow: "0 20px 60px rgba(0,0,0,0.25)", fontFamily: FONT }}
+        onClick={e => { e.stopPropagation(); setOpenTitleFor(""); }}
+      >
+        {/* Header — razz-tinted icon tile + title + close, mirroring the
+            "Import users from legacy BTIS" header. */}
+        <div className="flex items-start justify-between px-7 pt-6 pb-5 flex-shrink-0" style={{ borderBottom: `1px solid ${border}` }}>
+          <div className="flex items-start gap-3 flex-1 min-w-0">
+            <div
+              className="flex items-center justify-center flex-shrink-0 rounded-lg"
+              style={{ width: 48, height: 48, background: "rgba(166, 20, 195, 0.10)" }}
+            >
+              <Users className="w-5 h-5" style={{ color: "#A614C3" }} strokeWidth={2} />
+            </div>
+            <div className="flex-1 min-w-0 pt-0.5">
+              <h2 id={titleId} className="text-[18px] font-bold" style={{ fontFamily: FONT, color: text }}>
+                Set up your team
+              </h2>
+              <p className="text-[12.5px] mt-1" style={{ fontFamily: FONT, color: muted, lineHeight: 1.5 }}>
+                Nobody is set as Admin yet. Pick who manages this agency and confirm each person&apos;s Job Title.
+              </p>
+            </div>
+          </div>
+          <button
+            ref={closeBtnRef}
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="p-1.5 rounded-md flex-shrink-0 transition-colors cursor-pointer"
+            style={{ background: "transparent", border: "none", color: muted, marginTop: 2, marginRight: -4 }}
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Search */}
+        <div className="px-7 pt-5 pb-4 flex-shrink-0">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: muted }} />
+            <input
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder="Search name or email..."
+              className="w-full outline-none"
+              style={{
+                background: searchBg,
+                border: `1px solid ${border}`,
+                borderRadius: 12,
+                padding: "10px 12px 10px 36px",
+                fontFamily: FONT,
+                fontSize: 13,
+                color: text,
+                boxSizing: "border-box",
+              }}
+            />
+          </div>
+        </div>
+
+        {/* User list */}
+        <div className="overflow-y-auto flex-1 px-7" style={{ minHeight: 160 }}>
+          {users.map((u, i) => {
+            const visible = filteredIds.has(u.id);
+            if (!visible) return null;
+            const isLast = i === users.length - 1;
+            const titleOpen = openTitleFor === u.id;
+            // Principal is capped at one across the agency; disable the option
+            // in every OTHER user's dropdown once someone holds it. Matches the
+            // "Only 1 allowed" rule in the Add User modal.
+            const principalTakenByOther = hasPrincipal && u.jobTitle !== "Principal";
+            return (
+              <div
+                key={u.id}
+                className="flex items-center gap-3 py-3"
+                style={{ borderBottom: isLast ? "none" : `1px solid ${rowDivider}` }}
+              >
+                {/* Name + email */}
+                <div className="flex-1 min-w-0">
+                  <div className="text-[13.5px] font-semibold truncate" style={{ fontFamily: FONT, color: text }}>
+                    {u.name}
+                  </div>
+                  <div className="text-[11.5px] mt-0.5 truncate" style={{ fontFamily: FONT, color: muted }}>
+                    {u.email}
+                  </div>
+                </div>
+
+                {/* Job Title dropdown — same DropTrigger shape as Add User. */}
+                <div className="relative flex-shrink-0" style={{ width: 170 }}>
+                  <button
+                    type="button"
+                    onClick={e => { e.stopPropagation(); setOpenTitleFor(titleOpen ? "" : u.id); }}
+                    className="w-full px-3 py-2 rounded-lg text-[12.5px] flex items-center justify-between transition-colors cursor-pointer"
+                    style={{
+                      fontFamily: FONT,
+                      background: fieldBg,
+                      border: `1px solid ${border}`,
+                      color: u.jobTitle ? text : muted,
+                      boxSizing: "border-box",
+                    }}
+                  >
+                    <span className="truncate">{u.jobTitle || "Select title"}</span>
+                    <ChevronDown className="w-3.5 h-3.5 flex-shrink-0 ml-1" style={{ color: muted }} />
+                  </button>
+                  {titleOpen && (
+                    <div
+                      className="absolute left-0 right-0 top-full mt-1 rounded-lg overflow-y-auto z-20"
+                      style={{ background: bg, boxShadow: "0 8px 24px rgba(0,0,0,0.18)", border: `1px solid ${border}`, maxHeight: 220 }}
+                    >
+                      {JOB_TITLES.map(t => {
+                        const disabled = t === "Principal" && principalTakenByOther;
+                        const selected = u.jobTitle === t;
+                        return (
+                          <button
+                            key={t}
+                            type="button"
+                            disabled={disabled}
+                            onClick={e => { e.stopPropagation(); if (!disabled) setTitle(u.id, t); }}
+                            className="w-full text-left px-3 py-2 text-[12.5px] transition-colors"
+                            style={{
+                              fontFamily: FONT,
+                              color: disabled ? muted : text,
+                              background: selected ? (isDark ? "rgba(255,255,255,0.08)" : "#F9FAFB") : "transparent",
+                              cursor: disabled ? "not-allowed" : "pointer",
+                              opacity: disabled ? 0.6 : 1,
+                            }}
+                            onMouseEnter={e => { if (!disabled) e.currentTarget.style.background = isDark ? "rgba(255,255,255,0.08)" : "#F9FAFB"; }}
+                            onMouseLeave={e => (e.currentTarget.style.background = selected ? (isDark ? "rgba(255,255,255,0.08)" : "#F9FAFB") : "transparent")}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span>{t}</span>
+                              {disabled && (
+                                <span className="text-[10px] italic flex-shrink-0" style={{ color: muted }}>Only 1 allowed</span>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Admin toggle — identical pattern to Add User's toggle. */}
+                <div
+                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg flex-shrink-0"
+                  style={{ background: togglePillBg }}
+                >
+                  <span className="text-[11.5px] font-medium" style={{ fontFamily: FONT, color: text }}>Admin</span>
+                  <button
+                    type="button"
+                    onClick={() => toggleAdmin(u.id)}
+                    aria-label={u.isAdmin ? `Remove ${u.name} as admin` : `Make ${u.name} admin`}
+                    className="relative transition-all flex-shrink-0 cursor-pointer"
+                    style={{
+                      width: 34,
+                      height: 20,
+                      borderRadius: 9999,
+                      border: "none",
+                      padding: 0,
+                      background: u.isAdmin ? RAZZ_GRAD : "#D1D5DB",
+                    }}
+                  >
+                    <div
+                      className="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all"
+                      style={{ left: u.isAdmin ? 16 : 2 }}
+                    />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+
+          {filteredIds.size === 0 && (
+            <div className="py-8 text-center text-[12.5px]" style={{ fontFamily: FONT, color: muted }}>
+              No users match &quot;{query}&quot;.
+            </div>
+          )}
+        </div>
+
+        {/* Footer — status line + actions */}
+        <div
+          className="flex items-center justify-between px-7 py-4 flex-shrink-0 gap-3"
+          style={{ borderTop: `1px solid ${border}` }}
+        >
+          <div className="text-[12px] min-w-0" style={{ fontFamily: FONT, color: muted }}>
+            <span style={{ color: adminCount > 0 ? "#A614C3" : muted, fontWeight: 600 }}>
+              {adminCount} admin{adminCount === 1 ? "" : "s"} selected
+            </span>
+            {missingTitleCount > 0 && (
+              <>
+                {" · "}
+                <span>{missingTitleCount} without Job Title — you can add them later</span>
+              </>
+            )}
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button
+              type="button"
+              onClick={onRemindLater}
+              className="px-3.5 py-2 rounded-lg text-[12.5px] font-semibold transition-colors cursor-pointer"
+              style={{
+                fontFamily: FONT,
+                background: "transparent",
+                border: `1px solid ${border}`,
+                color: text,
+              }}
+            >
+              Remind me later
+            </button>
+            <button
+              type="button"
+              disabled={!canSave}
+              onClick={() => onSave(users)}
+              className="px-4 py-2 rounded-lg text-[12.5px] font-semibold text-white whitespace-nowrap transition-all"
+              style={{
+                fontFamily: FONT,
+                background: canSave ? RAZZ_GRAD : "#C7C9D4",
+                border: "none",
+                cursor: canSave ? "pointer" : "not-allowed",
+                opacity: canSave ? 1 : 0.75,
+              }}
+            >
+              Save team ({adminCount})
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

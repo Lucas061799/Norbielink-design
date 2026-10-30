@@ -13,7 +13,9 @@ import {
 } from "lucide-react";
 import { AddressAutocomplete } from "./AddressAutocomplete";
 import { StyledSelect } from "./StyledSelect";
-import LicenseAlertBanner from "./LicenseAlertBanner";
+// LicenseAlertBanner render paused on 2026-10-30; import kept out so the file
+// doesn't carry an unused import warning. Re-add when License expiration ships.
+// import LicenseAlertBanner from "./LicenseAlertBanner";
 
 const FONT = "var(--font-montserrat), Montserrat, sans-serif";
 const AGENCY_PHONE = "+1 (888) 555-0188";
@@ -741,7 +743,7 @@ const StatusPill = ({ status, isDark }: { status: string; isDark: boolean }) => 
   </span>
 );
 
-function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleStar, inactiveUserIds, setInactiveUserIds, statusInactiveUserIds, setStatusInactiveUserIds, removedUserIds, setRemovedUserIds, bookRolled, setBookRolled, allAgencies, initialTab, onNavigateToAgency, viewMode = "internal", itcRecords, setItcRecords, isSuperAdmin = true, pageTitleOverride }: {
+function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleStar, inactiveUserIds, setInactiveUserIds, statusInactiveUserIds, setStatusInactiveUserIds, removedUserIds, setRemovedUserIds, bookRolled, setBookRolled, allAgencies, initialTab, onNavigateToAgency, viewMode = "internal", itcRecords, setItcRecords, isSuperAdmin = true, pageTitleOverride, spotlightUsers = false, onSpotlightConsumed, spotlightActive = false, onSpotlightDismiss, onOpenTeamSetup }: {
   agency: AgencyDetail;
   isDark: boolean;
   onBack: () => void;
@@ -778,6 +780,23 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
   // Defaults to "Admin" (client view) / "Agencies" (internal). Used by the
   // Accounting → Statements shortcut route so the header reads "Accounting".
   pageTitleOverride?: string;
+  // Set true by the shell right after the user dismisses the first-run Team
+  // Setup modal — jumps to the Users tab and pops a dismissible razz-tinted
+  // coachmark above the user table so they can see where to assign admins.
+  // `onSpotlightConsumed` fires once the user dismisses the coachmark or the
+  // auto-dismiss timer expires, letting the shell flip the prop back off.
+  spotlightUsers?: boolean;
+  onSpotlightConsumed?: () => void;
+  // Lifted spotlight-visible state: shared with the TopBar bell so the
+  // coachmark + the bell halo stay in sync. The shell dismisses via
+  // onSpotlightDismiss (any-click-outside, X, or its 8s timer).
+  spotlightActive?: boolean;
+  onSpotlightDismiss?: () => void;
+  // Optional: when supplied, the spotlight coachmark surfaces an "Open bulk
+  // setup" button that reopens the shell-owned Team Setup modal. Lets users
+  // jump back to the one-shot "set everyone at once" flow without hunting
+  // for a trigger.
+  onOpenTeamSetup?: () => void;
 }) {
   // Mock role toggle for the Admin (client) section. In production internal & client are
   // separate deployments and this flag would come from auth; here we let the demo user
@@ -914,6 +933,19 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
   const [stmtDownloadFor, setStmtDownloadFor] = useState<string | null>(null);
   const [stmtPreviewExpanded, setStmtPreviewExpanded] = useState(false);
   const [detailTab, setDetailTab] = useState<DetailTab>(initialTab ?? "overview");
+  // Jump to the Users tab the moment the shell asks us to spotlight; signal
+  // consumption so the shell can clear its one-shot prop. The coachmark's
+  // own render + 8s auto-dismiss are now driven by `spotlightActive` (lifted
+  // to shell so the TopBar bell halo stays in sync).
+  useEffect(() => {
+    if (!spotlightUsers) return;
+    setDetailTab("users");
+    onSpotlightConsumed?.();
+  }, [spotlightUsers, onSpotlightConsumed]);
+  // Alias so the existing JSX reads naturally. Dismiss handlers call
+  // `onSpotlightDismiss` (shell-owned) instead of a local setter.
+  const usersSpotlightCallout = spotlightActive;
+  const dismissSpotlight = () => onSpotlightDismiss?.();
   const [isEditing, setIsEditing]           = useState(false);
   const [editExpanded, setEditExpanded]     = useState(false);
   // Read-only "view expanded" side panel for the Agency Information card
@@ -1903,6 +1935,11 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
   const [agencyContactOverride, setAgencyContactOverride] = useState<string | null>(null);
   // Track users granted admin permissions via the Principal-reassign flow (Principal implies admin).
   const [adminGrantOverrides, setAdminGrantOverrides] = useState<Set<string>>(new Set());
+  // Inline Admin-column overrides: lets the user click an Admin cell in the
+  // user table to toggle admin on/off per user without opening Edit User.
+  // Takes precedence over the raw `u.isAdmin` + Principal-reassignment grants
+  // when present; falls back to those when the user hasn't touched the cell.
+  const [inlineAdminOverrides, setInlineAdminOverrides] = useState<Map<string, boolean>>(new Map());
   // ── Documents tab state (demo only — files are mock entries; uploads add rows but don't store anything). ──
   type AgencyDocCategory = "bor" | "w9" | "license" | "agreement" | "other" | "eo";
   type AgencyDoc = { id: string; category: AgencyDocCategory; name: string; date: string; size?: string; archived?: boolean; trashed?: boolean };
@@ -3215,12 +3252,10 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
         <h1 className="text-[22px] font-normal" style={{ ...font, color: c.text }}>{pageTitleOverride ?? (viewMode === "client" ? "Admin" : "Agencies")}</h1>
       </div>
 
-        {/* License alert — only in client view (the user's own Admin page where
-            they'd renew). Below the "Admin" page title bar, above the agency
-            hero. */}
-        {viewMode === "client" && (
-          <LicenseAlertBanner isDark={isDark} />
-        )}
+        {/* License alert banner paused — see 2026-10-30 pivot to the Team
+            Setup prompt (owned by DashboardShell). Re-enable this slot when
+            the License expiration flow lands.
+            {viewMode === "client" && <LicenseAlertBanner isDark={isDark} />} */}
 
         {/* Back link — only useful in the internal staff view (the list is one level up).
             Hidden in client view because there's no list to return to. */}
@@ -7901,7 +7936,119 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
 
         {/* ── Users tab ── */}
         {detailTab === "users" && (
-          <div className="flex flex-col" onClick={() => { setUserMenuId(null); setUserMenuPos(null); setJobTitleOpen(false); }}>
+          <>
+            {/* Spotlight dim/blur backdrop — only while the Team Setup
+                coachmark is up. Dims + softly blurs the entire chrome so the
+                coachmark alone reads as the lit island below. The backdrop
+                itself is clickable: a tap anywhere outside the coachmark
+                dismisses the spotlight (same as the X). */}
+            {usersSpotlightCallout && (
+              <div
+                className="fixed inset-0"
+                onClick={() => dismissSpotlight()}
+                aria-label="Dismiss tip"
+                role="button"
+                tabIndex={-1}
+                style={{
+                  background: "rgba(0,0,0,0.35)",
+                  backdropFilter: "blur(2px)",
+                  WebkitBackdropFilter: "blur(2px)",
+                  zIndex: 40,
+                  cursor: "default",
+                  animation: "teamSetupSpotlightIn 220ms ease-out",
+                }}
+              />
+            )}
+            <div
+              className="flex flex-col"
+              onClick={() => { setUserMenuId(null); setUserMenuPos(null); setJobTitleOpen(false); }}
+            >
+            {/* Team-setup coachmark — raised by the shell when the user X's
+                the first-run Team Setup modal, so after landing on this tab
+                they immediately see where to assign admins & titles.
+                Styled to match the Legacy BTIS banner below (neutral card +
+                razz-gradient icon stroke + razz-gradient title text) so the
+                two push-prompts on this tab read as one family instead of
+                shouting with a hard razz border. Auto-dismisses in 8s or on
+                the X. */}
+            {usersSpotlightCallout && (
+              <div
+                className="rounded-xl p-4 mb-4 flex items-start gap-3"
+                // Click within the coachmark should NOT dismiss (the user may
+                // be reading or heading for the Open bulk setup button).
+                // Only backdrop clicks dismiss — see the backdrop above.
+                onClick={e => e.stopPropagation()}
+                style={{
+                  background: isDark ? "#1E2240" : "#F9FAFB",
+                  border: `1px solid ${c.border}`,
+                  // Lifts the coachmark above the fixed dim backdrop so it
+                  // reads as the sole lit island.
+                  position: "relative",
+                  zIndex: 41,
+                  boxShadow: isDark
+                    ? "0 20px 48px rgba(0,0,0,0.45)"
+                    : "0 20px 48px rgba(0,0,0,0.12)",
+                }}
+              >
+                <svg className="w-5 h-5 flex-shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <defs>
+                    <linearGradient id="team-coach-razz" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="24" y2="0">
+                      <stop offset="0%" stopColor={isDark ? "#C9A6FF" : "#5C2ED4"} />
+                      <stop offset="100%" stopColor={isDark ? "#E68BF2" : "#A614C3"} />
+                    </linearGradient>
+                  </defs>
+                  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" stroke="url(#team-coach-razz)" />
+                  <circle cx="9" cy="7" r="4" stroke="url(#team-coach-razz)" />
+                  <path d="M22 21v-2a4 4 0 0 0-3-3.87" stroke="url(#team-coach-razz)" />
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75" stroke="url(#team-coach-razz)" />
+                </svg>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[13px] font-semibold"
+                    style={{
+                      ...font,
+                      backgroundImage: isDark
+                        ? "linear-gradient(88.54deg, #C9A6FF 0.1%, #E68BF2 63.88%)"
+                        : "linear-gradient(88.54deg, #5C2ED4 0.1%, #A614C3 63.88%)",
+                      backgroundClip: "text",
+                      WebkitBackgroundClip: "text",
+                      WebkitTextFillColor: "transparent",
+                    }}>
+                    Assign admins & titles here
+                  </div>
+                  <div className="text-[12px] mt-0.5" style={{ ...font, color: c.muted }}>
+                    Click the <span style={{ fontWeight: 600, color: c.text }}>Admin</span> icon in any row to grant or revoke admin. For <span style={{ fontWeight: 600, color: c.text }}>Job Title</span> changes, use the <span style={{ fontWeight: 600, color: c.text }}>⋮</span> menu → Edit User, or reopen the bulk setup.
+                  </div>
+                </div>
+                {onOpenTeamSetup && (
+                  <button
+                    type="button"
+                    onClick={() => { onOpenTeamSetup(); dismissSpotlight(); }}
+                    className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold text-white whitespace-nowrap transition-all cursor-pointer self-start"
+                    style={{
+                      ...font,
+                      background: "linear-gradient(90deg, #5C2ED4 0%, #A614C3 65%)",
+                      border: "none",
+                      marginTop: 0,
+                    }}
+                  >
+                    Open bulk setup
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => dismissSpotlight()}
+                  aria-label="Dismiss tip"
+                  className="flex-shrink-0 cursor-pointer self-start"
+                  style={{
+                    background: "transparent", border: "none", padding: 2,
+                    color: isDark ? "#8B8FA8" : "#9CA3AF",
+                    marginTop: 2, marginRight: -4,
+                  }}
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
             {/* Legacy BTIS auto-detect banner — shown when there are new
                 users on the legacy admin page that haven't been copied
                 to NorbieLink yet. External-admin only (clientMode); the
@@ -7946,19 +8093,29 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                   </div>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
-                  <button onClick={() => setLegacyBannerDismissed(true)}
-                    className="px-3 py-1.5 text-[12px] font-semibold rounded-lg transition-colors whitespace-nowrap"
-                    style={{ ...font, color: c.text, background: isDark ? "rgba(255,255,255,0.04)" : "#FFFFFF", border: `1px solid ${c.border}` }}
-                    onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
-                    onMouseLeave={e => (e.currentTarget.style.background = isDark ? "rgba(255,255,255,0.04)" : "#FFFFFF")}>
-                    Not now
-                  </button>
                   <button onClick={openLegacyImport}
                     className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold text-white rounded-lg transition-all whitespace-nowrap"
                     style={{ ...font, background: btnGrad }}
                     onMouseEnter={e => (e.currentTarget.style.filter = "brightness(1.08)")}
                     onMouseLeave={e => (e.currentTarget.style.filter = "none")}>
                     Review & import
+                  </button>
+                  {/* Dismiss — collapsed from a labeled "Not now" button into an
+                      icon-only X to match the Team Setup coachmark pattern and
+                      drop a redundant verbal control next to the primary CTA. */}
+                  <button
+                    onClick={() => setLegacyBannerDismissed(true)}
+                    aria-label="Dismiss legacy BTIS import prompt"
+                    className="flex-shrink-0 cursor-pointer self-start"
+                    style={{
+                      background: "transparent",
+                      border: "none",
+                      padding: 2,
+                      color: isDark ? "#8B8FA8" : "#9CA3AF",
+                      marginTop: 2,
+                      marginRight: -4,
+                    }}>
+                    <X className="w-4 h-4" />
                   </button>
                 </div>
               </div>
@@ -8243,11 +8400,47 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                         <div className="text-[13px] font-semibold truncate" style={{ fontFamily:FONT, color:c.text }}>{u.name}</div>
                       </div>
 
-                      {/* Admin — render gear icon when the user has admin permissions (including auto-grants from Principal reassignment). */}
-                      <div className="flex items-center justify-center">
-                        {(u.isAdmin || adminGrantOverrides.has(u.id))
-                          ? <GradientUserCog size={18} />
-                          : <span className="text-[13px]" style={{ fontFamily: FONT, color: c.muted }}>—</span>}
+                      {/* Admin — inline toggle button. Click to flip admin
+                          on/off for this user without opening Edit User.
+                          `inlineAdminOverrides` wins when present; otherwise
+                          we fall back to the raw `u.isAdmin` + any grant
+                          that came from a Principal reassignment. */}
+                      <div className="flex items-center justify-center" onClick={e => e.stopPropagation()}>
+                        {(() => {
+                          const effectiveIsAdmin = inlineAdminOverrides.has(u.id)
+                            ? !!inlineAdminOverrides.get(u.id)
+                            : (u.isAdmin || adminGrantOverrides.has(u.id));
+                          const toggle = () => {
+                            setInlineAdminOverrides(prev => {
+                              const next = new Map(prev);
+                              next.set(u.id, !effectiveIsAdmin);
+                              return next;
+                            });
+                          };
+                          return (
+                            <button
+                              type="button"
+                              onClick={toggle}
+                              aria-label={effectiveIsAdmin ? `Revoke admin from ${u.name}` : `Grant admin to ${u.name}`}
+                              aria-pressed={effectiveIsAdmin}
+                              title={effectiveIsAdmin ? "Admin — click to revoke" : "Not admin — click to grant"}
+                              className="flex items-center justify-center rounded-md transition-all cursor-pointer"
+                              style={{
+                                width: 32,
+                                height: 32,
+                                background: "transparent",
+                                border: "none",
+                                padding: 0,
+                              }}
+                              onMouseEnter={e => (e.currentTarget.style.background = c.hoverBg)}
+                              onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                            >
+                              {effectiveIsAdmin
+                                ? <GradientUserCog size={18} />
+                                : <span className="text-[13px]" style={{ fontFamily: FONT, color: c.muted }}>—</span>}
+                            </button>
+                          );
+                        })()}
                       </div>
 
                       {/* Job title */}
@@ -8409,6 +8602,13 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
               </div>
             </div>
           </div>
+            <style>{`
+              @keyframes teamSetupSpotlightIn {
+                from { opacity: 0; backdrop-filter: blur(0px); -webkit-backdrop-filter: blur(0px); }
+                to   { opacity: 1; backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px); }
+              }
+            `}</style>
+          </>
         )}
 
       {/* ── Add/Edit User Modal ── */}
@@ -11025,7 +11225,7 @@ function AddAgencyForm({ isDark, onSaveForLater, onDiscard, initialDraft, c, btn
 }
 
 /* ─── Component ─────────────────────────────────────────────────────────── */
-export default function Agencies({ isDark, clientMode = false, initialTab, pageTitleOverride }: { isDark: boolean; clientMode?: boolean; initialTab?: DetailTab; pageTitleOverride?: string }) {
+export default function Agencies({ isDark, clientMode = false, initialTab, pageTitleOverride, spotlightUsers = false, onSpotlightConsumed, spotlightActive = false, onSpotlightDismiss, onOpenTeamSetup }: { isDark: boolean; clientMode?: boolean; initialTab?: DetailTab; pageTitleOverride?: string; spotlightUsers?: boolean; onSpotlightConsumed?: () => void; spotlightActive?: boolean; onSpotlightDismiss?: () => void; onOpenTeamSetup?: () => void }) {
   const [search, setSearch]           = useState("");
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("All");
   // Per-tab card-selection state — used to visually pin the active stat card
@@ -11679,6 +11879,11 @@ export default function Agencies({ isDark, clientMode = false, initialTab, pageT
         allAgencies={allAgencies}
         itcRecords={itcRecords}
         setItcRecords={setItcRecords}
+        spotlightUsers={spotlightUsers}
+        onSpotlightConsumed={onSpotlightConsumed}
+        spotlightActive={spotlightActive}
+        onSpotlightDismiss={onSpotlightDismiss}
+        onOpenTeamSetup={onOpenTeamSetup}
       />
     );
   }

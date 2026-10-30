@@ -2,16 +2,25 @@
 
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
-import { Search, Bell, AlertCircle, Wrench, Clock, X, RotateCcw } from "lucide-react";
+import { Search, Bell, Users, Wrench, X, RotateCcw } from "lucide-react";
 import btisLogo from "@/assets/btislogo.png";
 
 interface TopBarProps {
   isDark?: boolean;
   activePage?: string;
-  onNavigateToLicense?: () => void;
+  // Team Setup prompt plumbing. The shell owns the state; the bell shows a
+  // mirror entry whenever `teamSetupBellVisible` is true and routes a click
+  // back to `onOpenTeamSetup`.
+  teamSetupBellVisible?: boolean;
+  // When the shell raises the Users-tab coachmark it also halos the bell so
+  // the user sees "this prompt also lives here" at the same beat. True while
+  // the spotlight is on; cleared when the spotlight dismisses.
+  teamSetupBellSpotlight?: boolean;
+  onOpenTeamSetup?: () => void;
+  onDismissTeamSetupBell?: () => void;
 }
 
-type NotifType = "license-expired" | "license-expiring" | "maintenance";
+type NotifType = "team-setup" | "maintenance";
 
 type Notification = {
   id: string;
@@ -26,22 +35,17 @@ const FONT = "var(--font-montserrat), Montserrat, sans-serif";
 const RAZZ = "#A614C3";
 const RAZZ_DEEP = "#5C2ED4";
 
+// License entries pulled on 2026-10-30 pivot. See DashboardShell for the
+// Team Setup prompt wiring: this bell entry is the final fallback surface
+// after the modal and inline banner get dismissed.
 const INITIAL_NOTIFS: Notification[] = [
   {
-    id: "lic-expired-acme",
-    type: "license-expired",
-    title: "License expired",
-    body: "Acme Insurance Agency's California license expired on 09/15/2026. Renew now to keep writing business.",
-    timestamp: "2 days ago",
-    actionLabel: "Renew license",
-  },
-  {
-    id: "lic-expiring-15",
-    type: "license-expiring",
-    title: "License expires in 15 days",
-    body: "Your Texas license expires on 11/11/2026. Verify with NIPR before it lapses.",
-    timestamp: "Yesterday",
-    actionLabel: "Verify now",
+    id: "team-setup",
+    type: "team-setup",
+    title: "Finish setting up your team",
+    body: "Nobody is set as Admin for Acme Insurance Agency yet. Pick who manages the agency.",
+    timestamp: "Just now",
+    actionLabel: "Set up team",
   },
   {
     id: "maint-nov-02",
@@ -198,7 +202,7 @@ function NotifRow({
   );
 }
 
-export default function TopBar({ isDark = false, activePage, onNavigateToLicense }: TopBarProps) {
+export default function TopBar({ isDark = false, activePage, teamSetupBellVisible = true, teamSetupBellSpotlight = false, onOpenTeamSetup, onDismissTeamSetupBell }: TopBarProps) {
   const hideSearch = activePage === "Quotes" || activePage === "Policies";
   const [open, setOpen] = useState(false);
   // `notifs` stays stable — dismissing an item adds its id to `dismissedIds`
@@ -211,8 +215,13 @@ export default function TopBar({ isDark = false, activePage, onNavigateToLicense
   const panelRef = useRef<HTMLDivElement | null>(null);
   const btnRef = useRef<HTMLButtonElement | null>(null);
 
-  const activeNotifs = notifs.filter(n => !dismissedIds.has(n.id));
-  const dismissedNotifs = notifs.filter(n => dismissedIds.has(n.id));
+  // The team-setup entry is additionally gated by the shell-level flag so
+  // dismissing it from here (adding to `dismissedIds`) AND the shell removing
+  // it (setting `teamSetupBellVisible` false after the user clicks "Dismiss"
+  // on any surface) both collapse it from the panel.
+  const shellFilter = (n: Notification) => n.type !== "team-setup" || teamSetupBellVisible;
+  const activeNotifs = notifs.filter(n => shellFilter(n) && !dismissedIds.has(n.id));
+  const dismissedNotifs = notifs.filter(n => shellFilter(n) && dismissedIds.has(n.id));
   const unreadCount = activeNotifs.filter(n => !readIds.has(n.id)).length;
   // When nothing's active and user has dismissed stuff, auto-flip the toggle
   // on so the panel isn't a sad empty state hiding content behind a link.
@@ -235,19 +244,21 @@ export default function TopBar({ isDark = false, activePage, onNavigateToLicense
 
   const markAllRead = () => setReadIds(new Set(notifs.map(n => n.id)));
   const markRead = (id: string) => setReadIds(prev => { const next = new Set(prev); next.add(id); return next; });
-  const dismiss = (id: string) => setDismissedIds(prev => { const next = new Set(prev); next.add(id); return next; });
+  const dismiss = (id: string, type: NotifType) => {
+    // Team-setup lives at shell level; dismissing from here forwards up so
+    // the inline banner stays consistent with the bell. Everything else is
+    // local to the panel.
+    if (type === "team-setup") {
+      onDismissTeamSetupBell?.();
+      return;
+    }
+    setDismissedIds(prev => { const next = new Set(prev); next.add(id); return next; });
+  };
   const restore = (id: string) => setDismissedIds(prev => { const next = new Set(prev); next.delete(id); return next; });
 
   const iconFor = (type: NotifType) => {
-    if (type === "license-expired") return <AlertCircle className="w-4 h-4" style={{ color: "#DC2626" }} />;
-    if (type === "license-expiring") return <Clock className="w-4 h-4" style={{ color: "#D97706" }} />;
+    if (type === "team-setup") return <Users className="w-4 h-4" style={{ color: RAZZ }} />;
     return <Wrench className="w-4 h-4" style={{ color: isDark ? "#9CA3AF" : "#6B7280" }} />;
-  };
-
-  const accentFor = (type: NotifType) => {
-    if (type === "license-expired") return "#DC2626";
-    if (type === "license-expiring") return "#D97706";
-    return isDark ? "rgba(255,255,255,0.14)" : "#E5E7EB";
   };
 
   const bg = isDark ? "#151828" : "#ffffff";
@@ -292,8 +303,32 @@ export default function TopBar({ isDark = false, activePage, onNavigateToLicense
       {/* Notification bell + its popover — wrapped in a `relative` so the
           panel can anchor to the bell's own right edge (right: 0), keeping
           the panel visually tied to its trigger regardless of what sits
-          beyond it in the chrome (divider, btis mark, etc.). */}
-      <div className="relative flex-shrink-0">
+          beyond it in the chrome (divider, btis mark, etc.).
+          When the Team Setup spotlight is on, this wrapper is elevated
+          above the shell-level dim backdrop (z-index 42, same stacking tier
+          as the Users-tab coachmark at 41 — bell wins so the halo lands on
+          top) and gets a razz ring + inner bg to read as the second
+          "lit island". */}
+      <div
+        className="relative flex-shrink-0"
+        style={teamSetupBellSpotlight ? {
+          zIndex: 42,
+          borderRadius: 10,
+          padding: 4,
+          margin: -4,
+          background: bg,
+          boxShadow: `0 0 0 6px ${isDark ? "rgba(192,132,252,0.22)" : "rgba(166,20,195,0.18)"}, 0 12px 32px rgba(0,0,0,0.14)`,
+          animation: "teamSetupBellHaloIn 220ms ease-out",
+        } : undefined}
+      >
+        {teamSetupBellSpotlight && (
+          <style>{`
+            @keyframes teamSetupBellHaloIn {
+              from { box-shadow: 0 0 0 0 transparent, 0 0 0 0 transparent; }
+              to   { box-shadow: 0 0 0 6px ${isDark ? "rgba(192,132,252,0.22)" : "rgba(166,20,195,0.18)"}, 0 12px 32px rgba(0,0,0,0.14); }
+            }
+          `}</style>
+        )}
         <button
           ref={btnRef}
           type="button"
@@ -403,8 +438,8 @@ export default function TopBar({ isDark = false, activePage, onNavigateToLicense
                 </div>
               ) : (
                 visibleRows.map((n, i) => {
-                  const isLicense = n.type === "license-expired" || n.type === "license-expiring";
-                  const sev = n.type === "license-expired" ? "#DC2626" : n.type === "license-expiring" ? "#D97706" : (isDark ? "#8B8FA8" : "#9CA3AF");
+                  const isTeamSetup = n.type === "team-setup";
+                  const sev = isTeamSetup ? RAZZ : (isDark ? "#8B8FA8" : "#9CA3AF");
                   const isDismissed = dismissedIds.has(n.id);
                   return (
                     <NotifRow
@@ -423,12 +458,12 @@ export default function TopBar({ isDark = false, activePage, onNavigateToLicense
                       isDismissed={isDismissed}
                       onAction={() => {
                         markRead(n.id);
-                        if (isLicense && onNavigateToLicense) {
-                          onNavigateToLicense();
+                        if (isTeamSetup && onOpenTeamSetup) {
+                          onOpenTeamSetup();
                           setOpen(false);
                         }
                       }}
-                      onDismiss={() => dismiss(n.id)}
+                      onDismiss={() => dismiss(n.id, n.type)}
                       onRestore={() => restore(n.id)}
                     />
                   );

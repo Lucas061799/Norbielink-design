@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Lightbulb, ClipboardCheck, ChevronRight, Sparkles, ExternalLink, X, User, Home, Key, HeartHandshake, Trophy, Heart, Briefcase } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import LicenseAlertBanner from "@/components/LicenseAlertBanner";
+import TeamSetupBanner from "@/components/TeamSetupBanner";
 
 // 3×3 dot grid — the "apps" affordance shown in the design; lucide's LayoutGrid
 // is 4 squares (2×2), not what we want here.
@@ -23,9 +23,11 @@ function DotGridIcon({ className, color }: { className?: string; color: string }
 
 interface MarketplaceProps {
   isDark?: boolean;
-  // Routes the License banner's "Renew license" CTA + post-dismiss toast
-  // "Open Admin now" to the Admin / Agency detail page.
-  onNavigateToLicense?: () => void;
+  // Team Setup prompt plumbing — the shell owns the state (modal / banner /
+  // bell), the Marketplace just renders the banner slot and reports clicks.
+  teamSetupBannerVisible?: boolean;
+  onOpenTeamSetup?: () => void;
+  onDismissTeamSetupBanner?: () => void;
 }
 
 // Left-column tiles. `icon` is the base filename in /public/insurance-icons/;
@@ -160,7 +162,7 @@ const EMPTY_STATE_COPY: Record<"All" | PromoCategory, string> = {
   Learning:   "New training dropping soon",
 };
 
-export default function Marketplace({ isDark = false, onNavigateToLicense }: MarketplaceProps) {
+export default function Marketplace({ isDark = false, teamSetupBannerVisible = false, onOpenTeamSetup, onDismissTeamSetupBanner }: MarketplaceProps) {
   const text     = isDark ? "#F9FAFB" : "#1F2937";
   const heading  = isDark ? "#F9FAFB" : "#2D3653";
   const muted    = isDark ? "#8B8FA8" : "#6B7280";
@@ -208,11 +210,17 @@ export default function Marketplace({ isDark = false, onNavigateToLicense }: Mar
         <h1 className="text-[22px] font-normal" style={{ color: heading }}>Marketplace</h1>
       </div>
 
-      {/* License alert banner — sits below the "Marketplace" page title bar
-          (push-based alert, no bell click required). The TopBar bell still
-          carries the full notification list. See LicenseAlertBanner for the
-          severity rules + the post-dismiss recovery toast. */}
-      <LicenseAlertBanner isDark={isDark} onAction={onNavigateToLicense} hintAfterDismiss />
+      {/* Team Setup banner — fallback surface for the first-run prompt once
+          the modal is dismissed. The shell owns the state; the Marketplace
+          just renders a slot. The TopBar bell carries a mirror entry so the
+          user can still get back to the modal after this banner is dismissed. */}
+      {teamSetupBannerVisible && (
+        <TeamSetupBanner
+          isDark={isDark}
+          onOpen={() => onOpenTeamSetup?.()}
+          onDismiss={() => onDismissTeamSetupBanner?.()}
+        />
+      )}
 
       {/* Two-column layout — column widths follow the Figma 888 : 600 ratio
           (≈ 1.48 : 1) so the grid and the right rail stay proportional at any width.
