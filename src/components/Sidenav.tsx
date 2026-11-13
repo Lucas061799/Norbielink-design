@@ -9,7 +9,7 @@ import jungleBg from "@/assets/sidebar-bg.png";
 import {
   LayoutGrid, Sparkles, FileText, Shield,
   Briefcase, CreditCard, Calculator, FileEdit,
-  Wrench, HelpCircle, UserCog, Building2, Globe, ChevronDown, Users,
+  Wrench, HelpCircle, UserCog, Building2, Globe, ChevronDown, Users, BarChart3,
   User, LogOut, X, Images, Pencil, ZoomIn, ZoomOut, AlertTriangle, Rocket,
   Mail, MessageSquare, Check,
 } from "lucide-react";
@@ -184,6 +184,7 @@ export default function Sidenav({ isDark = false, onToggleDark, activeItem = "Ma
     { label: "Support",           icon: <HelpCircle className="w-[18px] h-[18px]" /> },
     { label: "Admin",             icon: <UserCog    className="w-[18px] h-[18px]" /> },
     { label: "Agencies",          icon: <Building2  className="w-[18px] h-[18px]" /> },
+    { label: "Reports",           icon: <BarChart3  className="w-[18px] h-[18px]" /> },
     { label: "Website",           icon: <Globe      className="w-[18px] h-[18px]" /> },
     { label: "Pricing",           icon: <Rocket     className="w-[18px] h-[18px]" />, hasChevron: true, children: [
       { label: "Phase 1" },

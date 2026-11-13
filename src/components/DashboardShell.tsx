@@ -11,6 +11,7 @@ import Endorsements from "@/components/Endorsements";
 import Marketplace from "@/components/Marketplace";
 import Website from "@/components/Website";
 import Pricing from "@/components/Pricing";
+import Reports from "@/components/Reports";
 import TeamSetupModal from "@/components/TeamSetupModal";
 import TeamSetupDismissToast from "@/components/TeamSetupDismissToast";
 
@@ -269,6 +270,8 @@ export default function DashboardShell({ children, pageTitle }: DashboardShellPr
         return <Policies isDark={darkMode} />;
       case "Endorsements":
         return <Endorsements isDark={darkMode} />;
+      case "Reports":
+        return <Reports isDark={darkMode} onNavigate={setActivePage} />;
       case "Pricing":
       case "Pricing · Phase 2":
         return <Pricing isDark={darkMode} phase={2} />;
