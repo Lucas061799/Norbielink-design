@@ -104,7 +104,7 @@ export default function TeamSetupDismissToast({ isDark, open, onClose, onOpenTea
         </div>
         <div className="flex-1 min-w-0 text-[12px]" style={{ color: bodyColor, lineHeight: 1.45 }}>
           <span style={{ color: titleColor, fontWeight: 600 }}>On the Marketplace</span>
-          {" "}— a banner at the top lets you pick admins any time.
+          {" "}— a banner at the top takes you to your users any time.
         </div>
       </div>
 
@@ -118,7 +118,7 @@ export default function TeamSetupDismissToast({ isDark, open, onClose, onOpenTea
         </div>
         <div className="flex-1 min-w-0 text-[12px]" style={{ color: bodyColor, lineHeight: 1.45 }}>
           <span style={{ color: titleColor, fontWeight: 600 }}>In the bell</span>
-          {" "}— open the notification bell in the top-right to jump back here.
+          {" "}— open the notification bell in the top-right to get back to your users.
         </div>
       </div>
 

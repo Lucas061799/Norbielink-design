@@ -197,37 +197,20 @@ export default function DashboardShell({ children, pageTitle }: DashboardShellPr
     // modal now, there's nothing to hint toward.
     setTeamSetupDismissHintOpen(false);
   };
-  const dismissTeamSetupModal = () => {
-    setTeamSetupModalDismissed(true);
-    // Spotlight landing only fires ONCE. First-dismiss gets the full
-    // three-part attention beat (jump to Admin → coachmark lift + bell
-    // halo → top-right hint toast). Second+ dismiss (user reopened via
-    // the persistent Users-tab coachmark) just closes the modal — no
-    // repeat blur / halo / toast, since they already know where everything
-    // lives.
-    if (teamSetupSpotlightFired) return;
-    setActivePage("Admin");
-    setTeamSetupSpotlightUsers(true);
-    setTeamSetupSpotlightActive(true);
-    setTeamSetupMountKey(k => k + 1);
-    setTeamSetupDismissHintOpen(true);
-    setTeamSetupSpotlightFired(true);
-  };
-
-  // New-agency notice X / "Remind me later": just close it and stay where
+  // Popup X / "Remind me later" (both views): just close it and stay where
   // they are (the Marketplace). No jump to Admin or spotlight — the banner,
   // bell and one-time "Need to come back to this?" hint still point back.
-  const dismissNewAgencyNotice = () => {
+  const dismissTeamSetupModal = () => {
     setTeamSetupModalDismissed(true);
     if (teamSetupSpotlightFired) return;
     setTeamSetupDismissHintOpen(true);
     setTeamSetupSpotlightFired(true);
   };
 
-  // New-agency notice CTA: close the notice and land on Admin › Users, where
-  // they choose Add New User or Import Users (bulk). Nothing is pre-opened.
-  // Not "done" — the banner/bell stay until they finish in the Users tab.
-  // Skips the first-dismiss spotlight/toast since they're heading there now.
+  // Go to Admin › Users, where the access levels are explained and they
+  // choose Add New User or Import Users. Used by the new-agency popup's
+  // "Add users", the Marketplace banner, the bell, and the hint toast.
+  // Not "done" — the banner/bell stay until setup is finished.
   const goToAddUsers = () => {
     setTeamSetupModalDismissed(true);
     setTeamSetupDismissHintOpen(false);
@@ -380,8 +363,8 @@ export default function DashboardShell({ children, pageTitle }: DashboardShellPr
         <NewAgencyTeamModal
           isDark={darkMode}
           open={modalOpen}
-          onClose={dismissNewAgencyNotice}
-          onRemindLater={dismissNewAgencyNotice}
+          onClose={dismissTeamSetupModal}
+          onRemindLater={dismissTeamSetupModal}
           onAddUsers={goToAddUsers}
         />
       ) : (
@@ -401,7 +384,7 @@ export default function DashboardShell({ children, pageTitle }: DashboardShellPr
         isDark={darkMode}
         open={teamSetupDismissHintOpen && teamSetupPending}
         onClose={() => setTeamSetupDismissHintOpen(false)}
-        onOpenTeamSetup={openTeamSetup}
+        onOpenTeamSetup={goToAddUsers}
       />
     </div>
   );
