@@ -345,8 +345,11 @@ export default function Reports({ isDark = false, onNavigate }: ReportsProps) {
     const colored = items.map((it, i) => ({ ...it, color: PALETTE[i % PALETTE.length] }));
     return <Composition items={colored} size={donutSize} legendCols={legendCols} colors={{ heading: c.heading, text: c.text, faint: c.faint, track: c.track }} />;
   };
+  // Bold date/period text inside section subtitles.
+  const b = (text: React.ReactNode) => <strong className="font-semibold" style={{ color: c.heading }}>{text}</strong>;
+
   // 4×2 metric panel used by the Agency and User overviews.
-  const metricGrid = (title: string, subtitle: string, items: Metric[], mb = "mb-6") => (
+  const metricGrid = (title: string, subtitle: React.ReactNode, items: Metric[], mb = "mb-6") => (
     <div className={`rounded-xl overflow-hidden ${mb}`} style={{ background: c.box, border: `1px solid ${c.line}` }}>
       <div className="px-6 py-4 flex flex-wrap items-baseline justify-between gap-2" style={{ borderBottom: `1px solid ${c.line}` }}>
         <h2 className="text-[16px] font-bold" style={{ color: c.heading }}>{title}</h2>
@@ -429,7 +432,6 @@ export default function Reports({ isDark = false, onNavigate }: ReportsProps) {
       <div className="flex items-center justify-between flex-shrink-0 mb-10" style={{ height: 71, background: isDark ? "#0F1120" : "#FFFFFF", borderBottom: `0.87px solid ${c.line}`, marginTop: -24, marginLeft: -48, marginRight: -48, paddingLeft: 28, paddingRight: 28 }}>
         <h1 className="text-[22px] font-normal" style={{ color: c.heading }}>Reports</h1>
         <div className="flex items-center gap-3">
-          <span className="hidden lg:inline text-[11px] font-semibold uppercase" style={{ letterSpacing: "0.12em", color: c.faint }}>Agency Adoption Report · Snapshot {asOfLabel}</span>
           <div className="relative">
             <button type="button" onClick={() => setCohortOpen(o => !o)} className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12.5px] font-semibold cursor-pointer" style={{ fontFamily: FONT, border: `1px solid ${c.line}`, color: c.text }}>
               {ds.short}<ChevronDown className="w-3.5 h-3.5" style={{ color: c.faint }} />
@@ -482,7 +484,7 @@ export default function Reports({ isDark = false, onNavigate }: ReportsProps) {
       </div>
 
       {/* Overview — agencies (the account) then users (the people in them) */}
-      {metricGrid("Agency Adoption Overview", `${ds.label} · snapshot ${asOfLabel} · change vs ${adoptPrevLabel}${cohort !== "all" ? " · wave figures are sample data" : ""}`, overview)}
+      {metricGrid("Agency Adoption Overview", <>{ds.label} · snapshot {b(asOfLabel)} · change vs {b(adoptPrevLabel)}{cohort !== "all" && " · wave figures are sample data"}</>, overview)}
 
       {/* Agency next steps — never logged in / lapsed */}
       {nextSteps([
@@ -492,7 +494,7 @@ export default function Reports({ isDark = false, onNavigate }: ReportsProps) {
           text: <><strong style={{ color: c.heading }}>{LAPSED} agencies</strong> have used NorbieLink before but not in the last 30 days.</> },
       ])}
 
-      {metricGrid("User Activity", `Agents inside these agencies · change vs ${adoptPrevLabel} · sample data`, userMetrics, "mb-10")}
+      {metricGrid("User Activity", <>Agents inside these agencies · change vs {b(adoptPrevLabel)} · sample data</>, userMetrics, "mb-10")}
 
 
       {/* ── Activity & traffic ──────────────────────────────────────────── */}
@@ -503,7 +505,7 @@ export default function Reports({ isDark = false, onNavigate }: ReportsProps) {
             <SampleTag />
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-[12px]" style={{ color: c.faint }}>{periodLabel}{compare && ` · vs ${actPrevLabel}`}</span>
+            <span className="text-[12px]" style={{ color: c.muted }}>{b(periodLabel)}{compare && <> · vs {b(actPrevLabel)}</>}</span>
             <button type="button" onClick={() => setCompare(v => !v)} className="flex items-center gap-2 text-[12.5px] font-medium cursor-pointer" style={{ fontFamily: FONT, color: c.muted }}>
               <span className="flex items-center justify-center" style={{ width: 15, height: 15, borderRadius: 4, border: `1.5px solid ${compare ? "#A614C3" : c.line}`, background: compare ? RAZZ : "transparent" }}>{compare && <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />}</span>
               Compare
