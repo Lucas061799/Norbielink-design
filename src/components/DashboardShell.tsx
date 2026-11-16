@@ -358,7 +358,8 @@ export default function DashboardShell({ children, pageTitle }: DashboardShellPr
           activePage={activePage}
           teamSetupBellVisible={bellEntryVisible}
           teamSetupBellSpotlight={teamSetupSpotlightActive}
-          onOpenTeamSetup={openTeamSetup}
+          // Bell "Set up team" → Admin › Users (same as the Marketplace banner).
+          onOpenTeamSetup={goToAddUsers}
           onDismissTeamSetupBell={() => setTeamSetupBellDismissed(true)}
           impersonation={impersonation}
           impersonationSpotlight={impersonationSpotlightActive}
