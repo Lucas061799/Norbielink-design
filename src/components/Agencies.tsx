@@ -8120,7 +8120,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                   </div>
                   {/* Access levels. "Account Manager" is the name for the
                       see-everything-but-not-admin level — not built yet. */}
-                  <div className="grid grid-cols-2 grid-rows-2 gap-2.5 mt-1.5">
+                  <div className="grid grid-cols-2 grid-rows-2 gap-2.5 mt-1.5" style={{ maxWidth: 720 }}>
                     {[
                       { name: "Admin", perms: ["Add, edit, and delete users", "Make other users Admins", "See all agency quotes and policies", "View accounting statements and commissions"] },
                       { name: "Account Manager", perms: ["See all agency quotes and policies"] },
