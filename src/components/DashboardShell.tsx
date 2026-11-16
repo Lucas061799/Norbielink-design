@@ -31,6 +31,14 @@ const noopSubscribe = () => () => {};
 // Mock: which first-run popup to show. A real agency would decide this from
 // its user count (only the primary contact → new). For demos, `?agency=new`
 // shows the "Add your team" popup; anything else shows the admin picker.
+// Sidenav "Onboarding" demo entries → the URL that loads each first-run view
+// with the popup reset. A full reload keeps every dismissal/spotlight flag
+// honest instead of hand-resetting a dozen pieces of state.
+const ONBOARDING_VIEWS: Record<string, string> = {
+  "Onboarding · New agency admin": "/?teamSetup=reset&agency=new",
+  "Onboarding · Legacy agency admin": "/?teamSetup=reset",
+};
+
 function readIsNewAgency(): boolean {
   try {
     return new URLSearchParams(window.location.search).get("agency") === "new";
@@ -327,7 +335,12 @@ export default function DashboardShell({ children, pageTitle }: DashboardShellPr
         isDark={darkMode}
         onToggleDark={() => setDarkMode(!darkMode)}
         activeItem={activePage}
-        onActiveChange={setActivePage}
+        onActiveChange={item => {
+          const demoUrl = ONBOARDING_VIEWS[item];
+          if (demoUrl) window.location.assign(demoUrl);
+          else setActivePage(item);
+        }}
+        activeDemoItem={isNewAgency ? "Onboarding · New agency admin" : "Onboarding · Legacy agency admin"}
       />
       <div className="flex-1 flex flex-col overflow-hidden">
         <TopBar

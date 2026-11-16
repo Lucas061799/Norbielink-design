@@ -11,7 +11,7 @@ import {
   Briefcase, CreditCard, Calculator, FileEdit,
   Wrench, HelpCircle, UserCog, Building2, Globe, ChevronDown, Users, BarChart3,
   User, LogOut, X, Images, Pencil, ZoomIn, ZoomOut, AlertTriangle, Rocket,
-  Mail, MessageSquare, Check,
+  Mail, MessageSquare, Check, UserPlus,
 } from "lucide-react";
 
 interface NavItemProps {
@@ -95,9 +95,12 @@ interface SidenavProps {
   onToggleDark?: () => void;
   activeItem?: string;
   onActiveChange?: (item: string) => void;
+  // Demo: which onboarding view is loaded, so its submenu entry stays
+  // highlighted even though the current page is something else.
+  activeDemoItem?: string;
 }
 
-export default function Sidenav({ isDark = false, onToggleDark, activeItem = "Marketplace", onActiveChange }: SidenavProps) {
+export default function Sidenav({ isDark = false, onToggleDark, activeItem = "Marketplace", onActiveChange, activeDemoItem }: SidenavProps) {
   const [legacyView, setLegacyView] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const accountRef = useRef<HTMLDivElement | null>(null);
@@ -189,6 +192,12 @@ export default function Sidenav({ isDark = false, onToggleDark, activeItem = "Ma
     { label: "Pricing",           icon: <Rocket     className="w-[18px] h-[18px]" />, hasChevron: true, children: [
       { label: "Phase 1" },
       { label: "Phase 2" },
+    ] },
+    // Demo switcher — reloads the app into one of the two first-run admin
+    // popups (see DashboardShell ONBOARDING_VIEWS).
+    { label: "Onboarding",        icon: <UserPlus   className="w-[18px] h-[18px]" />, hasChevron: true, children: [
+      { label: "New agency admin" },
+      { label: "Legacy agency admin" },
     ] },
   ];
 
@@ -390,7 +399,7 @@ export default function Sidenav({ isDark = false, onToggleDark, activeItem = "Ma
                 <div ref={submenuRef} className="pl-8 py-0.5 space-y-0.5">
                   {item.children!.map(ch => {
                     const childLabel = `${item.label} · ${ch.label}`;
-                    const isActive = activeItem === childLabel;
+                    const isActive = activeItem === childLabel || activeDemoItem === childLabel;
                     return (
                       <button
                         key={ch.label}
