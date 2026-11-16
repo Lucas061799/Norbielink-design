@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef } from "react";
-import { X, UserPlus, Users, FileText, Calculator, ArrowRight } from "lucide-react";
+import { X, UserPlus, ArrowRight } from "lucide-react";
 
 // -----------------------------------------------------------------------------
 // First-run Team Setup notice — NEW agency variant.
@@ -9,8 +9,9 @@ import { X, UserPlus, Users, FileText, Calculator, ArrowRight } from "lucide-rea
 // Trigger (mock): the agency was just created and has no users in NorbieLink
 // besides the primary contact (the signed-in user). There's no roster to pick
 // admins from, so unlike TeamSetupModal this is just a notice: it explains
-// what Admins can do and sends the user to Admin › Users, where they add
-// people one at a time (Add New User) or in bulk (Import Users).
+// that each person gets an access level and sends the user to Admin › Users,
+// where the levels are explained and they add people one at a time (Add New
+// User) or in bulk (Import Users).
 //
 // Shares TeamSetupModal's visual language (2xl card, Montserrat, razz CTA)
 // and its dismissal surfaces in DashboardShell (X / Remind me later →
@@ -48,15 +49,9 @@ export default function NewAgencyTeamModal({ isDark, open, onClose, onRemindLate
 
   const bg     = isDark ? "#1E2240" : "#FFFFFF";
   const text   = isDark ? "#F9FAFB" : "#1F2937";
-  const muted  = isDark ? "#C4C8D0" : "#4B5563";
+  const muted  = isDark ? "#D1D5DB" : "#374151";
   const border = isDark ? "rgba(255,255,255,0.10)" : "#E5E7EB";
-  const cardBg = isDark ? "rgba(255,255,255,0.04)" : "#F9FAFB";
 
-  const perms = [
-    { icon: Users,      label: "Add, edit, and delete users" },
-    { icon: FileText,   label: "See all of the agency's quotes and policies" },
-    { icon: Calculator, label: "View accounting statements" },
-  ];
 
   return (
     <div
@@ -92,22 +87,10 @@ export default function NewAgencyTeamModal({ isDark, open, onClose, onRemindLate
           </h2>
           <p className="text-[13px] mt-1.5" style={{ fontFamily: FONT, color: muted, lineHeight: 1.55 }}>
             You&apos;re the only user so far, and you&apos;re an Admin because you&apos;re the primary contact.
-            Add the people at your agency who&apos;ll use NorbieLink, and choose who else should be an Admin.
+            Add the people at your agency who&apos;ll use NorbieLink and give each person an access level.
+            Admins can change anyone&apos;s access level at any time.
           </p>
 
-          <div className="mt-5 rounded-xl px-4 py-3.5" style={{ background: cardBg, border: `1px solid ${border}` }}>
-            <div className="text-[12px] font-semibold" style={{ fontFamily: FONT, color: text }}>
-              Admins can:
-            </div>
-            <ul className="mt-2 flex flex-col gap-2">
-              {perms.map(({ icon: Icon, label }) => (
-                <li key={label} className="flex items-center gap-2.5 text-[12.5px]" style={{ fontFamily: FONT, color: text }}>
-                  <Icon className="w-4 h-4 flex-shrink-0" style={{ color: "#A614C3" }} />
-                  {label}
-                </li>
-              ))}
-            </ul>
-          </div>
 
           <p className="text-[12.5px] mt-4" style={{ fontFamily: FONT, color: muted, lineHeight: 1.5 }}>
             You can do this anytime in{" "}

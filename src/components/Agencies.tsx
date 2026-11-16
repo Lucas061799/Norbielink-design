@@ -964,6 +964,16 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
   // backdrop, bell halo (shell-owned), raised shadow — is transient and
   // tied to `spotlightActive` only.
   const coachmarkVisible = teamSetupPending;
+  // "Set up your team" box is an accordion; starts open and remembers the
+  // admin's choice in this browser.
+  const TEAM_TIP_OPEN_KEY = "norbielink.teamTipOpen";
+  const [teamTipOpen, setTeamTipOpen] = useState(() => {
+    try { return typeof window === "undefined" || localStorage.getItem(TEAM_TIP_OPEN_KEY) !== "0"; } catch { return true; }
+  });
+  const toggleTeamTip = () => setTeamTipOpen(prev => {
+    try { localStorage.setItem(TEAM_TIP_OPEN_KEY, prev ? "0" : "1"); } catch { /* session-only */ }
+    return !prev;
+  });
   const dismissSpotlight = () => onSpotlightDismiss?.();
   const [isEditing, setIsEditing]           = useState(false);
   const [editExpanded, setEditExpanded]     = useState(false);
@@ -8078,58 +8088,80 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                   <path d="M16 3.13a4 4 0 0 1 0 7.75" stroke="url(#team-coach-razz)" />
                 </svg>
                 <div className="flex-1 min-w-0">
-                  <div className="text-[13px] font-semibold"
-                    style={{
-                      ...font,
-                      backgroundImage: isDark
-                        ? "linear-gradient(88.54deg, #C9A6FF 0.1%, #E68BF2 63.88%)"
-                        : "linear-gradient(88.54deg, #5C2ED4 0.1%, #A614C3 63.88%)",
-                      backgroundClip: "text",
-                      WebkitBackgroundClip: "text",
-                      WebkitTextFillColor: "transparent",
-                    }}>
-                    Assign admins & titles here
-                  </div>
-                  <div className="text-[12px] mt-0.5" style={{ ...font, color: c.muted }}>
-                    Click the <span style={{ fontWeight: 600, color: c.text }}>Admin</span> icon in any row to grant or revoke admin. For <span style={{ fontWeight: 600, color: c.text }}>Job title</span> changes, use the <span style={{ fontWeight: 600, color: c.text }}>⋮</span> menu → Edit User{newAgency ? "." : ", or reopen the bulk setup."}
-                  </div>
-                </div>
-                {/* New agencies have no bulk setup to reopen (the notice just
-                    points here), so the tip is text-only for them. */}
-                {!newAgency && (
-                <div className="flex items-center gap-2 flex-shrink-0 self-start">
-                  {onCompleteTeamSetup && (
-                    <button
-                      type="button"
-                      onClick={() => { onCompleteTeamSetup(); dismissSpotlight(); }}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold whitespace-nowrap transition-all cursor-pointer"
+                  <button type="button" onClick={toggleTeamTip} aria-expanded={teamTipOpen}
+                    className="w-full flex items-center gap-2 text-left cursor-pointer"
+                    style={{ background: "transparent", border: "none", padding: 0 }}>
+                    <span className="text-[13px] font-semibold"
                       style={{
                         ...font,
-                        background: "transparent",
-                        border: `1px solid ${c.border}`,
-                        color: c.text,
-                      }}
-                    >
-                      Done setting up
-                    </button>
-                  )}
-                  {onOpenTeamSetup && (
-                    <button
-                      type="button"
-                      onClick={() => { onOpenTeamSetup(); dismissSpotlight(); }}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold text-white whitespace-nowrap transition-all cursor-pointer"
-                      style={{
-                        ...font,
-                        background: "linear-gradient(90deg, #5C2ED4 0%, #A614C3 65%)",
-                        border: "none",
-                        marginTop: 0,
-                      }}
-                    >
-                      Open bulk setup
-                    </button>
-                  )}
+                        backgroundImage: isDark
+                          ? "linear-gradient(88.54deg, #C9A6FF 0.1%, #E68BF2 63.88%)"
+                          : "linear-gradient(88.54deg, #5C2ED4 0.1%, #A614C3 63.88%)",
+                        backgroundClip: "text",
+                        WebkitBackgroundClip: "text",
+                        WebkitTextFillColor: "transparent",
+                      }}>
+                      Set up your team
+                    </span>
+                    {!teamTipOpen && (
+                      <span className="text-[12px] truncate" style={{ ...font, color: isDark ? "#D1D5DB" : "#374151" }}>
+                        · Access levels and tips for adding users
+                      </span>
+                    )}
+                    <ChevronDown className="w-4 h-4 ml-auto flex-shrink-0 transition-transform"
+                      style={{ color: isDark ? "#D1D5DB" : "#374151", transform: teamTipOpen ? "rotate(180deg)" : undefined }} />
+                  </button>
+                  {teamTipOpen && (<>
+                  <div className="text-[12px] mt-0.5" style={{ ...font, color: isDark ? "#D1D5DB" : "#374151" }}>
+                    Add the people at your agency and give each person an access level. Admins can change anyone&apos;s access level at any time.
+                  </div>
+                  <div className="text-[11px] font-semibold uppercase tracking-wide mt-3" style={{ ...font, color: isDark ? "#D1D5DB" : "#374151" }}>
+                    Access levels
+                  </div>
+                  {/* Access levels. "Account Manager" is the name for the
+                      see-everything-but-not-admin level — not built yet. */}
+                  <div className="grid grid-cols-2 grid-rows-2 gap-2.5 mt-1.5">
+                    {[
+                      { name: "Admin", perms: ["Add, edit, and delete users", "Make other users Admins", "See all agency quotes and policies", "View accounting statements and commissions"] },
+                      { name: "Account Manager", perms: ["See all agency quotes and policies"] },
+                      { name: "CSR and Producer", perms: ["See only their own quotes and policies"] },
+                    ].map(role => (
+                      // Admin fills the left column; the other two stack on the right.
+                      <div key={role.name} className={`rounded-lg px-3 py-2.5${role.name === "Admin" ? " row-span-2" : ""}`}
+                        style={{ background: isDark ? "rgba(255,255,255,0.04)" : "#FFFFFF", border: `1px solid ${c.border}` }}>
+                        <div className="text-[12px] font-semibold" style={{ ...font, color: c.text }}>{role.name}</div>
+                        <ul className="mt-1.5 flex flex-col gap-1">
+                          {role.perms.map(p => (
+                            <li key={p} className="flex items-start gap-1.5 text-[11.5px]" style={{ ...font, color: isDark ? "#D1D5DB" : "#374151", lineHeight: 1.4 }}>
+                              <Check className="w-3 h-3 flex-shrink-0 mt-[3px]" style={{ color: "#A614C3" }} />
+                              {p}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                  {(() => {
+                    const b = (t: string) => <span style={{ fontWeight: 600, color: c.text }}>{t}</span>;
+                    const notes = [
+                      <>Turn on {b("Admin")} by clicking the <span className="inline-flex align-middle mx-0.5" aria-label="Admin icon"><GradientUserCog size={14} /></span> icon in any row.</>,
+                      <>To change someone to {b("Account Manager")}, {b("CSR")}, {b("Producer")}, etc., click the {b("⋮")} menu → {b("Edit User")} and pick from the {b("Job title")} dropdown.</>,
+                      <>New users get an {b("invitation email")} when you add them. If it doesn&apos;t arrive, ask them to check their junk or spam folder.</>,
+                      <>Use the {b("⋮")} menu to resend the invitation, reset a password, and more.</>,
+                    ];
+                    return (
+                      <ul className="mt-3 flex flex-col gap-1">
+                        {notes.map((n, i) => (
+                          <li key={i} className="flex items-start gap-2 text-[11.5px]" style={{ ...font, color: isDark ? "#D1D5DB" : "#374151", lineHeight: 1.45 }}>
+                            <span className="flex-shrink-0 rounded-full mt-[6px]" style={{ width: 4, height: 4, background: "#A614C3" }} />
+                            <span>{n}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    );
+                  })()}
+                  </>)}
                 </div>
-                )}
               </div>
             )}
             {/* Legacy BTIS auto-detect banner — shown when there are new
@@ -8583,7 +8615,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                           // having to log out and sign back in under their account.
                           // Only shown in internal view and only for active users.
                           const impersonate = viewMode === "internal" && !isInactive ? ["Start a Quote"] : [];
-                          const base = isInactive ? [] : [...impersonate, "Edit User", "Reset Password", "Reassign Accounts"];
+                          const base = isInactive ? [] : [...impersonate, "Edit User", "Resend Invitation", "Reset Password", "Reassign Accounts"];
                           // Unlock User and Deactivate User both go to the bottom of the menu
                           // because they're rarer / heavier-weight actions. Unlock specifically
                           // is most often disabled (only meaningful when the account is locked),
@@ -8630,6 +8662,11 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                                     setAuState("");
                                     setAuZip("");
                                     setEditUserId(u.id);
+                                  } else if (action === "Resend Invitation") {
+                                    showToast({
+                                      title: "Invitation resent",
+                                      description: `A new invitation email was sent to ${u.email}.`,
+                                    });
                                   } else if (action === "Reset Password") {
                                     showToast({
                                       title: "Password reset link sent",

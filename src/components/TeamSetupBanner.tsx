@@ -25,7 +25,7 @@ const FONT = "var(--font-montserrat), Montserrat, sans-serif";
 export default function TeamSetupBanner({ isDark, onOpen, onDismiss }: TeamSetupBannerProps) {
   const bg          = isDark ? "#1E2240" : "#F9FAFB";
   const borderCol   = isDark ? "rgba(255,255,255,0.10)" : "#E5E7EB";
-  const bodyColor   = isDark ? "#9CA3AF" : "#6B7280";
+  const bodyColor   = isDark ? "#D1D5DB" : "#374151";
   const dismissColor = isDark ? "#8B8FA8" : "#9CA3AF";
   // Per-instance so two banners on one page don't collide on the same DOM id.
   const gradId = useId();
@@ -77,7 +77,7 @@ export default function TeamSetupBanner({ isDark, onOpen, onDismiss }: TeamSetup
           Finish setting up your team
         </div>
         <div className="text-[12px] mt-0.5" style={{ fontFamily: FONT, color: bodyColor }}>
-          You&apos;re the only Admin for Acme Insurance Agency. Choose who else should be an Admin — Admins can view accounting statements and add, edit, or delete users.
+          Set up your agency&apos;s users and their access levels.
         </div>
       </div>
 

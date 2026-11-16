@@ -79,7 +79,10 @@ export default function DashboardShell({ children, pageTitle }: DashboardShellPr
   const teamSetupLoaded = storedTeamSetupDone !== null;
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get("teamSetup") !== "reset") return;
-    try { localStorage.removeItem(TEAM_SETUP_DONE_KEY); } catch { /* nothing stored */ }
+    try {
+      localStorage.removeItem(TEAM_SETUP_DONE_KEY);
+      localStorage.removeItem("norbielink.teamTipOpen"); // "Set up your team" box starts open again
+    } catch { /* nothing stored */ }
   }, []);
   const [teamSetupModalDismissed, setTeamSetupModalDismissed] = useState(false);
   const [teamSetupBannerDismissed, setTeamSetupBannerDismissed] = useState(false);
@@ -211,6 +214,16 @@ export default function DashboardShell({ children, pageTitle }: DashboardShellPr
     setTeamSetupSpotlightFired(true);
   };
 
+  // New-agency notice X / "Remind me later": just close it and stay where
+  // they are (the Marketplace). No jump to Admin or spotlight — the banner,
+  // bell and one-time "Need to come back to this?" hint still point back.
+  const dismissNewAgencyNotice = () => {
+    setTeamSetupModalDismissed(true);
+    if (teamSetupSpotlightFired) return;
+    setTeamSetupDismissHintOpen(true);
+    setTeamSetupSpotlightFired(true);
+  };
+
   // New-agency notice CTA: close the notice and land on Admin › Users, where
   // they choose Add New User or Import Users (bulk). Nothing is pre-opened.
   // Not "done" — the banner/bell stay until they finish in the Users tab.
@@ -239,7 +252,9 @@ export default function DashboardShell({ children, pageTitle }: DashboardShellPr
           <Marketplace
             isDark={darkMode}
             teamSetupBannerVisible={bannerVisible}
-            onOpenTeamSetup={openTeamSetup}
+            // Banner "Set up team" → Admin › Users, where the access levels and
+            // Add New User / Import Users live.
+            onOpenTeamSetup={goToAddUsers}
             onDismissTeamSetupBanner={() => setTeamSetupBannerDismissed(true)}
           />
         );
@@ -364,8 +379,8 @@ export default function DashboardShell({ children, pageTitle }: DashboardShellPr
         <NewAgencyTeamModal
           isDark={darkMode}
           open={modalOpen}
-          onClose={dismissTeamSetupModal}
-          onRemindLater={dismissTeamSetupModal}
+          onClose={dismissNewAgencyNotice}
+          onRemindLater={dismissNewAgencyNotice}
           onAddUsers={goToAddUsers}
         />
       ) : (
