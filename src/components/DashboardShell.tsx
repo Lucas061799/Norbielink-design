@@ -351,7 +351,7 @@ export default function DashboardShell({ children, pageTitle }: DashboardShellPr
         />
         <main
           className="flex-1 overflow-hidden transition-colors duration-300 px-12"
-          style={(() => { const fullHeightPages = ["Clients", "Agencies", "Admin", "Quotes", "Policies", "Endorsements", "Accounting · Statements"]; const isFullHeight = fullHeightPages.includes(activePage); return { background: darkMode ? "#0F1120" : "#ffffff", paddingTop: isFullHeight ? 0 : 24, paddingBottom: isFullHeight ? 48 : 24, display: isFullHeight ? "flex" : "block", flexDirection: "column" as const, overflowY: isFullHeight ? "hidden" : "auto", height: isFullHeight ? "100%" : "auto" }; })()}
+          style={(() => { const fullHeightPages = ["Clients", "Agencies", "Admin", "Quotes", "Policies", "Endorsements", "Accounting · Statements"]; const isFullHeight = fullHeightPages.includes(activePage); return { background: darkMode ? "#0F1120" : activePage === "Reports" ? "#F3F4F6" : "#ffffff", paddingTop: isFullHeight ? 0 : 24, paddingBottom: isFullHeight ? 48 : 24, display: isFullHeight ? "flex" : "block", flexDirection: "column" as const, overflowY: isFullHeight ? "hidden" : "auto", height: isFullHeight ? "100%" : "auto" }; })()}
         >
           {renderPage()}
         </main>

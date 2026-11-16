@@ -25,6 +25,18 @@ const DATASET: Record<Cohort, { label: string; short: string; cur: Snap; prev: S
 };
 const COHORTS: Cohort[] = ["all", "w1", "w2", "w3"];
 
+// User (agent) snapshots by cohort — the people inside the agencies above.
+// invited = all user accounts created; activated = has logged in at least
+// once; active30/7 = users active in the window; single = active agencies
+// where only one user is active (usually the primary contact). Sample data.
+interface UserSnap { invited: number; activated: number; active30: number; active7: number; single: number; }
+const USERS: Record<Cohort, { cur: UserSnap; prev: UserSnap }> = {
+  all: { cur: { invited: 4812, activated: 3105, active30: 1642, active7: 806, single: 112 }, prev: { invited: 4420, activated: 2770, active30: 1470, active7: 731, single: 124 } },
+  w1:  { cur: { invited: 2290, activated: 1820, active30: 1098, active7: 561, single: 48 },  prev: { invited: 2240, activated: 1745, active30: 1040, active7: 530, single: 55 } },
+  w2:  { cur: { invited: 1650, activated: 915,  active30: 428,  active7: 196, single: 39 },  prev: { invited: 1480, activated: 760,  active30: 360,  active7: 170, single: 41 } },
+  w3:  { cur: { invited: 872,  activated: 370,  active30: 116,  active7: 49,  single: 25 },  prev: { invited: 700,  activated: 265,  active30: 70,   active7: 31,  single: 28 } },
+};
+
 const pct = (n: number, base: number) => Math.round((n / base) * 100);
 
 // ── Activity & traffic (range-driven, sample) ─────────────────────────────
@@ -67,17 +79,41 @@ const fmtShort = (iso: string) => { const [, m, dd] = iso.split("-").map(Number)
 // metrics still resolve. A real build would query the exact date range.
 const bucketFor = (days: number): RangeId => (days <= 10 ? "7d" : days <= 45 ? "30d" : days <= 135 ? "90d" : days <= 280 ? "ytd" : "12m");
 
+// ── User (agent) drill-down lists (sample) ────────────────────────────────
+type UserSegKind = "invited" | "activated" | "uactive30" | "uactive7" | "pending";
+const USER_POOL = [
+  { name: "Dana Pruitt",    title: "Principal",       agency: "Summit Risk Partners",    email: "dana@summitrisk.com" },
+  { name: "Kyle Benton",    title: "Producer",        agency: "Summit Risk Partners",    email: "kyle@summitrisk.com" },
+  { name: "Marcus Reed",    title: "Principal",       agency: "Harbor & Vale Insurance", email: "marcus@harborvale.com" },
+  { name: "Elena Ruiz",     title: "CSR",             agency: "Harbor & Vale Insurance", email: "elena@harborvale.com" },
+  { name: "Grace Lin",      title: "Account Manager", agency: "Meridian Coverage Group", email: "grace@meridiancoverage.com" },
+  { name: "Sam Okafor",     title: "Producer",        agency: "Meridian Coverage Group", email: "sam@meridiancoverage.com" },
+  { name: "Priya Nair",     title: "Principal",       agency: "Cedar Ridge Agency",      email: "priya@cedarridge.com" },
+  { name: "Hannah Boyd",    title: "Producer",        agency: "Northgate Assurance",     email: "hannah@northgateassure.com" },
+  { name: "Tom Alvarez",    title: "CSR",             agency: "Northgate Assurance",     email: "tom@northgateassure.com" },
+  { name: "Nadia Khan",     title: "Principal",       agency: "Ironwood Insurance",      email: "nadia@ironwoodins.com" },
+  { name: "Owen Clarke",    title: "Producer",        agency: "Blue Harbor Brokers",     email: "owen@blueharbor.com" },
+  { name: "Mia Torres",     title: "Accounting",      agency: "Pine Street Insurance",   email: "mia@pinestreetins.com" },
+];
+const USER_SEG_INFO: Record<UserSegKind, { title: string; note: string; meta: (i: number) => string }> = {
+  invited:   { title: "Users invited",           note: "Every user account created across the agencies.",    meta: (i) => (i % 3 === 2 ? "Invite pending" : "Activated") },
+  activated: { title: "Activated users",         note: "Have logged in at least once.",                       meta: (i) => `First login ${["Feb 3", "Mar 18", "Apr 2", "Jun 11", "Aug 27"][i % 5]}` },
+  uactive30: { title: "Active users · 30 days",  note: "Portal activity in the last 30 days.",                meta: (i) => `Last active ${["today", "yesterday", "3 days ago", "1 week ago", "2 weeks ago"][i % 5]}` },
+  uactive7:  { title: "Active users · 7 days",   note: "Portal activity in the last 7 days.",                 meta: (i) => `Last active ${["today", "yesterday", "2 days ago", "4 days ago"][i % 4]}` },
+  pending:   { title: "Pending invites",         note: "Invited but haven't logged in yet — resend from Admin › Users.", meta: (i) => `Invited ${["Nov 4", "Oct 22", "Oct 9", "Sep 30", "Sep 12"][i % 5]}` },
+};
+
 // ── ProSuite (sample) ─────────────────────────────────────────────────────
 // Who's on ProSuite and which of its tools they actually use. Tool list
 // mirrors the ProSuite plan on the Pricing page.
 const PRO_STATS = { members: [142, 118], newMembers: [24, 17], renewals60: 19, avgTools: [3.4, 3.0] };
-const PRO_TOOLS: { name: string; does: string; using: Pair; active30: number }[] = [
-  { name: "Outmarket",          does: "AI quote comparison across carriers", using: [118, 96],  active30: 91 },
-  { name: "NowCerts",           does: "Self-service certificates, 24/7",     using: [104, 88],  active30: 79 },
-  { name: "Commercial Leads",   does: "Real-time commercial leads",          using: [71, 52],   active30: 48 },
-  { name: "Compliance Library", does: "Legal & compliance documents",        using: [63, 58],   active30: 22 },
-  { name: "CE Tracking",        does: "CE discounts + compliance tracking",  using: [49, 41],   active30: 17 },
-  { name: "Growth Support",     does: "1:1 agency growth & strategy",        using: [27, 25],   active30: 9 },
+const PRO_TOOLS: { name: string; does: string; using: Pair; users: number; active30: number }[] = [
+  { name: "Outmarket",          does: "AI quote comparison across carriers", using: [118, 96],  users: 340, active30: 91 },
+  { name: "NowCerts",           does: "Self-service certificates, 24/7",     using: [104, 88],  users: 296, active30: 79 },
+  { name: "Commercial Leads",   does: "Real-time commercial leads",          using: [71, 52],   users: 158, active30: 48 },
+  { name: "Compliance Library", does: "Legal & compliance documents",        using: [63, 58],   users: 121, active30: 22 },
+  { name: "CE Tracking",        does: "CE discounts + compliance tracking",  using: [49, 41],   users: 187, active30: 17 },
+  { name: "Growth Support",     does: "1:1 agency growth & strategy",        using: [27, 25],   users: 41, active30: 9 },
 ];
 const PRO_MEMBERS: { agency: string; contact: string; state: string; since: string; users: number; tools: string[]; lastActive: string }[] = [
   { agency: "Summit Risk Partners",    contact: "Dana Pruitt",  state: "CA", since: "Feb 2026", users: 14, tools: ["Outmarket", "NowCerts", "Commercial Leads", "CE Tracking"], lastActive: "Today" },
@@ -104,16 +140,21 @@ const AGENCY_POOL = [
   { name: "Vanguard Agency",         contact: "Sofia Mendes",  email: "sofia@vanguardagency.com",  phone: "(305) 555-0176" },
   { name: "Oakfield Brokers",        contact: "Derek Yoon",    email: "derek@oakfieldbrokers.com", phone: "(972) 555-0112" },
 ];
-type SegKind = "all" | "loggedin" | "active" | "weekly" | "nologin" | "dormant";
+type SegKind = "all" | "loggedin" | "active" | "weekly" | "nologin" | "dormant" | "single";
 const SEG_INFO: Record<SegKind, { title: string; note: string; meta: (i: number) => string }> = {
   all:      { title: "All tracked agencies",            note: "Every agency in the reporting universe.",               meta: () => "Tracked" },
   loggedin: { title: "Agencies that have logged in",    note: "Signed in at least once — adopted.",                    meta: (i) => `Last login ${["2 days", "5 days", "1 week", "3 weeks", "1 month"][i % 5]} ago` },
   active:   { title: "Active agencies · last 30 days",  note: "Recorded portal activity in the last 30 days.",         meta: () => "Active this month" },
   weekly:   { title: "Active agencies · last 7 days",   note: "Recorded portal activity in the last 7 days.",          meta: () => "Active this week" },
   nologin:  { title: "Agencies with no recorded login", note: "Invited but never signed in — onboarding opportunity.", meta: (i) => `Invited ${["Oct 2", "Sep 18", "Aug 30", "Jul 12"][i % 4]} · never signed in` },
+  single:   { title: "Single-user agencies",            note: "Active, but only one person logs in — usually the primary contact.", meta: (i) => `Only ${["the principal", "the primary contact", "one CSR", "one producer"][i % 4]} is active` },
   dormant:  { title: "Lapsed agencies",                 note: "Logged in before, inactive 30+ days — re-engage.",      meta: (i) => `Last active ${["5", "7", "9", "12", "16"][i % 5]} weeks ago` },
 };
-const buildSegment = (kind: SegKind, count: number) => ({ kind, count, title: SEG_INFO[kind].title, note: SEG_INFO[kind].note, rows: AGENCY_POOL.map((a, i) => ({ ...a, meta: SEG_INFO[kind].meta(i) })) });
+// Users per sample agency; never-logged-in / lapsed agencies have no
+// recently active users by definition.
+const POOL_USERS = [14, 9, 6, 11, 22, 5, 17, 8, 7, 12, 4, 10];
+const POOL_ACTIVE = [6, 3, 2, 5, 9, 1, 7, 1, 3, 4, 1, 4];
+const buildSegment = (kind: SegKind, count: number) => ({ kind, count, title: SEG_INFO[kind].title, note: SEG_INFO[kind].note, rows: AGENCY_POOL.map((a, i) => ({ ...a, meta: SEG_INFO[kind].meta(i), users: POOL_USERS[i % POOL_USERS.length], activeUsers: kind === "nologin" || kind === "dormant" ? 0 : kind === "single" ? 1 : POOL_ACTIVE[i % POOL_ACTIVE.length] })) });
 const downloadCsv = (filename: string, rows: (string | number)[][]) => {
   const csv = rows.map(r => r.map(x => `"${String(x).replace(/"/g, '""')}"`).join(",")).join("\n");
   try {
@@ -211,6 +252,7 @@ function Composition({ items, size = 116, legendCols = 1, colors }: {
 
 export default function Reports({ isDark = false, onNavigate }: ReportsProps) {
   const [drill, setDrill] = useState<SegKind | null>(null);
+  const [userDrill, setUserDrill] = useState<UserSegKind | null>(null);
   const [cohort, setCohort] = useState<Cohort>("all");
   const [cohortOpen, setCohortOpen] = useState(false);
   const [rangeId, setRangeId] = useState<RangeId>("30d");
@@ -228,7 +270,9 @@ export default function Reports({ isDark = false, onNavigate }: ReportsProps) {
     faint:   isDark ? "#C4C8D0" : "#4B5563",
     line:    isDark ? "rgba(255,255,255,0.10)" : "#EBECF0",
     panel:   isDark ? "#14182E" : "#FFFFFF",
-    panelAlt:isDark ? "#191D34" : "#FAFAFC",
+    panelAlt:isDark ? "#191D34" : "#FFFFFF",
+    // Boxes are white on the grey Reports page background (set in DashboardShell).
+    box:     isDark ? "#191D34" : "#FFFFFF",
     track:   isDark ? "rgba(255,255,255,0.08)" : "#EEEFF3",
   };
 
@@ -239,7 +283,7 @@ export default function Reports({ isDark = false, onNavigate }: ReportsProps) {
   const pr = ds.prev;
   const pNO = pr.total - pr.loggedin;
   const adoptNow = pct(LOGGED_IN, TOTAL), adoptPrev = pct(pr.loggedin, pr.total);
-  const segCount: Record<SegKind, number> = { all: TOTAL, loggedin: LOGGED_IN, active: ACTIVE_30, weekly: ACTIVE_7, nologin: NO_LOGIN, dormant: LAPSED };
+  const segCount: Record<Exclude<SegKind, "single">, number> = { all: TOTAL, loggedin: LOGGED_IN, active: ACTIVE_30, weekly: ACTIVE_7, nologin: NO_LOGIN, dormant: LAPSED };
 
   // Activity (range-scoped)
   const d = RANGE_DATA[rangeId];
@@ -256,7 +300,8 @@ export default function Reports({ isDark = false, onNavigate }: ReportsProps) {
 
   // Overview grid: counts on top (click → drill-down list); each rate sits
   // directly under the count it's derived from (Never logged in under Tracked).
-  const overview: { label: string; value: string; cur: number; prev: number; unit?: string; inverse?: boolean; info: string; kind?: SegKind }[] = [
+  type Metric = { label: string; value: string; cur: number; prev: number; unit?: string; inverse?: boolean; info: string; kind?: SegKind; userKind?: UserSegKind };
+  const overview: Metric[] = [
     { label: "Agencies tracked", value: TOTAL.toLocaleString(), cur: TOTAL, prev: pr.total, info: "Unique agencies in the reporting universe", kind: "all" },
     { label: "Have logged in", value: LOGGED_IN.toLocaleString(), cur: LOGGED_IN, prev: pr.loggedin, info: "Agencies with at least one sign-in", kind: "loggedin" },
     { label: "Active · 30 days", value: ACTIVE_30.toLocaleString(), cur: ACTIVE_30, prev: pr.active30, info: "Agencies with portal activity in the last 30 days", kind: "active" },
@@ -265,6 +310,21 @@ export default function Reports({ isDark = false, onNavigate }: ReportsProps) {
     { label: "Adoption rate", value: `${adoptNow}%`, cur: adoptNow, prev: adoptPrev, unit: " pts", info: "Share of tracked agencies that have logged in" },
     { label: "Monthly return rate", value: `${pct(ACTIVE_30, LOGGED_IN)}%`, cur: pct(ACTIVE_30, LOGGED_IN), prev: pct(pr.active30, pr.loggedin), unit: " pts", info: "Share of logged-in agencies active in the last 30 days" },
     { label: "Weekly return rate", value: `${pct(ACTIVE_7, ACTIVE_30)}%`, cur: pct(ACTIVE_7, ACTIVE_30), prev: pct(pr.active7, pr.active30), unit: " pts", info: "Share of monthly-active agencies also active in the last 7 days" },
+  ];
+  // Users (agents) inside those agencies — same 4×2 layout, each rate under
+  // the count it comes from.
+  const us = USERS[cohort].cur, up = USERS[cohort].prev;
+  const PENDING = us.invited - us.activated, pPENDING = up.invited - up.activated;
+  const perAgency = (users: number, agencies: number) => Math.round((users / agencies) * 10) / 10;
+  const userMetrics: Metric[] = [
+    { label: "Users invited", value: us.invited.toLocaleString(), cur: us.invited, prev: up.invited, info: "All user accounts created across the agencies", userKind: "invited" },
+    { label: "Activated", value: us.activated.toLocaleString(), cur: us.activated, prev: up.activated, info: "Users who have logged in at least once", userKind: "activated" },
+    { label: "Active · 30 days", value: us.active30.toLocaleString(), cur: us.active30, prev: up.active30, info: "Users with portal activity in the last 30 days", userKind: "uactive30" },
+    { label: "Active · 7 days", value: us.active7.toLocaleString(), cur: us.active7, prev: up.active7, info: "Users with portal activity in the last 7 days", userKind: "uactive7" },
+    { label: "Pending invites", value: PENDING.toLocaleString(), cur: PENDING, prev: pPENDING, inverse: true, info: "Invited users who haven't logged in yet", userKind: "pending" },
+    { label: "Activation rate", value: `${pct(us.activated, us.invited)}%`, cur: pct(us.activated, us.invited), prev: pct(up.activated, up.invited), unit: " pts", info: "Share of invited users who have logged in" },
+    { label: "Active users per agency", value: perAgency(us.active30, ACTIVE_30).toFixed(1), cur: perAgency(us.active30, ACTIVE_30), prev: perAgency(up.active30, pr.active30), info: "Average active users (30 days) in each active agency" },
+    { label: "Single-user agencies", value: us.single.toLocaleString(), cur: us.single, prev: up.single, inverse: true, info: "Active agencies where only one person logs in, usually the primary contact", kind: "single" },
   ];
   const winStats = [
     { label: "Active agencies", value: d.active[0].toLocaleString(), cur: d.active[0], prev: d.active[1] },
@@ -285,10 +345,71 @@ export default function Reports({ isDark = false, onNavigate }: ReportsProps) {
     const colored = items.map((it, i) => ({ ...it, color: PALETTE[i % PALETTE.length] }));
     return <Composition items={colored} size={donutSize} legendCols={legendCols} colors={{ heading: c.heading, text: c.text, faint: c.faint, track: c.track }} />;
   };
+  // 4×2 metric panel used by the Agency and User overviews.
+  const metricGrid = (title: string, subtitle: string, items: Metric[], mb = "mb-6") => (
+    <div className={`rounded-xl overflow-hidden ${mb}`} style={{ background: c.box, border: `1px solid ${c.line}` }}>
+      <div className="px-6 py-4 flex flex-wrap items-baseline justify-between gap-2" style={{ borderBottom: `1px solid ${c.line}` }}>
+        <h2 className="text-[16px] font-bold" style={{ color: c.heading }}>{title}</h2>
+        <span className="text-[12px]" style={{ color: c.muted }}>{subtitle}</span>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+        {items.map((m, idx) => {
+          const clickable = !!m.kind || !!m.userKind;
+          const open = () => { if (m.kind) setDrill(m.kind); else if (m.userKind) setUserDrill(m.userKind); };
+          return (
+            <div key={m.label}
+              role={clickable ? "button" : undefined} tabIndex={clickable ? 0 : undefined}
+              onClick={open}
+              onKeyDown={(e) => { if (clickable && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); open(); } }}
+              title={m.info}
+              className={`px-6 py-5 transition-colors${clickable ? " cursor-pointer" : ""}`}
+              style={{ borderTop: idx >= 4 ? `1px solid ${c.line}` : undefined, borderLeft: idx % 4 ? `1px solid ${c.line}` : undefined }}
+              onMouseEnter={e => { if (clickable) e.currentTarget.style.background = isDark ? "rgba(255,255,255,0.05)" : "#F5F6F8"; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}>
+              {/* Clickable boxes show it on hover (tint) — no extra link text. */}
+              <div className="text-[13px] font-semibold" style={{ color: c.text }}>{m.label}</div>
+              <div className="flex items-center justify-between gap-3 mt-2">
+                <span className="text-[30px] font-extrabold leading-none tracking-tight" style={{ color: c.heading }}>{m.value}</span>
+                <DeltaPill cur={m.cur} prev={m.prev} unit={m.unit} inverse={m.inverse} isDark={isDark} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+
+  // Two-up "next steps" strip under each overview: icon, title, one line,
+  // action link; the whole half opens its list.
+  const nextSteps = (items: { key: string; icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>; title: string; action: string; text: React.ReactNode; open: () => void }[], mb = "mb-6") => (
+    <div className={`rounded-xl overflow-hidden ${mb} grid grid-cols-1 lg:grid-cols-2`} style={{ background: c.box, border: `1px solid ${c.line}` }}>
+      {items.map((o, i) => (
+        <div key={o.key} role="button" tabIndex={0}
+          onClick={o.open}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); o.open(); } }}
+          className="flex items-start gap-3.5 px-6 py-5 cursor-pointer transition-colors"
+          style={{ borderLeft: i ? `1px solid ${c.line}` : undefined }}
+          onMouseEnter={e => { e.currentTarget.style.background = isDark ? "rgba(255,255,255,0.05)" : "#F5F6F8"; }}
+          onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}>
+          <div className="flex items-center justify-center rounded-lg flex-shrink-0" style={{ width: 36, height: 36, background: isDark ? "rgba(166,20,195,0.16)" : "rgba(166,20,195,0.08)" }}>
+            <o.icon className="w-4 h-4" style={{ color: "#A614C3" }} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-[13px] font-semibold" style={{ color: c.heading }}>{o.title}</span>
+              <span className="text-[12px] font-semibold whitespace-nowrap" style={{ color: "#A614C3" }}>{o.action} →</span>
+            </div>
+            <p className="text-[12.5px] leading-relaxed mt-1" style={{ color: c.muted }}>{o.text}</p>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+
   // Same boxed look as the Agency Adoption Overview: label, big value,
   // change pill (shown when Compare is on).
   const statRow = (items: { label: string; value: string; cur: number; prev: number }[]) => (
-    <div className="rounded-xl overflow-hidden grid grid-cols-2 lg:grid-cols-4" style={{ background: c.panel, border: `1px solid ${c.line}` }}>
+    <div className="rounded-xl overflow-hidden grid grid-cols-2 lg:grid-cols-4" style={{ background: c.box, border: `1px solid ${c.line}` }}>
       {items.map((s, i) => (
         <div key={s.label} className="px-6 py-5"
           style={{ borderLeft: i % 4 ? `1px solid ${c.line}` : undefined }}>
@@ -305,7 +426,7 @@ export default function Reports({ isDark = false, onNavigate }: ReportsProps) {
   return (
     <div style={{ fontFamily: FONT, color: c.text }}>
       {/* Report header */}
-      <div className="flex items-center justify-between flex-shrink-0 mb-10" style={{ height: 71, borderBottom: `0.87px solid ${c.line}`, marginTop: -24, marginLeft: -48, marginRight: -48, paddingLeft: 28, paddingRight: 28 }}>
+      <div className="flex items-center justify-between flex-shrink-0 mb-10" style={{ height: 71, background: isDark ? "#0F1120" : "#FFFFFF", borderBottom: `0.87px solid ${c.line}`, marginTop: -24, marginLeft: -48, marginRight: -48, paddingLeft: 28, paddingRight: 28 }}>
         <h1 className="text-[22px] font-normal" style={{ color: c.heading }}>Reports</h1>
         <div className="flex items-center gap-3">
           <span className="hidden lg:inline text-[11px] font-semibold uppercase" style={{ letterSpacing: "0.12em", color: c.faint }}>Agency Adoption Report · Snapshot {asOfLabel}</span>
@@ -360,71 +481,19 @@ export default function Reports({ isDark = false, onNavigate }: ReportsProps) {
         </div>
       </div>
 
-      {/* Overview — compact metric grid (label · value · change pill) */}
-      <div className="rounded-xl overflow-hidden mb-6" style={{ background: c.panel, border: `1px solid ${c.line}` }}>
-        <div className="px-6 py-4 flex flex-wrap items-baseline justify-between gap-2" style={{ borderBottom: `1px solid ${c.line}` }}>
-          <h2 className="text-[16px] font-bold" style={{ color: c.heading }}>Agency Adoption Overview</h2>
-          <span className="text-[12px]" style={{ color: c.muted }}>
-            {ds.label} · snapshot {asOfLabel} · change vs {adoptPrevLabel}{cohort !== "all" && " · wave figures are sample data"}
-          </span>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-          {overview.map((m, idx) => {
-            const clickable = !!m.kind;
-            const open = () => { if (m.kind) setDrill(m.kind); };
-            return (
-              <div key={m.label}
-                role={clickable ? "button" : undefined} tabIndex={clickable ? 0 : undefined}
-                onClick={open}
-                onKeyDown={(e) => { if (clickable && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); open(); } }}
-                title={m.info}
-                className={`px-6 py-5 transition-colors${clickable ? " cursor-pointer" : ""}`}
-                style={{ borderTop: idx >= 4 ? `1px solid ${c.line}` : undefined, borderLeft: idx % 4 ? `1px solid ${c.line}` : undefined }}
-                onMouseEnter={e => { if (clickable) e.currentTarget.style.background = isDark ? "rgba(255,255,255,0.05)" : "#F5F6F8"; }}
-                onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}>
-                {/* Clickable boxes show it on hover (tint) — no extra link text. */}
-                <div className="text-[13px] font-semibold" style={{ color: c.text }}>{m.label}</div>
-                <div className="flex items-center justify-between gap-3 mt-2">
-                  <span className="text-[30px] font-extrabold leading-none tracking-tight" style={{ color: c.heading }}>{m.value}</span>
-                  <DeltaPill cur={m.cur} prev={m.prev} unit={m.unit} inverse={m.inverse} isDark={isDark} />
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
+      {/* Overview — agencies (the account) then users (the people in them) */}
+      {metricGrid("Agency Adoption Overview", `${ds.label} · snapshot ${asOfLabel} · change vs ${adoptPrevLabel}${cohort !== "all" ? " · wave figures are sample data" : ""}`, overview)}
 
-      {/* Opportunities — never logged in / lapsed, framed as next steps.
-          Compact (no oversized numbers or red deltas); whole row opens the list. */}
-      <div className="rounded-xl overflow-hidden mb-10 grid grid-cols-1 lg:grid-cols-2" style={{ background: c.panel, border: `1px solid ${c.line}` }}>
-        {[
-          { kind: "nologin" as SegKind, icon: UserPlus, title: "Ready to onboard",
-            text: <><strong style={{ color: c.heading }}>{NO_LOGIN} agencies</strong> haven&apos;t logged in yet.</>,
-            action: "Onboard" },
-          { kind: "dormant" as SegKind, icon: RefreshCw, title: "Ready to re-engage",
-            text: <><strong style={{ color: c.heading }}>{LAPSED} agencies</strong> have used NorbieLink before but not in the last 30 days.</>,
-            action: "Re-engage" },
-        ].map((o, i) => (
-          <div key={o.kind} role="button" tabIndex={0}
-            onClick={() => setDrill(o.kind)}
-            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setDrill(o.kind); } }}
-            className="flex items-start gap-3.5 px-6 py-5 cursor-pointer transition-colors"
-            style={{ borderLeft: i ? `1px solid ${c.line}` : undefined }}
-            onMouseEnter={e => { e.currentTarget.style.background = isDark ? "rgba(255,255,255,0.05)" : "#F5F6F8"; }}
-            onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}>
-            <div className="flex items-center justify-center rounded-lg flex-shrink-0" style={{ width: 36, height: 36, background: isDark ? "rgba(166,20,195,0.16)" : "rgba(166,20,195,0.08)" }}>
-              <o.icon className="w-4 h-4" style={{ color: "#A614C3" }} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-[13px] font-semibold" style={{ color: c.heading }}>{o.title}</span>
-                <span className="text-[12px] font-semibold whitespace-nowrap" style={{ color: "#A614C3" }}>{o.action} →</span>
-              </div>
-              <p className="text-[12.5px] leading-relaxed mt-1" style={{ color: c.muted }}>{o.text}</p>
-            </div>
-          </div>
-        ))}
-      </div>
+      {/* Agency next steps — never logged in / lapsed */}
+      {nextSteps([
+        { key: "nologin", icon: UserPlus, title: "Ready to onboard", action: "Onboard", open: () => setDrill("nologin"),
+          text: <><strong style={{ color: c.heading }}>{NO_LOGIN} agencies</strong> haven&apos;t logged in yet.</> },
+        { key: "dormant", icon: RefreshCw, title: "Ready to re-engage", action: "Re-engage", open: () => setDrill("dormant"),
+          text: <><strong style={{ color: c.heading }}>{LAPSED} agencies</strong> have used NorbieLink before but not in the last 30 days.</> },
+      ])}
+
+      {metricGrid("User Activity", `Agents inside these agencies · change vs ${adoptPrevLabel} · sample data`, userMetrics, "mb-10")}
+
 
       {/* ── Activity & traffic ──────────────────────────────────────────── */}
       <div className="pt-8" style={{ borderTop: `1px solid ${c.line}` }}>
@@ -519,7 +588,7 @@ export default function Reports({ isDark = false, onNavigate }: ReportsProps) {
         </div>
 
         {/* Summary */}
-        <div className="rounded-xl overflow-hidden mb-6 grid grid-cols-2 lg:grid-cols-4" style={{ background: c.panel, border: `1px solid ${c.line}` }}>
+        <div className="rounded-xl overflow-hidden mb-6 grid grid-cols-2 lg:grid-cols-4" style={{ background: c.box, border: `1px solid ${c.line}` }}>
           {[
             { label: "ProSuite members", value: PRO_STATS.members[0].toLocaleString(), sub: `${pct(PRO_STATS.members[0], LOGGED_IN)}% of logged-in agencies`, cur: PRO_STATS.members[0], prev: PRO_STATS.members[1] },
             { label: "New this period", value: PRO_STATS.newMembers[0].toLocaleString(), sub: periodLabel, cur: PRO_STATS.newMembers[0], prev: PRO_STATS.newMembers[1] },
@@ -541,13 +610,13 @@ export default function Reports({ isDark = false, onNavigate }: ReportsProps) {
         <div className="p-5 mb-6" style={panel}>
           <div className="flex items-baseline justify-between gap-3 flex-wrap mb-4">
             <span className="text-[13px] font-semibold" style={{ color: c.heading }}>Tools in use</span>
-            <span className="text-[12px]" style={{ color: c.muted }}>Agencies using each tool · share of {PRO_STATS.members[0]} members</span>
+            <span className="text-[12px]" style={{ color: c.muted }}>Agencies and users on each tool · share of {PRO_STATS.members[0]} member agencies</span>
           </div>
           <div className="flex flex-col">
             {PRO_TOOLS.map((t, i) => {
               const share = pct(t.using[0], PRO_STATS.members[0]);
               return (
-                <div key={t.name} className="grid items-center gap-4 py-3" style={{ gridTemplateColumns: "minmax(170px,1.1fr) 2fr 150px 104px", borderTop: i ? `1px solid ${c.line}` : undefined }}>
+                <div key={t.name} className="grid items-center gap-4 py-3" style={{ gridTemplateColumns: "minmax(170px,1.1fr) 2fr 190px 104px", borderTop: i ? `1px solid ${c.line}` : undefined }}>
                   <div className="min-w-0">
                     <div className="text-[13px] font-semibold" style={{ color: c.heading }}>{t.name}</div>
                     <div className="text-[11.5px] truncate" style={{ color: c.muted }}>{t.does}</div>
@@ -557,7 +626,7 @@ export default function Reports({ isDark = false, onNavigate }: ReportsProps) {
                   </div>
                   <div className="text-[12.5px] text-right whitespace-nowrap" style={{ color: c.text }}>
                     <span className="font-semibold" style={{ color: c.heading }}>{t.using[0]}</span> agencies · {share}%
-                    <div className="text-[11px]" style={{ color: c.muted }}>{t.active30} active · 30 days</div>
+                    <div className="text-[11px]" style={{ color: c.muted }}>{t.users} users · {t.active30} agencies active 30d</div>
                   </div>
                   <div className="justify-self-end"><DeltaPill cur={t.using[0]} prev={t.using[1]} isDark={isDark} /></div>
                 </div>
@@ -567,7 +636,7 @@ export default function Reports({ isDark = false, onNavigate }: ReportsProps) {
         </div>
 
         {/* Members */}
-        <div className="rounded-xl overflow-hidden" style={{ background: c.panel, border: `1px solid ${c.line}` }}>
+        <div className="rounded-xl overflow-hidden" style={{ background: c.box, border: `1px solid ${c.line}` }}>
           <div className="px-5 py-4 flex items-baseline justify-between gap-3" style={{ borderBottom: `1px solid ${c.line}` }}>
             <span className="text-[13px] font-semibold" style={{ color: c.heading }}>ProSuite members</span>
             <span className="text-[12px]" style={{ color: c.muted }}>Showing {PRO_MEMBERS.length} of {PRO_STATS.members[0]} · most recently active</span>
@@ -575,7 +644,7 @@ export default function Reports({ isDark = false, onNavigate }: ReportsProps) {
           <div className="overflow-x-auto">
             <table className="w-full text-left" style={{ minWidth: 760 }}>
               <thead>
-                <tr className="text-[11px] font-bold uppercase" style={{ letterSpacing: "0.08em", color: c.muted, background: c.panelAlt }}>
+                <tr className="text-[11px] font-bold uppercase" style={{ letterSpacing: "0.08em", color: c.muted, background: isDark ? "#1E2240" : "#F7F8FA" }}>
                   <th className="px-5 py-2.5 font-bold">Agency</th>
                   <th className="px-3 py-2.5 font-bold">Member since</th>
                   <th className="px-3 py-2.5 font-bold text-right">Users</th>
@@ -616,7 +685,7 @@ export default function Reports({ isDark = false, onNavigate }: ReportsProps) {
 
       {/* Drill-down modal */}
       {drill && (() => {
-        const seg = buildSegment(drill, segCount[drill]);
+        const seg = buildSegment(drill, drill === "single" ? USERS[cohort].cur.single : segCount[drill]);
         return (
           <div className="fixed inset-0 z-[80] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.45)" }} onClick={() => setDrill(null)}>
             <div className="rounded-2xl w-[640px] max-w-[94vw] max-h-[84vh] flex flex-col" style={{ background: c.panel, boxShadow: "0 20px 60px rgba(0,0,0,0.25)", fontFamily: FONT }} onClick={(e) => e.stopPropagation()}>
@@ -631,16 +700,54 @@ export default function Reports({ isDark = false, onNavigate }: ReportsProps) {
                 {seg.rows.map((r, i) => (
                   <div key={r.name} className="flex items-start justify-between gap-3 py-3" style={{ borderBottom: i === seg.rows.length - 1 ? "none" : `1px solid ${c.line}` }}>
                     <div className="min-w-0"><div className="text-[13px] font-medium truncate" style={{ color: c.text }}>{r.name}</div><div className="text-[11.5px] mt-0.5 truncate" style={{ color: c.muted }}>{r.contact} · {r.email} · {r.phone}</div></div>
-                    <span className="text-[11.5px] flex-shrink-0 text-right pt-0.5" style={{ color: c.muted }}>{r.meta}</span>
+                    <div className="flex-shrink-0 text-right pt-0.5">
+                      <div className="text-[12px] font-semibold" style={{ color: c.text }}>{r.users} users · {r.activeUsers} active</div>
+                      <div className="text-[11.5px] mt-0.5" style={{ color: c.muted }}>{r.meta}</div>
+                    </div>
                   </div>
                 ))}
               </div>
               <div className="flex items-center justify-between gap-3 px-6 py-4" style={{ borderTop: `1px solid ${c.line}` }}>
                 <span className="text-[11.5px]" style={{ color: c.faint }}>Showing {seg.rows.length} of {seg.count.toLocaleString()} · sample data</span>
                 <div className="flex items-center gap-2">
-                  <button type="button" onClick={() => downloadCsv(`norbielink-${seg.kind}-${cohort}.csv`, [["Agency", "Contact", "Email", "Phone", "Status"], ...seg.rows.map(r => [r.name, r.contact, r.email, r.phone, r.meta])])} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12.5px] font-semibold cursor-pointer" style={{ fontFamily: FONT, border: `1px solid ${c.line}`, color: c.text }}><Download className="w-3.5 h-3.5" style={{ color: c.faint }} /> Export CSV</button>
+                  <button type="button" onClick={() => downloadCsv(`norbielink-${seg.kind}-${cohort}.csv`, [["Agency", "Contact", "Email", "Phone", "Users", "Active users (30d)", "Status"], ...seg.rows.map(r => [r.name, r.contact, r.email, r.phone, r.users, r.activeUsers, r.meta])])} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12.5px] font-semibold cursor-pointer" style={{ fontFamily: FONT, border: `1px solid ${c.line}`, color: c.text }}><Download className="w-3.5 h-3.5" style={{ color: c.faint }} /> Export CSV</button>
                   <button type="button" onClick={() => { setDrill(null); viewAgencies(); }} className="px-3.5 py-1.5 rounded-lg text-[12.5px] font-semibold text-white cursor-pointer" style={{ fontFamily: FONT, background: RAZZ, border: "none" }}>Open in Agencies</button>
                 </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* User drill-down modal — people, not agencies */}
+      {userDrill && (() => {
+        const info = USER_SEG_INFO[userDrill];
+        const count = { invited: us.invited, activated: us.activated, uactive30: us.active30, uactive7: us.active7, pending: PENDING }[userDrill];
+        const rows = USER_POOL.map((u, i) => ({ ...u, meta: info.meta(i) }));
+        return (
+          <div className="fixed inset-0 z-[80] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.45)" }} onClick={() => setUserDrill(null)}>
+            <div className="rounded-2xl w-[640px] max-w-[94vw] max-h-[84vh] flex flex-col" style={{ background: c.panel, boxShadow: "0 20px 60px rgba(0,0,0,0.25)", fontFamily: FONT }} onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-start justify-between gap-3 px-6 pt-5 pb-4" style={{ borderBottom: `1px solid ${c.line}` }}>
+                <div className="min-w-0">
+                  <div className="flex items-baseline gap-2"><span className="text-[20px] font-bold" style={{ color: c.heading }}>{count.toLocaleString()}</span><h3 className="text-[14px] font-semibold" style={{ color: c.heading }}>{info.title}</h3></div>
+                  <p className="text-[12px] mt-0.5" style={{ color: c.muted }}>{info.note} · {ds.label}</p>
+                </div>
+                <button type="button" onClick={() => setUserDrill(null)} aria-label="Close" className="p-1.5 rounded-md cursor-pointer flex-shrink-0" style={{ color: c.faint, border: "none", background: "transparent" }}><X className="w-4 h-4" /></button>
+              </div>
+              <div className="overflow-y-auto px-6 py-2" style={{ minHeight: 120 }}>
+                {rows.map((r, i) => (
+                  <div key={r.email} className="flex items-start justify-between gap-3 py-3" style={{ borderBottom: i === rows.length - 1 ? "none" : `1px solid ${c.line}` }}>
+                    <div className="min-w-0">
+                      <div className="text-[13px] font-medium truncate" style={{ color: c.text }}>{r.name} <span className="font-normal" style={{ color: c.muted }}>· {r.title}</span></div>
+                      <div className="text-[11.5px] mt-0.5 truncate" style={{ color: c.muted }}>{r.agency} · {r.email}</div>
+                    </div>
+                    <span className="text-[11.5px] flex-shrink-0 text-right pt-0.5" style={{ color: c.muted }}>{r.meta}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="flex items-center justify-between gap-3 px-6 py-4" style={{ borderTop: `1px solid ${c.line}` }}>
+                <span className="text-[11.5px]" style={{ color: c.faint }}>Showing {rows.length} of {count.toLocaleString()} · sample data</span>
+                <button type="button" onClick={() => downloadCsv(`norbielink-users-${userDrill}-${cohort}.csv`, [["Name", "Job title", "Agency", "Email", "Status"], ...rows.map(r => [r.name, r.title, r.agency, r.email, r.meta])])} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12.5px] font-semibold cursor-pointer" style={{ fontFamily: FONT, border: `1px solid ${c.line}`, color: c.text }}><Download className="w-3.5 h-3.5" style={{ color: c.faint }} /> Export CSV</button>
               </div>
             </div>
           </div>
