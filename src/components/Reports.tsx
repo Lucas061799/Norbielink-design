@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Download, X, ChevronDown, Check, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { Download, X, ChevronDown, Check, ArrowUpRight, ArrowDownRight, UserPlus, RefreshCw } from "lucide-react";
 
 interface ReportsProps {
   isDark?: boolean;
@@ -10,8 +10,6 @@ interface ReportsProps {
 
 const FONT = "var(--font-montserrat), Montserrat, sans-serif";
 const RAZZ = "linear-gradient(90deg,#5C2ED4 0%,#A614C3 100%)";
-const TEAL_GRAD = "linear-gradient(90deg,#0EA5A5 0%,#2DD4BF 100%)";
-const TEAL = "#0D9488";
 
 const AS_OF = "Nov 11, 2026";
 const PREV_AS_OF = "Oct 11";
@@ -28,7 +26,6 @@ const DATASET: Record<Cohort, { label: string; short: string; cur: Snap; prev: S
 const COHORTS: Cohort[] = ["all", "w1", "w2", "w3"];
 
 const pct = (n: number, base: number) => Math.round((n / base) * 100);
-const pct1 = (n: number, base: number) => ((n / base) * 100).toFixed(1);
 
 // ── Activity & traffic (range-driven, sample) ─────────────────────────────
 type RangeId = "7d" | "30d" | "90d" | "12m" | "ytd";
@@ -69,6 +66,28 @@ const fmtShort = (iso: string) => { const [, m, dd] = iso.split("-").map(Number)
 // Map a custom span (days) onto the nearest sample bucket so the mocked
 // metrics still resolve. A real build would query the exact date range.
 const bucketFor = (days: number): RangeId => (days <= 10 ? "7d" : days <= 45 ? "30d" : days <= 135 ? "90d" : days <= 280 ? "ytd" : "12m");
+
+// ── ProSuite (sample) ─────────────────────────────────────────────────────
+// Who's on ProSuite and which of its tools they actually use. Tool list
+// mirrors the ProSuite plan on the Pricing page.
+const PRO_STATS = { members: [142, 118], newMembers: [24, 17], renewals60: 19, avgTools: [3.4, 3.0] };
+const PRO_TOOLS: { name: string; does: string; using: Pair; active30: number }[] = [
+  { name: "Outmarket",          does: "AI quote comparison across carriers", using: [118, 96],  active30: 91 },
+  { name: "NowCerts",           does: "Self-service certificates, 24/7",     using: [104, 88],  active30: 79 },
+  { name: "Commercial Leads",   does: "Real-time commercial leads",          using: [71, 52],   active30: 48 },
+  { name: "Compliance Library", does: "Legal & compliance documents",        using: [63, 58],   active30: 22 },
+  { name: "CE Tracking",        does: "CE discounts + compliance tracking",  using: [49, 41],   active30: 17 },
+  { name: "Growth Support",     does: "1:1 agency growth & strategy",        using: [27, 25],   active30: 9 },
+];
+const PRO_MEMBERS: { agency: string; contact: string; state: string; since: string; users: number; tools: string[]; lastActive: string }[] = [
+  { agency: "Summit Risk Partners",    contact: "Dana Pruitt",  state: "CA", since: "Feb 2026", users: 14, tools: ["Outmarket", "NowCerts", "Commercial Leads", "CE Tracking"], lastActive: "Today" },
+  { agency: "Harbor & Vale Insurance", contact: "Marcus Reed",  state: "WA", since: "Mar 2026", users: 9,  tools: ["Outmarket", "NowCerts", "Compliance Library"],              lastActive: "Yesterday" },
+  { agency: "Meridian Coverage Group", contact: "Grace Lin",    state: "NY", since: "Jan 2026", users: 22, tools: ["Outmarket", "NowCerts", "Commercial Leads", "Growth Support", "CE Tracking"], lastActive: "Today" },
+  { agency: "Cedar Ridge Agency",      contact: "Priya Nair",   state: "OR", since: "Jun 2026", users: 5,  tools: ["NowCerts"],                                                 lastActive: "3 days ago" },
+  { agency: "Northgate Assurance",     contact: "Hannah Boyd",  state: "IL", since: "Apr 2026", users: 11, tools: ["Outmarket", "Commercial Leads"],                            lastActive: "Today" },
+  { agency: "Ironwood Insurance",      contact: "Nadia Khan",   state: "AZ", since: "Sep 2026", users: 7,  tools: ["Outmarket", "NowCerts", "Compliance Library"],              lastActive: "1 week ago" },
+  { agency: "Blue Harbor Brokers",     contact: "Owen Clarke",  state: "CA", since: "Oct 2026", users: 4,  tools: ["Outmarket"],                                                lastActive: "2 days ago" },
+];
 
 // ── Drill-down segments ───────────────────────────────────────────────────
 const AGENCY_POOL = [
@@ -112,13 +131,13 @@ function SampleTag() {
 function Delta({ cur, prev, unit = "", inverse = false, label, isDark }: { cur: number; prev: number; unit?: string; inverse?: boolean; label?: string; isDark: boolean }) {
   const diff = cur - prev;
   const good = diff === 0 ? null : inverse ? diff < 0 : diff > 0;
-  const color = good === null ? (isDark ? "#9AA0AD" : "#6B7280") : good ? (isDark ? "#34D399" : "#059669") : (isDark ? "#F87171" : "#DC2626");
+  const color = good === null ? (isDark ? "#C4C8D0" : "#4B5563") : good ? (isDark ? "#34D399" : "#059669") : (isDark ? "#F87171" : "#DC2626");
   const Icon = diff >= 0 ? ArrowUpRight : ArrowDownRight;
   const mag = Number.isInteger(diff) ? Math.abs(diff).toString() : Math.abs(diff).toFixed(1);
   return (
     <span className="inline-flex items-center gap-1 text-[11px]" style={{ fontFamily: FONT }}>
       <span className="inline-flex items-center gap-0.5 font-semibold" style={{ color }}><Icon className="w-3 h-3" strokeWidth={2.5} />{mag}{unit}</span>
-      <span style={{ color: isDark ? "#9AA0AD" : "#6B7280" }}>vs {label ?? PREV_AS_OF}</span>
+      <span style={{ color: isDark ? "#C4C8D0" : "#4B5563" }}>vs {label ?? PREV_AS_OF}</span>
     </span>
   );
 }
@@ -205,8 +224,8 @@ export default function Reports({ isDark = false, onNavigate }: ReportsProps) {
   const c = {
     heading: isDark ? "#F9FAFB" : "#1C2030",
     text:    isDark ? "#E5E7EB" : "#1F2937",
-    muted:   isDark ? "#C4C8D0" : "#4B5563",
-    faint:   isDark ? "#9AA0AD" : "#6B7280",
+    muted:   isDark ? "#D1D5DB" : "#374151",
+    faint:   isDark ? "#C4C8D0" : "#4B5563",
     line:    isDark ? "rgba(255,255,255,0.10)" : "#EBECF0",
     panel:   isDark ? "#14182E" : "#FFFFFF",
     panelAlt:isDark ? "#191D34" : "#FAFAFC",
@@ -218,7 +237,7 @@ export default function Reports({ isDark = false, onNavigate }: ReportsProps) {
   const TOTAL = ds.cur.total, LOGGED_IN = ds.cur.loggedin, ACTIVE_30 = ds.cur.active30, ACTIVE_7 = ds.cur.active7;
   const NO_LOGIN = TOTAL - LOGGED_IN, LAPSED = LOGGED_IN - ACTIVE_30;
   const pr = ds.prev;
-  const pNO = pr.total - pr.loggedin, pLAPSED = pr.loggedin - pr.active30;
+  const pNO = pr.total - pr.loggedin;
   const adoptNow = pct(LOGGED_IN, TOTAL), adoptPrev = pct(pr.loggedin, pr.total);
   const segCount: Record<SegKind, number> = { all: TOTAL, loggedin: LOGGED_IN, active: ACTIVE_30, weekly: ACTIVE_7, nologin: NO_LOGIN, dormant: LAPSED };
 
@@ -235,22 +254,17 @@ export default function Reports({ isDark = false, onNavigate }: ReportsProps) {
   const seriesMax = Math.max(...d.series.map(s => s.c));
   const lob = LOB_SHARES.map(l => ({ lob: l.lob, premium: d.premium[0] * l.share }));
 
-  // Overview grid: counts on top (click → drill-down list), rates below.
+  // Overview grid: counts on top (click → drill-down list); each rate sits
+  // directly under the count it's derived from (Never logged in under Tracked).
   const overview: { label: string; value: string; cur: number; prev: number; unit?: string; inverse?: boolean; info: string; kind?: SegKind }[] = [
     { label: "Agencies tracked", value: TOTAL.toLocaleString(), cur: TOTAL, prev: pr.total, info: "Unique agencies in the reporting universe", kind: "all" },
     { label: "Have logged in", value: LOGGED_IN.toLocaleString(), cur: LOGGED_IN, prev: pr.loggedin, info: "Agencies with at least one sign-in", kind: "loggedin" },
     { label: "Active · 30 days", value: ACTIVE_30.toLocaleString(), cur: ACTIVE_30, prev: pr.active30, info: "Agencies with portal activity in the last 30 days", kind: "active" },
     { label: "Active · 7 days", value: ACTIVE_7.toLocaleString(), cur: ACTIVE_7, prev: pr.active7, info: "Agencies with portal activity in the last 7 days", kind: "weekly" },
+    { label: "Never logged in", value: NO_LOGIN.toLocaleString(), cur: NO_LOGIN, prev: pNO, inverse: true, info: "Invited agencies with no recorded sign-in — onboarding opportunity", kind: "nologin" },
     { label: "Adoption rate", value: `${adoptNow}%`, cur: adoptNow, prev: adoptPrev, unit: " pts", info: "Share of tracked agencies that have logged in" },
     { label: "Monthly return rate", value: `${pct(ACTIVE_30, LOGGED_IN)}%`, cur: pct(ACTIVE_30, LOGGED_IN), prev: pct(pr.active30, pr.loggedin), unit: " pts", info: "Share of logged-in agencies active in the last 30 days" },
     { label: "Weekly return rate", value: `${pct(ACTIVE_7, ACTIVE_30)}%`, cur: pct(ACTIVE_7, ACTIVE_30), prev: pct(pr.active7, pr.active30), unit: " pts", info: "Share of monthly-active agencies also active in the last 7 days" },
-    { label: "Never logged in", value: NO_LOGIN.toLocaleString(), cur: NO_LOGIN, prev: pNO, inverse: true, info: "Invited agencies with no recorded sign-in — onboarding opportunity", kind: "nologin" },
-  ];
-  const funnel = [
-    { label: "Agencies tracked", sub: "total universe", n: TOTAL, pp: 100, grad: "linear-gradient(90deg,#5C2ED4,#7C3AED)", connector: `${pct1(LOGGED_IN, TOTAL)}% have created an individual login`, kind: "all" as SegKind },
-    { label: "Have logged in", sub: "adopted", n: LOGGED_IN, pp: adoptNow, grad: "linear-gradient(90deg,#A614C3,#D633E0)", connector: `${pct1(ACTIVE_30, LOGGED_IN)}% of adopters returned within 30 days`, kind: "loggedin" as SegKind },
-    { label: "Active in last 30 days", sub: "monthly active", n: ACTIVE_30, pp: pct(ACTIVE_30, TOTAL), grad: "linear-gradient(90deg,#C13FD6,#E05BE0)", connector: `${pct1(ACTIVE_7, ACTIVE_30)}% of monthly actives returned within 7 days`, kind: "active" as SegKind },
-    { label: "Active in last 7 days", sub: "weekly active", n: ACTIVE_7, pp: pct(ACTIVE_7, TOTAL), grad: TEAL_GRAD, connector: undefined as string | undefined, kind: "weekly" as SegKind },
   ];
   const winStats = [
     { label: "Active agencies", value: d.active[0].toLocaleString(), cur: d.active[0], prev: d.active[1] },
@@ -265,23 +279,24 @@ export default function Reports({ isDark = false, onNavigate }: ReportsProps) {
     { label: "Returning", value: `${tr.returning[0]}%`, cur: tr.returning[0], prev: tr.returning[1] },
   ];
 
-  const R = 54, CIRC = 2 * Math.PI * R, prog = (adoptNow / 100) * CIRC;
   const panel: React.CSSProperties = { background: c.panelAlt, border: `1px solid ${c.line}`, borderRadius: 18 };
-  const clickable = (kind: SegKind, node: React.ReactNode, cls = "") => (
-    <button type="button" onClick={() => setDrill(kind)} className={`text-left cursor-pointer ${cls}`} style={{ fontFamily: FONT }}>{node}</button>
-  );
 
   const composition = (items: { name: string; value: number; display: string }[], donutSize = 116, legendCols = 1) => {
     const colored = items.map((it, i) => ({ ...it, color: PALETTE[i % PALETTE.length] }));
     return <Composition items={colored} size={donutSize} legendCols={legendCols} colors={{ heading: c.heading, text: c.text, faint: c.faint, track: c.track }} />;
   };
+  // Same boxed look as the Agency Adoption Overview: label, big value,
+  // change pill (shown when Compare is on).
   const statRow = (items: { label: string; value: string; cur: number; prev: number }[]) => (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-5">
-      {items.map(s => (
-        <div key={s.label}>
-          <div className="text-[26px] font-bold leading-none tracking-tight" style={{ color: c.heading }}>{s.value}</div>
-          <div className="mt-2 mb-1" style={{ minHeight: 14 }}>{compare && <Delta cur={s.cur} prev={s.prev} label={actPrevLabel} isDark={isDark} />}</div>
-          <div className="text-[12px]" style={{ color: c.muted }}>{s.label}</div>
+    <div className="rounded-xl overflow-hidden grid grid-cols-2 lg:grid-cols-4" style={{ background: c.panel, border: `1px solid ${c.line}` }}>
+      {items.map((s, i) => (
+        <div key={s.label} className="px-6 py-5"
+          style={{ borderLeft: i % 4 ? `1px solid ${c.line}` : undefined }}>
+          <div className="text-[13px] font-semibold" style={{ color: c.text }}>{s.label}</div>
+          <div className="flex items-center justify-between gap-3 mt-2">
+            <span className="text-[30px] font-extrabold leading-none tracking-tight" style={{ color: c.heading }}>{s.value}</span>
+            {compare && <DeltaPill cur={s.cur} prev={s.prev} isDark={isDark} />}
+          </div>
         </div>
       ))}
     </div>
@@ -379,81 +394,36 @@ export default function Reports({ isDark = false, onNavigate }: ReportsProps) {
         </div>
       </div>
 
-      {/* Funnel + Engagement */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1.35fr_1fr] gap-5 mb-6">
-        <div className="p-7" style={panel}>
-          <div className="flex items-baseline justify-between mb-6">
-            <h3 className="text-[13px] font-bold uppercase" style={{ letterSpacing: "0.1em", color: c.heading }}>Adoption funnel</h3>
-            <span className="text-[11.5px]" style={{ color: c.faint }}>Agencies · share of {TOTAL.toLocaleString()}</span>
-          </div>
-          <div className="flex flex-col gap-1">
-            {funnel.map((f) => (
-              <div key={f.label}>
-                {clickable(f.kind, (
-                  <>
-                    <div className="flex items-baseline justify-between gap-3 mb-1.5">
-                      <span className="text-[13px]" style={{ color: c.heading }}><strong>{f.label}</strong> <span style={{ color: c.faint }}>{f.sub}</span></span>
-                      <span className="text-[13px]" style={{ color: c.heading }}><strong>{f.n.toLocaleString()}</strong> <span className="text-[11.5px]" style={{ color: c.faint }}>{f.pp}%</span></span>
-                    </div>
-                    <div className="h-[18px] rounded-full" style={{ background: c.track }}><div className="h-full rounded-full" style={{ width: `${Math.max(f.pp, 2)}%`, background: f.grad }} /></div>
-                  </>
-                ), "w-full")}
-                {f.connector && <div className="text-[11px] py-2 pl-1" style={{ color: TEAL }}>↘ {f.connector}</div>}
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="p-7" style={panel}>
-          <div className="flex items-baseline justify-between mb-5">
-            <h3 className="text-[13px] font-bold uppercase" style={{ letterSpacing: "0.1em", color: c.heading }}>Engagement</h3>
-            <span className="text-[11.5px]" style={{ color: c.faint }}>Repeat usage</span>
-          </div>
-          <div className="flex items-center gap-5 mb-6">
-            <div className="relative flex-shrink-0" style={{ width: 128, height: 128 }}>
-              <svg width="128" height="128" viewBox="0 0 128 128">
-                <circle cx="64" cy="64" r={R} fill="none" stroke={c.track} strokeWidth="14" />
-                <circle cx="64" cy="64" r={R} fill="none" stroke="#A614C3" strokeWidth="14" strokeLinecap="round" strokeDasharray={`${prog} ${CIRC - prog}`} transform="rotate(-90 64 64)" />
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-[22px] font-extrabold leading-none" style={{ color: c.heading }}>{adoptNow}%</span>
-                <span className="text-[9px] font-bold uppercase mt-1" style={{ letterSpacing: "0.1em", color: c.faint }}>Adopted</span>
-              </div>
+      {/* Opportunities — never logged in / lapsed, framed as next steps.
+          Compact (no oversized numbers or red deltas); whole row opens the list. */}
+      <div className="rounded-xl overflow-hidden mb-10 grid grid-cols-1 lg:grid-cols-2" style={{ background: c.panel, border: `1px solid ${c.line}` }}>
+        {[
+          { kind: "nologin" as SegKind, icon: UserPlus, title: "Ready to onboard",
+            text: <><strong style={{ color: c.heading }}>{NO_LOGIN} agencies</strong> haven&apos;t logged in yet.</>,
+            action: "Onboard" },
+          { kind: "dormant" as SegKind, icon: RefreshCw, title: "Ready to re-engage",
+            text: <><strong style={{ color: c.heading }}>{LAPSED} agencies</strong> have used NorbieLink before but not in the last 30 days.</>,
+            action: "Re-engage" },
+        ].map((o, i) => (
+          <div key={o.kind} role="button" tabIndex={0}
+            onClick={() => setDrill(o.kind)}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setDrill(o.kind); } }}
+            className="flex items-start gap-3.5 px-6 py-5 cursor-pointer transition-colors"
+            style={{ borderLeft: i ? `1px solid ${c.line}` : undefined }}
+            onMouseEnter={e => { e.currentTarget.style.background = isDark ? "rgba(255,255,255,0.05)" : "#F5F6F8"; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}>
+            <div className="flex items-center justify-center rounded-lg flex-shrink-0" style={{ width: 36, height: 36, background: isDark ? "rgba(166,20,195,0.16)" : "rgba(166,20,195,0.08)" }}>
+              <o.icon className="w-4 h-4" style={{ color: "#A614C3" }} />
             </div>
-            <div className="flex flex-col gap-2">
-              {clickable("loggedin", <span className="text-[12.5px] flex items-center gap-2" style={{ color: c.muted }}><span style={{ width: 9, height: 9, borderRadius: 999, background: "#A614C3" }} /><strong style={{ color: c.heading }}>{LOGGED_IN}</strong> logged in</span>)}
-              {clickable("nologin", <span className="text-[12.5px] flex items-center gap-2" style={{ color: c.muted }}><span style={{ width: 9, height: 9, borderRadius: 999, background: c.track }} /><strong style={{ color: c.heading }}>{NO_LOGIN}</strong> never logged in</span>)}
-              <Delta cur={adoptNow} prev={adoptPrev} unit=" pts" label={adoptPrevLabel} isDark={isDark} />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-[13px] font-semibold" style={{ color: c.heading }}>{o.title}</span>
+                <span className="text-[12px] font-semibold whitespace-nowrap" style={{ color: "#A614C3" }}>{o.action} →</span>
+              </div>
+              <p className="text-[12.5px] leading-relaxed mt-1" style={{ color: c.muted }}>{o.text}</p>
             </div>
           </div>
-          <div className="mb-4">
-            <div className="text-[24px] font-extrabold leading-none mb-1.5" style={{ color: TEAL }}>{pct(ACTIVE_30, LOGGED_IN)}%</div>
-            <p className="text-[12px] leading-relaxed" style={{ color: c.muted }}>of agencies that have used NorbieLink were active in the last 30 days — healthy repeat engagement, not one-and-done logins.</p>
-          </div>
-          <div>
-            <div className="text-[24px] font-extrabold leading-none mb-1.5" style={{ color: "#A614C3" }}>{pct(ACTIVE_7, ACTIVE_30)}%</div>
-            <p className="text-[12px] leading-relaxed" style={{ color: c.muted }}>of monthly actives also logged in during the last 7 days, showing a solid core of habitual weekly users.</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Never logged in / Lapsed */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-10">
-        <div className="p-6 flex gap-5" style={panel}>
-          <button type="button" onClick={() => setDrill("nologin")} className="text-[40px] font-extrabold leading-none flex-shrink-0 cursor-pointer" style={{ fontFamily: FONT, color: "#A614C3" }}>{NO_LOGIN}</button>
-          <div>
-            <div className="flex items-center gap-2 mb-1.5"><span className="text-[12px] font-bold uppercase" style={{ letterSpacing: "0.08em", color: c.heading }}>Never logged in · {pct(NO_LOGIN, TOTAL)}%</span><Delta cur={NO_LOGIN} prev={pNO} inverse label={adoptPrevLabel} isDark={isDark} /></div>
-            <p className="text-[12px] leading-relaxed mb-3" style={{ color: c.muted }}>Agencies with no recorded login. The single largest headroom in the program — a defined list, reachable with guided onboarding and admin-led setup.</p>
-            <button type="button" onClick={() => setDrill("nologin")} className="inline-block px-2.5 py-1 rounded text-[10.5px] font-bold uppercase cursor-pointer" style={{ fontFamily: FONT, letterSpacing: "0.06em", color: TEAL, background: isDark ? "rgba(45,212,191,0.14)" : "#E9F8F5" }}>Onboard</button>
-          </div>
-        </div>
-        <div className="p-6 flex gap-5" style={panel}>
-          <button type="button" onClick={() => setDrill("dormant")} className="text-[40px] font-extrabold leading-none flex-shrink-0 cursor-pointer" style={{ fontFamily: FONT, color: "#7C3AED" }}>{LAPSED}</button>
-          <div>
-            <div className="flex items-center gap-2 mb-1.5"><span className="text-[12px] font-bold uppercase" style={{ letterSpacing: "0.08em", color: c.heading }}>Lapsed · {pct(LAPSED, LOGGED_IN)}% of adopters</span><Delta cur={LAPSED} prev={pLAPSED} inverse label={adoptPrevLabel} isDark={isDark} /></div>
-            <p className="text-[12px] leading-relaxed mb-3" style={{ color: c.muted }}>Logged in at some point but inactive for 30+ days ({LOGGED_IN} adopted − {ACTIVE_30} active). They already know the portal — these need a reason to return, not a first-time intro.</p>
-            <button type="button" onClick={() => setDrill("dormant")} className="inline-block px-2.5 py-1 rounded text-[10.5px] font-bold uppercase cursor-pointer" style={{ fontFamily: FONT, letterSpacing: "0.06em", color: "#7C3AED", background: isDark ? "rgba(124,58,237,0.16)" : "#F1EBFE" }}>Re-engage</button>
-          </div>
-        </div>
+        ))}
       </div>
 
       {/* ── Activity & traffic ──────────────────────────────────────────── */}
@@ -464,7 +434,7 @@ export default function Reports({ isDark = false, onNavigate }: ReportsProps) {
             <SampleTag />
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-[12px]" style={{ color: c.faint }}>{periodLabel}</span>
+            <span className="text-[12px]" style={{ color: c.faint }}>{periodLabel}{compare && ` · vs ${actPrevLabel}`}</span>
             <button type="button" onClick={() => setCompare(v => !v)} className="flex items-center gap-2 text-[12.5px] font-medium cursor-pointer" style={{ fontFamily: FONT, color: c.muted }}>
               <span className="flex items-center justify-center" style={{ width: 15, height: 15, borderRadius: 4, border: `1.5px solid ${compare ? "#A614C3" : c.line}`, background: compare ? RAZZ : "transparent" }}>{compare && <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />}</span>
               Compare
@@ -530,6 +500,111 @@ export default function Reports({ isDark = false, onNavigate }: ReportsProps) {
               {composition(col.items.map(i => ({ name: i.name, value: i.share, display: `${i.share}%` })), 96, 1)}
             </div>
           ))}
+        </div>
+      </div>
+
+      {/* ── ProSuite: who's on it and which tools they use ─────────────── */}
+      <div className="pt-8 mb-10" style={{ borderTop: `1px solid ${c.line}` }}>
+        <div className="flex items-start justify-between gap-4 flex-wrap mb-6">
+          <div className="flex items-center gap-2">
+            <h3 className="text-[13px] font-bold uppercase" style={{ letterSpacing: "0.1em", color: c.heading }}>ProSuite</h3>
+            <SampleTag />
+          </div>
+          <button type="button"
+            onClick={() => downloadCsv("norbielink-prosuite-members.csv", [["Agency", "Contact", "State", "Member since", "Users", "Tools used", "Last active"], ...PRO_MEMBERS.map(m => [m.agency, m.contact, m.state, m.since, m.users, m.tools.join("; "), m.lastActive])])}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold cursor-pointer"
+            style={{ fontFamily: FONT, color: c.text, background: c.panel, border: `1px solid ${c.line}` }}>
+            <Download className="w-3.5 h-3.5" style={{ color: c.faint }} /> Export members
+          </button>
+        </div>
+
+        {/* Summary */}
+        <div className="rounded-xl overflow-hidden mb-6 grid grid-cols-2 lg:grid-cols-4" style={{ background: c.panel, border: `1px solid ${c.line}` }}>
+          {[
+            { label: "ProSuite members", value: PRO_STATS.members[0].toLocaleString(), sub: `${pct(PRO_STATS.members[0], LOGGED_IN)}% of logged-in agencies`, cur: PRO_STATS.members[0], prev: PRO_STATS.members[1] },
+            { label: "New this period", value: PRO_STATS.newMembers[0].toLocaleString(), sub: periodLabel, cur: PRO_STATS.newMembers[0], prev: PRO_STATS.newMembers[1] },
+            { label: "Avg. tools per agency", value: PRO_STATS.avgTools[0].toFixed(1), sub: `of ${PRO_TOOLS.length} ProSuite tools`, cur: PRO_STATS.avgTools[0], prev: PRO_STATS.avgTools[1] },
+            { label: "Renewals due · 60 days", value: PRO_STATS.renewals60.toLocaleString(), sub: "Annual plan renewals coming up", cur: null as number | null, prev: null as number | null },
+          ].map((m, i) => (
+            <div key={m.label} className="px-6 py-5" style={{ borderLeft: i % 2 ? `1px solid ${c.line}` : undefined, borderTop: i >= 2 ? `1px solid ${c.line}` : undefined }}>
+              <div className="text-[13px] font-semibold" style={{ color: c.text }}>{m.label}</div>
+              <div className="flex items-center justify-between gap-3 mt-2">
+                <span className="text-[30px] font-extrabold leading-none tracking-tight" style={{ color: c.heading }}>{m.value}</span>
+                {m.cur !== null && m.prev !== null && <DeltaPill cur={m.cur} prev={m.prev} isDark={isDark} />}
+              </div>
+              <div className="text-[11.5px] mt-2" style={{ color: c.muted }}>{m.sub}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Tool usage */}
+        <div className="p-5 mb-6" style={panel}>
+          <div className="flex items-baseline justify-between gap-3 flex-wrap mb-4">
+            <span className="text-[13px] font-semibold" style={{ color: c.heading }}>Tools in use</span>
+            <span className="text-[12px]" style={{ color: c.muted }}>Agencies using each tool · share of {PRO_STATS.members[0]} members</span>
+          </div>
+          <div className="flex flex-col">
+            {PRO_TOOLS.map((t, i) => {
+              const share = pct(t.using[0], PRO_STATS.members[0]);
+              return (
+                <div key={t.name} className="grid items-center gap-4 py-3" style={{ gridTemplateColumns: "minmax(170px,1.1fr) 2fr 150px 104px", borderTop: i ? `1px solid ${c.line}` : undefined }}>
+                  <div className="min-w-0">
+                    <div className="text-[13px] font-semibold" style={{ color: c.heading }}>{t.name}</div>
+                    <div className="text-[11.5px] truncate" style={{ color: c.muted }}>{t.does}</div>
+                  </div>
+                  <div className="h-[10px] rounded-full" style={{ background: c.track }}>
+                    <div className="h-full rounded-full" style={{ width: `${Math.max(share, 2)}%`, background: RAZZ }} />
+                  </div>
+                  <div className="text-[12.5px] text-right whitespace-nowrap" style={{ color: c.text }}>
+                    <span className="font-semibold" style={{ color: c.heading }}>{t.using[0]}</span> agencies · {share}%
+                    <div className="text-[11px]" style={{ color: c.muted }}>{t.active30} active · 30 days</div>
+                  </div>
+                  <div className="justify-self-end"><DeltaPill cur={t.using[0]} prev={t.using[1]} isDark={isDark} /></div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Members */}
+        <div className="rounded-xl overflow-hidden" style={{ background: c.panel, border: `1px solid ${c.line}` }}>
+          <div className="px-5 py-4 flex items-baseline justify-between gap-3" style={{ borderBottom: `1px solid ${c.line}` }}>
+            <span className="text-[13px] font-semibold" style={{ color: c.heading }}>ProSuite members</span>
+            <span className="text-[12px]" style={{ color: c.muted }}>Showing {PRO_MEMBERS.length} of {PRO_STATS.members[0]} · most recently active</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left" style={{ minWidth: 760 }}>
+              <thead>
+                <tr className="text-[11px] font-bold uppercase" style={{ letterSpacing: "0.08em", color: c.muted, background: c.panelAlt }}>
+                  <th className="px-5 py-2.5 font-bold">Agency</th>
+                  <th className="px-3 py-2.5 font-bold">Member since</th>
+                  <th className="px-3 py-2.5 font-bold text-right">Users</th>
+                  <th className="px-3 py-2.5 font-bold">Tools used</th>
+                  <th className="px-5 py-2.5 font-bold">Last active</th>
+                </tr>
+              </thead>
+              <tbody>
+                {PRO_MEMBERS.map(m => (
+                  <tr key={m.agency} style={{ borderTop: `1px solid ${c.line}` }}>
+                    <td className="px-5 py-3">
+                      <div className="text-[13px] font-semibold" style={{ color: c.heading }}>{m.agency}</div>
+                      <div className="text-[11.5px]" style={{ color: c.muted }}>{m.contact} · {m.state}</div>
+                    </td>
+                    <td className="px-3 py-3 text-[12.5px] whitespace-nowrap" style={{ color: c.text }}>{m.since}</td>
+                    <td className="px-3 py-3 text-[12.5px] text-right" style={{ color: c.text }}>{m.users}</td>
+                    <td className="px-3 py-3">
+                      <div className="flex flex-wrap gap-1.5">
+                        {m.tools.map(tool => (
+                          <span key={tool} className="text-[11px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap" style={{ color: isDark ? "#E9B8F2" : "#7E0F95", background: isDark ? "rgba(166,20,195,0.18)" : "rgba(166,20,195,0.08)" }}>{tool}</span>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="px-5 py-3 text-[12.5px] whitespace-nowrap" style={{ color: c.text }}>{m.lastActive}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
