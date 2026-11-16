@@ -13,6 +13,7 @@ import Website from "@/components/Website";
 import Pricing from "@/components/Pricing";
 import Reports from "@/components/Reports";
 import TeamSetupModal from "@/components/TeamSetupModal";
+import NewAgencyTeamModal from "@/components/NewAgencyTeamModal";
 import TeamSetupDismissToast from "@/components/TeamSetupDismissToast";
 
 const TEAM_SETUP_DONE_KEY = "norbielink.teamSetupDone";
@@ -26,6 +27,17 @@ function readTeamSetupDone(): boolean {
   }
 }
 const noopSubscribe = () => () => {};
+
+// Mock: which first-run popup to show. A real agency would decide this from
+// its user count (only the primary contact → new). For demos, `?agency=new`
+// shows the "Add your team" popup; anything else shows the admin picker.
+function readIsNewAgency(): boolean {
+  try {
+    return new URLSearchParams(window.location.search).get("agency") === "new";
+  } catch {
+    return false;
+  }
+}
 
 interface DashboardShellProps {
   children: React.ReactNode;
@@ -55,6 +67,7 @@ export default function DashboardShell({ children, pageTitle }: DashboardShellPr
   // surface back until the client has read it — so a finished user never
   // sees the modal flash on load. `?teamSetup=reset` clears it for demos.
   const storedTeamSetupDone = useSyncExternalStore(noopSubscribe, readTeamSetupDone, () => null);
+  const isNewAgency = useSyncExternalStore(noopSubscribe, readIsNewAgency, () => false);
   const teamSetupLoaded = storedTeamSetupDone !== null;
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get("teamSetup") !== "reset") return;
@@ -78,6 +91,9 @@ export default function DashboardShell({ children, pageTitle }: DashboardShellPr
   // boolean (it would remount AGAIN when the one-shot flag clears, undoing
   // the Users tab), so a counter is the simplest stable mount token.
   const [teamSetupMountKey, setTeamSetupMountKey] = useState(0);
+  // New-agency notice → "Add users" lands on Admin › Users with the Add New
+  // User modal already open. Read once when Agencies mounts (keyed remount).
+  const [teamSetupOpenAddUser, setTeamSetupOpenAddUser] = useState(false);
   // Lifted spotlight-visible state — shared between the Users-tab coachmark
   // (inside AgencyDetailView) and the TopBar bell. Both call `dismiss` to
   // flip it off (coachmark X / coachmark backdrop click), and the shell runs
@@ -181,6 +197,7 @@ export default function DashboardShell({ children, pageTitle }: DashboardShellPr
     // the persistent Users-tab coachmark) just closes the modal — no
     // repeat blur / halo / toast, since they already know where everything
     // lives.
+    setTeamSetupOpenAddUser(false);
     if (teamSetupSpotlightFired) return;
     setActivePage("Admin");
     setTeamSetupSpotlightUsers(true);
@@ -188,6 +205,19 @@ export default function DashboardShell({ children, pageTitle }: DashboardShellPr
     setTeamSetupMountKey(k => k + 1);
     setTeamSetupDismissHintOpen(true);
     setTeamSetupSpotlightFired(true);
+  };
+
+  // New-agency notice CTA: close the notice and go straight to adding users.
+  // Not "done" — the banner/bell stay until they finish in the Users tab.
+  // Skips the first-dismiss spotlight/toast since they're heading there now.
+  const goToAddUsers = () => {
+    setTeamSetupModalDismissed(true);
+    setTeamSetupDismissHintOpen(false);
+    setTeamSetupSpotlightFired(true);
+    setActivePage("Admin");
+    setTeamSetupSpotlightUsers(true);
+    setTeamSetupOpenAddUser(true);
+    setTeamSetupMountKey(k => k + 1);
   };
 
   if (activePage === "Website") {
@@ -257,6 +287,8 @@ export default function DashboardShell({ children, pageTitle }: DashboardShellPr
             teamSetupPending={teamSetupPending}
             onOpenTeamSetup={openTeamSetup}
             onCompleteTeamSetup={completeTeamSetup}
+            openAddUserOnMount={teamSetupOpenAddUser}
+            newAgency={isNewAgency}
           />
         );
       case "Accounting · Statements":
@@ -320,13 +352,23 @@ export default function DashboardShell({ children, pageTitle }: DashboardShellPr
 
       {/* Team Setup prompt — mounted at shell level so the overlay covers the
           whole viewport and so the modal survives page changes. */}
-      <TeamSetupModal
-        isDark={darkMode}
-        open={modalOpen}
-        onClose={dismissTeamSetupModal}
-        onRemindLater={dismissTeamSetupModal}
-        onSave={completeTeamSetup}
-      />
+      {isNewAgency ? (
+        <NewAgencyTeamModal
+          isDark={darkMode}
+          open={modalOpen}
+          onClose={dismissTeamSetupModal}
+          onRemindLater={dismissTeamSetupModal}
+          onAddUsers={goToAddUsers}
+        />
+      ) : (
+        <TeamSetupModal
+          isDark={darkMode}
+          open={modalOpen}
+          onClose={dismissTeamSetupModal}
+          onRemindLater={dismissTeamSetupModal}
+          onSave={completeTeamSetup}
+        />
+      )}
 
       {/* Dismiss-hint toast — pops after the modal is X'd / "Remind me later"'d
           so the user knows the prompt is still reachable (banner + bell).

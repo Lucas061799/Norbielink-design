@@ -19,6 +19,9 @@ import { StyledSelect } from "./StyledSelect";
 
 const FONT = "var(--font-montserrat), Montserrat, sans-serif";
 const AGENCY_PHONE = "+1 (888) 555-0188";
+// Legacy BTIS user import (Users tab banner + "Import from Legacy" button).
+// Hidden until we decide whether this feature ships; flip to true to restore.
+const LEGACY_IMPORT_ENABLED = false;
 
 // UserCog icon stroked with the brand magenta. Used to denote admins.
 function GradientUserCog({ size = 18 }: { size?: number }) {
@@ -743,7 +746,7 @@ const StatusPill = ({ status, isDark }: { status: string; isDark: boolean }) => 
   </span>
 );
 
-function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleStar, inactiveUserIds, setInactiveUserIds, statusInactiveUserIds, setStatusInactiveUserIds, removedUserIds, setRemovedUserIds, bookRolled, setBookRolled, allAgencies, initialTab, onNavigateToAgency, viewMode = "internal", itcRecords, setItcRecords, isSuperAdmin = true, pageTitleOverride, spotlightUsers = false, onSpotlightConsumed, spotlightActive = false, onSpotlightDismiss, teamSetupPending = false, onOpenTeamSetup, onCompleteTeamSetup, onStartImpersonation }: {
+function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleStar, inactiveUserIds, setInactiveUserIds, statusInactiveUserIds, setStatusInactiveUserIds, removedUserIds, setRemovedUserIds, bookRolled, setBookRolled, allAgencies, initialTab, onNavigateToAgency, viewMode = "internal", itcRecords, setItcRecords, isSuperAdmin = true, pageTitleOverride, spotlightUsers = false, onSpotlightConsumed, spotlightActive = false, onSpotlightDismiss, teamSetupPending = false, onOpenTeamSetup, onCompleteTeamSetup, onStartImpersonation, openAddUserOnMount = false, newAgency = false }: {
   agency: AgencyDetail;
   isDark: boolean;
   onBack: () => void;
@@ -810,6 +813,8 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
   // calls this with the chosen user's identity, and the shell flips into
   // acting-as mode (banner + routes back to Marketplace).
   onStartImpersonation?: (payload: { userName: string; userEmail: string; agencyName: string; agencyCode: string }) => void;
+  openAddUserOnMount?: boolean;
+  newAgency?: boolean;
 }) {
   // Mock role toggle for the Admin (client) section. In production internal & client are
   // separate deployments and this flag would come from auth; here we let the demo user
@@ -1897,7 +1902,8 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
       .replace(/[^a-zA-Z0-9_-]+/g, "_");
     await downloadExcelTemplate(sentSummary.skipped, `${base}_skipped.xlsx`);
   };
-  const [addUserOpen,     setAddUserOpen]     = useState(false);
+  // Opens on mount when the new-agency notice's "Add users" sent them here.
+  const [addUserOpen,     setAddUserOpen]     = useState(openAddUserOnMount);
   const [editUserId,      setEditUserId]      = useState<string|null>(null);
   const [addressModalOpen, setAddressModalOpen] = useState(false);
   const [callModalOpen, setCallModalOpen] = useState(false);
@@ -8087,9 +8093,12 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                     Assign admins & titles here
                   </div>
                   <div className="text-[12px] mt-0.5" style={{ ...font, color: c.muted }}>
-                    Click the <span style={{ fontWeight: 600, color: c.text }}>Admin</span> icon in any row to grant or revoke admin. For <span style={{ fontWeight: 600, color: c.text }}>Job title</span> changes, use the <span style={{ fontWeight: 600, color: c.text }}>⋮</span> menu → Edit User, or reopen the bulk setup.
+                    Click the <span style={{ fontWeight: 600, color: c.text }}>Admin</span> icon in any row to grant or revoke admin. For <span style={{ fontWeight: 600, color: c.text }}>Job title</span> changes, use the <span style={{ fontWeight: 600, color: c.text }}>⋮</span> menu → Edit User{newAgency ? "." : ", or reopen the bulk setup."}
                   </div>
                 </div>
+                {/* New agencies have no bulk setup to reopen (the notice just
+                    points here), so the tip is text-only for them. */}
+                {!newAgency && (
                 <div className="flex items-center gap-2 flex-shrink-0 self-start">
                   {onCompleteTeamSetup && (
                     <button
@@ -8122,6 +8131,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                     </button>
                   )}
                 </div>
+                )}
               </div>
             )}
             {/* Legacy BTIS auto-detect banner — shown when there are new
@@ -8132,7 +8142,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                 Matches the "Pending updates" banner style (neutral card
                 + razz-gradient title + razz-stroked icon) so it reads
                 as one of the standard alert rows. */}
-            {viewMode === "client" && !legacyBannerDismissed && legacyNewCount > 0 && (
+            {LEGACY_IMPORT_ENABLED && viewMode === "client" && !legacyBannerDismissed && legacyNewCount > 0 && (
               <div className="rounded-xl p-4 mb-4 flex items-start gap-3"
                 style={{
                   background: isDark ? "rgba(255,255,255,0.04)" : "#F9FAFB",
@@ -8233,7 +8243,8 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                   admin can still migrate on behalf of an agency. The
                   auto-detect BANNER stays client-only (less useful as a
                   nudge for internal staff), but the manual entry point
-                  is universal. */}
+                  is universal. Hidden while LEGACY_IMPORT_ENABLED is off. */}
+              {LEGACY_IMPORT_ENABLED && (
               <button className="flex items-center gap-[10px] text-[12px] font-semibold transition-all flex-shrink-0"
                 style={{ fontFamily:FONT, height:37, padding:"9px 16px", borderRadius:"5.58px",
                   border: isDark ? "1.04px solid rgba(255,255,255,0.15)" : "1.04px solid #E5E7EB",
@@ -8250,6 +8261,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                 onClick={e=>{e.stopPropagation(); openLegacyImport();}}>
                 <Download className="w-3.5 h-3.5" style={{ color: "#A614C3" }} />Import from Legacy
               </button>
+              )}
               <div className="ml-auto flex items-center gap-2">
                 {/* Archive toggle removed — the "Deactivate User" action now permanently removes
                     the user (after reassigning their accounts) instead of moving them to an
@@ -11444,7 +11456,7 @@ function AddAgencyForm({ isDark, onSaveForLater, onDiscard, initialDraft, c, btn
 }
 
 /* ─── Component ─────────────────────────────────────────────────────────── */
-export default function Agencies({ isDark, clientMode = false, initialTab, pageTitleOverride, spotlightUsers = false, onSpotlightConsumed, spotlightActive = false, onSpotlightDismiss, teamSetupPending = false, onOpenTeamSetup, onCompleteTeamSetup, onStartImpersonation }: { isDark: boolean; clientMode?: boolean; initialTab?: DetailTab; pageTitleOverride?: string; spotlightUsers?: boolean; onSpotlightConsumed?: () => void; spotlightActive?: boolean; onSpotlightDismiss?: () => void; teamSetupPending?: boolean; onOpenTeamSetup?: () => void; onCompleteTeamSetup?: () => void; onStartImpersonation?: (payload: { userName: string; userEmail: string; agencyName: string; agencyCode: string }) => void }) {
+export default function Agencies({ isDark, clientMode = false, initialTab, pageTitleOverride, spotlightUsers = false, onSpotlightConsumed, spotlightActive = false, onSpotlightDismiss, teamSetupPending = false, onOpenTeamSetup, onCompleteTeamSetup, onStartImpersonation, openAddUserOnMount = false, newAgency = false }: { isDark: boolean; clientMode?: boolean; initialTab?: DetailTab; pageTitleOverride?: string; spotlightUsers?: boolean; onSpotlightConsumed?: () => void; spotlightActive?: boolean; onSpotlightDismiss?: () => void; teamSetupPending?: boolean; onOpenTeamSetup?: () => void; onCompleteTeamSetup?: () => void; onStartImpersonation?: (payload: { userName: string; userEmail: string; agencyName: string; agencyCode: string }) => void; openAddUserOnMount?: boolean; newAgency?: boolean }) {
   const [search, setSearch]           = useState("");
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("All");
   // Per-tab card-selection state — used to visually pin the active stat card
@@ -11546,7 +11558,12 @@ export default function Agencies({ isDark, clientMode = false, initialTab, pageT
   // Lifted from AgencyDetailView so deactivations propagate to the All Users tab in the main view.
   const [inactiveUserIds, setInactiveUserIds] = useState<Set<string>>(new Set());
   const [statusInactiveUserIds, setStatusInactiveUserIds] = useState<Set<string>>(new Set());
-  const [removedUserIds,  setRemovedUserIds]  = useState<Set<string>>(new Set());
+  // New agency (mock): only the primary contact exists yet, so the client's
+  // own agency starts with every other user hidden from the Users tab.
+  const [removedUserIds,  setRemovedUserIds]  = useState<Set<string>>(() =>
+    newAgency
+      ? new Set(mockAgencyUsers.filter(u => u.agencyId === "1" && u.id !== "u1").map(u => u.id))
+      : new Set());
   const [allUsersShowInactive, setAllUsersShowInactive] = useState(false);
   // Book Roll state: maps source agency id to the target agency code + effective date.
   // Used to flip the source agency's display to Unappointed (reason: Sold, soldTo: <code>).
@@ -12105,6 +12122,8 @@ export default function Agencies({ isDark, clientMode = false, initialTab, pageT
         teamSetupPending={teamSetupPending}
         onOpenTeamSetup={onOpenTeamSetup}
         onCompleteTeamSetup={onCompleteTeamSetup}
+        openAddUserOnMount={openAddUserOnMount}
+        newAgency={newAgency}
       />
     );
   }
