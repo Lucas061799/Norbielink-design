@@ -9,8 +9,8 @@ import { X, UserPlus, Users, FileText, Calculator, ArrowRight } from "lucide-rea
 // Trigger (mock): the agency was just created and has no users in NorbieLink
 // besides the primary contact (the signed-in user). There's no roster to pick
 // admins from, so unlike TeamSetupModal this is just a notice: it explains
-// what Admins can do and sends the user to Admin › Users › Add New User,
-// where they add each person (and set Admin / job title) themselves.
+// what Admins can do and sends the user to Admin › Users, where they add
+// people one at a time (Add New User) or in bulk (Import Users).
 //
 // Shares TeamSetupModal's visual language (2xl card, Montserrat, razz CTA)
 // and its dismissal surfaces in DashboardShell (X / Remind me later →
@@ -25,7 +25,7 @@ interface NewAgencyTeamModalProps {
   open: boolean;
   onClose: () => void;
   onRemindLater: () => void;
-  onAddUsers: () => void; // → Admin › Users with Add New User open
+  onAddUsers: () => void; // → Admin › Users
 }
 
 export default function NewAgencyTeamModal({ isDark, open, onClose, onRemindLater, onAddUsers }: NewAgencyTeamModalProps) {

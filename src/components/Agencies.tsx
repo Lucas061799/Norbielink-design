@@ -746,7 +746,7 @@ const StatusPill = ({ status, isDark }: { status: string; isDark: boolean }) => 
   </span>
 );
 
-function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleStar, inactiveUserIds, setInactiveUserIds, statusInactiveUserIds, setStatusInactiveUserIds, removedUserIds, setRemovedUserIds, bookRolled, setBookRolled, allAgencies, initialTab, onNavigateToAgency, viewMode = "internal", itcRecords, setItcRecords, isSuperAdmin = true, pageTitleOverride, spotlightUsers = false, onSpotlightConsumed, spotlightActive = false, onSpotlightDismiss, teamSetupPending = false, onOpenTeamSetup, onCompleteTeamSetup, onStartImpersonation, openAddUserOnMount = false, newAgency = false }: {
+function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleStar, inactiveUserIds, setInactiveUserIds, statusInactiveUserIds, setStatusInactiveUserIds, removedUserIds, setRemovedUserIds, bookRolled, setBookRolled, allAgencies, initialTab, onNavigateToAgency, viewMode = "internal", itcRecords, setItcRecords, isSuperAdmin = true, pageTitleOverride, spotlightUsers = false, onSpotlightConsumed, spotlightActive = false, onSpotlightDismiss, teamSetupPending = false, onOpenTeamSetup, onCompleteTeamSetup, onStartImpersonation, newAgency = false }: {
   agency: AgencyDetail;
   isDark: boolean;
   onBack: () => void;
@@ -813,7 +813,6 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
   // calls this with the chosen user's identity, and the shell flips into
   // acting-as mode (banner + routes back to Marketplace).
   onStartImpersonation?: (payload: { userName: string; userEmail: string; agencyName: string; agencyCode: string }) => void;
-  openAddUserOnMount?: boolean;
   newAgency?: boolean;
 }) {
   // Mock role toggle for the Admin (client) section. In production internal & client are
@@ -1902,8 +1901,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
       .replace(/[^a-zA-Z0-9_-]+/g, "_");
     await downloadExcelTemplate(sentSummary.skipped, `${base}_skipped.xlsx`);
   };
-  // Opens on mount when the new-agency notice's "Add users" sent them here.
-  const [addUserOpen,     setAddUserOpen]     = useState(openAddUserOnMount);
+  const [addUserOpen,     setAddUserOpen]     = useState(false);
   const [editUserId,      setEditUserId]      = useState<string|null>(null);
   const [addressModalOpen, setAddressModalOpen] = useState(false);
   const [callModalOpen, setCallModalOpen] = useState(false);
@@ -11456,7 +11454,7 @@ function AddAgencyForm({ isDark, onSaveForLater, onDiscard, initialDraft, c, btn
 }
 
 /* ─── Component ─────────────────────────────────────────────────────────── */
-export default function Agencies({ isDark, clientMode = false, initialTab, pageTitleOverride, spotlightUsers = false, onSpotlightConsumed, spotlightActive = false, onSpotlightDismiss, teamSetupPending = false, onOpenTeamSetup, onCompleteTeamSetup, onStartImpersonation, openAddUserOnMount = false, newAgency = false }: { isDark: boolean; clientMode?: boolean; initialTab?: DetailTab; pageTitleOverride?: string; spotlightUsers?: boolean; onSpotlightConsumed?: () => void; spotlightActive?: boolean; onSpotlightDismiss?: () => void; teamSetupPending?: boolean; onOpenTeamSetup?: () => void; onCompleteTeamSetup?: () => void; onStartImpersonation?: (payload: { userName: string; userEmail: string; agencyName: string; agencyCode: string }) => void; openAddUserOnMount?: boolean; newAgency?: boolean }) {
+export default function Agencies({ isDark, clientMode = false, initialTab, pageTitleOverride, spotlightUsers = false, onSpotlightConsumed, spotlightActive = false, onSpotlightDismiss, teamSetupPending = false, onOpenTeamSetup, onCompleteTeamSetup, onStartImpersonation, newAgency = false }: { isDark: boolean; clientMode?: boolean; initialTab?: DetailTab; pageTitleOverride?: string; spotlightUsers?: boolean; onSpotlightConsumed?: () => void; spotlightActive?: boolean; onSpotlightDismiss?: () => void; teamSetupPending?: boolean; onOpenTeamSetup?: () => void; onCompleteTeamSetup?: () => void; onStartImpersonation?: (payload: { userName: string; userEmail: string; agencyName: string; agencyCode: string }) => void; newAgency?: boolean }) {
   const [search, setSearch]           = useState("");
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("All");
   // Per-tab card-selection state — used to visually pin the active stat card
@@ -12122,7 +12120,6 @@ export default function Agencies({ isDark, clientMode = false, initialTab, pageT
         teamSetupPending={teamSetupPending}
         onOpenTeamSetup={onOpenTeamSetup}
         onCompleteTeamSetup={onCompleteTeamSetup}
-        openAddUserOnMount={openAddUserOnMount}
         newAgency={newAgency}
       />
     );

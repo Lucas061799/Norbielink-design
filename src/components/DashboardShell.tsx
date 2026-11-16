@@ -99,9 +99,6 @@ export default function DashboardShell({ children, pageTitle }: DashboardShellPr
   // boolean (it would remount AGAIN when the one-shot flag clears, undoing
   // the Users tab), so a counter is the simplest stable mount token.
   const [teamSetupMountKey, setTeamSetupMountKey] = useState(0);
-  // New-agency notice → "Add users" lands on Admin › Users with the Add New
-  // User modal already open. Read once when Agencies mounts (keyed remount).
-  const [teamSetupOpenAddUser, setTeamSetupOpenAddUser] = useState(false);
   // Lifted spotlight-visible state — shared between the Users-tab coachmark
   // (inside AgencyDetailView) and the TopBar bell. Both call `dismiss` to
   // flip it off (coachmark X / coachmark backdrop click), and the shell runs
@@ -205,7 +202,6 @@ export default function DashboardShell({ children, pageTitle }: DashboardShellPr
     // the persistent Users-tab coachmark) just closes the modal — no
     // repeat blur / halo / toast, since they already know where everything
     // lives.
-    setTeamSetupOpenAddUser(false);
     if (teamSetupSpotlightFired) return;
     setActivePage("Admin");
     setTeamSetupSpotlightUsers(true);
@@ -215,7 +211,8 @@ export default function DashboardShell({ children, pageTitle }: DashboardShellPr
     setTeamSetupSpotlightFired(true);
   };
 
-  // New-agency notice CTA: close the notice and go straight to adding users.
+  // New-agency notice CTA: close the notice and land on Admin › Users, where
+  // they choose Add New User or Import Users (bulk). Nothing is pre-opened.
   // Not "done" — the banner/bell stay until they finish in the Users tab.
   // Skips the first-dismiss spotlight/toast since they're heading there now.
   const goToAddUsers = () => {
@@ -224,7 +221,6 @@ export default function DashboardShell({ children, pageTitle }: DashboardShellPr
     setTeamSetupSpotlightFired(true);
     setActivePage("Admin");
     setTeamSetupSpotlightUsers(true);
-    setTeamSetupOpenAddUser(true);
     setTeamSetupMountKey(k => k + 1);
   };
 
@@ -295,7 +291,6 @@ export default function DashboardShell({ children, pageTitle }: DashboardShellPr
             teamSetupPending={teamSetupPending}
             onOpenTeamSetup={openTeamSetup}
             onCompleteTeamSetup={completeTeamSetup}
-            openAddUserOnMount={teamSetupOpenAddUser}
             newAgency={isNewAgency}
           />
         );
