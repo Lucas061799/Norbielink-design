@@ -11,7 +11,6 @@ interface ReportsProps {
 const FONT = "var(--font-montserrat), Montserrat, sans-serif";
 const RAZZ = "linear-gradient(90deg,#5C2ED4 0%,#A614C3 100%)";
 const TEAL_GRAD = "linear-gradient(90deg,#0EA5A5 0%,#2DD4BF 100%)";
-const HERO_GRAD = "linear-gradient(100deg,#A614C3 0%,#7C3AED 55%,#14B8A6 100%)";
 const TEAL = "#0D9488";
 
 const AS_OF = "Nov 11, 2026";
@@ -124,6 +123,22 @@ function Delta({ cur, prev, unit = "", inverse = false, label, isDark }: { cur: 
   );
 }
 
+// Compact change pill for the overview grid: "+48 (5.2%)", green when the
+// move is good, red when bad, grey when flat.
+function DeltaPill({ cur, prev, unit = "", inverse = false, isDark }: { cur: number; prev: number; unit?: string; inverse?: boolean; isDark: boolean }) {
+  const diff = cur - prev;
+  const good = diff === 0 ? null : inverse ? diff < 0 : diff > 0;
+  const fg = good === null ? (isDark ? "#C4C8D0" : "#374151") : good ? (isDark ? "#6EE7B7" : "#047857") : (isDark ? "#FCA5A5" : "#B91C1C");
+  const bg = good === null ? (isDark ? "rgba(255,255,255,0.08)" : "#F3F4F6") : good ? (isDark ? "rgba(16,185,129,0.16)" : "#D1FAE5") : (isDark ? "rgba(239,68,68,0.16)" : "#FEE2E2");
+  const mag = Number.isInteger(diff) ? Math.abs(diff).toLocaleString() : Math.abs(diff).toFixed(1);
+  const rel = prev ? ` (${((Math.abs(diff) / prev) * 100).toFixed(1)}%)` : "";
+  return (
+    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11.5px] font-semibold whitespace-nowrap" style={{ fontFamily: FONT, color: fg, background: bg }}>
+      {diff >= 0 ? "+" : "−"}{mag}{unit}{unit ? "" : rel}
+    </span>
+  );
+}
+
 const PALETTE = ["#5C2ED4", "#A614C3", "#C13FD6", "#D873E6", "#0EA5A5", "#2DD4BF", "#9AA0AD"];
 
 // Interactive donut + legend: hover a slice (or legend row) to highlight it,
@@ -220,11 +235,16 @@ export default function Reports({ isDark = false, onNavigate }: ReportsProps) {
   const seriesMax = Math.max(...d.series.map(s => s.c));
   const lob = LOB_SHARES.map(l => ({ lob: l.lob, premium: d.premium[0] * l.share }));
 
-  const kpis = [
-    { label: "Agencies tracked", value: TOTAL.toLocaleString(), suffix: undefined as string | undefined, sub: "Unique agencies in the reporting universe", accent: "linear-gradient(90deg,#5C2ED4,#7C3AED)", kind: "all" as SegKind, cur: TOTAL, prev: pr.total },
-    { label: "Have logged in", value: LOGGED_IN.toLocaleString(), suffix: `${adoptNow}%`, sub: "Adoption rate against all tracked agencies", accent: "linear-gradient(90deg,#A614C3,#D633E0)", kind: "loggedin" as SegKind, cur: LOGGED_IN, prev: pr.loggedin },
-    { label: "Active · last 30 days", value: ACTIVE_30.toLocaleString(), suffix: `${pct(ACTIVE_30, TOTAL)}%`, sub: `${pct(ACTIVE_30, LOGGED_IN)}% of agencies that have logged in`, accent: RAZZ, kind: "active" as SegKind, cur: ACTIVE_30, prev: pr.active30 },
-    { label: "Active · last 7 days", value: ACTIVE_7.toLocaleString(), suffix: `${pct(ACTIVE_7, TOTAL)}%`, sub: `${pct(ACTIVE_7, ACTIVE_30)}% of the last-30-day active base`, accent: TEAL_GRAD, kind: "weekly" as SegKind, cur: ACTIVE_7, prev: pr.active7 },
+  // Overview grid: counts on top (click → drill-down list), rates below.
+  const overview: { label: string; value: string; cur: number; prev: number; unit?: string; inverse?: boolean; info: string; kind?: SegKind }[] = [
+    { label: "Agencies tracked", value: TOTAL.toLocaleString(), cur: TOTAL, prev: pr.total, info: "Unique agencies in the reporting universe", kind: "all" },
+    { label: "Have logged in", value: LOGGED_IN.toLocaleString(), cur: LOGGED_IN, prev: pr.loggedin, info: "Agencies with at least one sign-in", kind: "loggedin" },
+    { label: "Active · 30 days", value: ACTIVE_30.toLocaleString(), cur: ACTIVE_30, prev: pr.active30, info: "Agencies with portal activity in the last 30 days", kind: "active" },
+    { label: "Active · 7 days", value: ACTIVE_7.toLocaleString(), cur: ACTIVE_7, prev: pr.active7, info: "Agencies with portal activity in the last 7 days", kind: "weekly" },
+    { label: "Adoption rate", value: `${adoptNow}%`, cur: adoptNow, prev: adoptPrev, unit: " pts", info: "Share of tracked agencies that have logged in" },
+    { label: "Monthly return rate", value: `${pct(ACTIVE_30, LOGGED_IN)}%`, cur: pct(ACTIVE_30, LOGGED_IN), prev: pct(pr.active30, pr.loggedin), unit: " pts", info: "Share of logged-in agencies active in the last 30 days" },
+    { label: "Weekly return rate", value: `${pct(ACTIVE_7, ACTIVE_30)}%`, cur: pct(ACTIVE_7, ACTIVE_30), prev: pct(pr.active7, pr.active30), unit: " pts", info: "Share of monthly-active agencies also active in the last 7 days" },
+    { label: "Never logged in", value: NO_LOGIN.toLocaleString(), cur: NO_LOGIN, prev: pNO, inverse: true, info: "Invited agencies with no recorded sign-in — onboarding opportunity", kind: "nologin" },
   ];
   const funnel = [
     { label: "Agencies tracked", sub: "total universe", n: TOTAL, pp: 100, grad: "linear-gradient(90deg,#5C2ED4,#7C3AED)", connector: `${pct1(LOGGED_IN, TOTAL)}% have created an individual login`, kind: "all" as SegKind },
@@ -325,40 +345,38 @@ export default function Reports({ isDark = false, onNavigate }: ReportsProps) {
         </div>
       </div>
 
-      {/* Eyebrow */}
-      <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full mb-5" style={{ background: isDark ? "rgba(45,212,191,0.12)" : "#EEFAF8", border: `1px solid ${isDark ? "rgba(45,212,191,0.25)" : "#CFF0EA"}` }}>
-        <span style={{ width: 7, height: 7, borderRadius: 999, background: TEAL }} />
-        <span className="text-[11px] font-bold uppercase" style={{ letterSpacing: "0.12em", color: TEAL }}>Portal adoption &amp; engagement</span>
-      </div>
-
-      {/* Hero */}
-      <h2 className="font-extrabold tracking-tight mb-4" style={{ color: c.heading, fontSize: 44, lineHeight: 1.08, maxWidth: 760 }}>
-        <span style={{ background: HERO_GRAD, WebkitBackgroundClip: "text", backgroundClip: "text", WebkitTextFillColor: "transparent" }}>{adoptNow}%</span> of tracked agencies have logged into NorbieLink.
-      </h2>
-      <p className="font-semibold mb-5" style={{ color: c.text, fontSize: 20, lineHeight: 1.3, maxWidth: 680 }}>{LOGGED_IN.toLocaleString()} of {TOTAL.toLocaleString()} agencies are in — and the ones who are, keep coming back.</p>
-      <p className="mb-6" style={{ color: c.muted, fontSize: 14, lineHeight: 1.65, maxWidth: 680 }}>
-        Agencies that adopt NorbieLink stay engaged: <strong style={{ color: c.heading }}>{pct(ACTIVE_30, LOGGED_IN)}% of logged-in agencies</strong> were active in the last 30 days, and roughly <strong style={{ color: c.heading }}>half of those</strong> logged in during the past week. Volume clusters in a predictable <strong style={{ color: c.heading }}>9 AM – 3 PM Pacific</strong> window, which makes the remaining <strong style={{ color: c.heading }}>{NO_LOGIN} agencies</strong> a clean, targeted onboarding opportunity.
-      </p>
-      <div className="flex items-center gap-2 mb-10 text-[12px]" style={{ color: c.faint }}>
-        <span>Showing <strong style={{ color: c.heading }}>{ds.label}</strong> · snapshot {asOfLabel} · change vs the {adoptPrevLabel} snapshot.{cohort !== "all" && " Wave figures are sample data."}</span>
-      </div>
-
-      {/* KPI cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        {kpis.map(k => (
-          <div key={k.label} role="button" tabIndex={0} onClick={() => setDrill(k.kind)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setDrill(k.kind); } }} className="relative rounded-xl overflow-hidden cursor-pointer" style={{ background: c.panel, border: `1px solid ${c.line}` }}>
-            <div style={{ height: 3, background: k.accent }} />
-            <div className="p-5">
-              <div className="text-[11px] font-bold uppercase mb-2.5" style={{ letterSpacing: "0.1em", color: c.faint }}>{k.label}</div>
-              <div className="flex items-baseline gap-2">
-                <span className="text-[34px] font-extrabold leading-none tracking-tight" style={{ color: c.heading }}>{k.value}</span>
-                {k.suffix && <span className="text-[15px] font-semibold" style={{ color: c.muted }}>{k.suffix}</span>}
+      {/* Overview — compact metric grid (label · value · change pill) */}
+      <div className="rounded-xl overflow-hidden mb-6" style={{ background: c.panel, border: `1px solid ${c.line}` }}>
+        <div className="px-6 py-4 flex flex-wrap items-baseline justify-between gap-2" style={{ borderBottom: `1px solid ${c.line}` }}>
+          <h2 className="text-[16px] font-bold" style={{ color: c.heading }}>Agency Adoption Overview</h2>
+          <span className="text-[12px]" style={{ color: c.muted }}>
+            {ds.label} · snapshot {asOfLabel} · change vs {adoptPrevLabel}{cohort !== "all" && " · wave figures are sample data"}
+          </span>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+          {overview.map((m, idx) => {
+            const clickable = !!m.kind;
+            const open = () => { if (m.kind) setDrill(m.kind); };
+            return (
+              <div key={m.label}
+                role={clickable ? "button" : undefined} tabIndex={clickable ? 0 : undefined}
+                onClick={open}
+                onKeyDown={(e) => { if (clickable && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); open(); } }}
+                title={m.info}
+                className={`px-6 py-5 transition-colors${clickable ? " cursor-pointer" : ""}`}
+                style={{ borderTop: idx >= 4 ? `1px solid ${c.line}` : undefined, borderLeft: idx % 4 ? `1px solid ${c.line}` : undefined }}
+                onMouseEnter={e => { if (clickable) e.currentTarget.style.background = isDark ? "rgba(255,255,255,0.05)" : "#F5F6F8"; }}
+                onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}>
+                {/* Clickable boxes show it on hover (tint) — no extra link text. */}
+                <div className="text-[13px] font-semibold" style={{ color: c.text }}>{m.label}</div>
+                <div className="flex items-center justify-between gap-3 mt-2">
+                  <span className="text-[30px] font-extrabold leading-none tracking-tight" style={{ color: c.heading }}>{m.value}</span>
+                  <DeltaPill cur={m.cur} prev={m.prev} unit={m.unit} inverse={m.inverse} isDark={isDark} />
+                </div>
               </div>
-              <div className="mt-2.5"><Delta cur={k.cur} prev={k.prev} label={adoptPrevLabel} isDark={isDark} /></div>
-              <div className="text-[11.5px] mt-2 leading-snug" style={{ color: c.muted }}>{k.sub}</div>
-            </div>
-          </div>
-        ))}
+            );
+          })}
+        </div>
       </div>
 
       {/* Funnel + Engagement */}
