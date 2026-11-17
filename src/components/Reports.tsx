@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Download, X, ChevronDown, Check, ArrowUpRight, ArrowDownRight, UserPlus, RefreshCw } from "lucide-react";
 
 interface ReportsProps {
@@ -125,6 +125,25 @@ const PRO_MEMBERS: { agency: string; contact: string; state: string; since: stri
   { agency: "Blue Harbor Brokers",     contact: "Owen Clarke",  state: "CA", since: "Oct 2026", users: 4,  tools: ["Outmarket"],                                                lastActive: "2 days ago" },
 ];
 
+// ── Single-agency view (sample) ───────────────────────────────────────────
+// Built from the sample agency pool so every agency in a list can be opened.
+type AgencyStatus = "Active" | "Lapsed" | "Never logged in";
+const AGENCY_STATUS: AgencyStatus[] = ["Active", "Active", "Active", "Active", "Active", "Lapsed", "Active", "Lapsed", "Active", "Never logged in", "Never logged in", "Active"];
+const AGENCY_SINCE = ["Jan 2025", "Mar 2025", "Jun 2025", "Aug 2025", "Feb 2025", "Nov 2024", "Jan 2025", "Apr 2025", "Sep 2025", "Oct 2026", "Oct 2026", "May 2025"];
+const AGENCY_LAST_LOGIN = ["Today", "Yesterday", "3 days ago", "2 days ago", "Today", "6 weeks ago", "Today", "9 weeks ago", "1 week ago", "Never", "Never", "4 days ago"];
+const FILLER_PEOPLE = [
+  { name: "Jordan Lee", title: "Producer" }, { name: "Ava Patel", title: "CSR" }, { name: "Chris Moreno", title: "Account Manager" },
+  { name: "Taylor Brooks", title: "Producer" }, { name: "Riley Chen", title: "CSR" }, { name: "Morgan Diaz", title: "Accounting" },
+  { name: "Jamie Fox", title: "Producer" }, { name: "Casey Nguyen", title: "CSR" }, { name: "Drew Patel", title: "Producer" },
+  { name: "Alex Romero", title: "Account Manager" }, { name: "Sydney Park", title: "CSR" }, { name: "Blake Turner", title: "Producer" },
+  { name: "Quinn Harper", title: "CSR" }, { name: "Reese Walker", title: "Producer" }, { name: "Avery Scott", title: "Accounting" },
+  { name: "Parker Lane", title: "Producer" }, { name: "Rowan Ellis", title: "CSR" }, { name: "Emerson Hale", title: "Producer" },
+  { name: "Finley Ross", title: "Account Manager" }, { name: "Hayden Cole", title: "CSR" }, { name: "Kendall Ray", title: "Producer" },
+];
+// Last-active cycle for sample people; the last entry is outside 30 days.
+const PERSON_LAST = ["Today", "Yesterday", "3 days ago", "1 week ago", "2 weeks ago", "5 weeks ago"];
+type PersonStatus = "active" | "inactive" | "pending";
+
 // ── Drill-down segments ───────────────────────────────────────────────────
 const AGENCY_POOL = [
   { name: "Summit Risk Partners",    contact: "Dana Pruitt",   email: "dana@summitrisk.com",       phone: "(415) 555-0132" },
@@ -153,8 +172,13 @@ const SEG_INFO: Record<SegKind, { title: string; note: string; meta: (i: number)
 // Users per sample agency; never-logged-in / lapsed agencies have no
 // recently active users by definition.
 const POOL_USERS = [14, 9, 6, 11, 22, 5, 17, 8, 7, 12, 4, 10];
-const POOL_ACTIVE = [6, 3, 2, 5, 9, 1, 7, 1, 3, 4, 1, 4];
-const buildSegment = (kind: SegKind, count: number) => ({ kind, count, title: SEG_INFO[kind].title, note: SEG_INFO[kind].note, rows: AGENCY_POOL.map((a, i) => ({ ...a, meta: SEG_INFO[kind].meta(i), users: POOL_USERS[i % POOL_USERS.length], activeUsers: kind === "nologin" || kind === "dormant" ? 0 : kind === "single" ? 1 : POOL_ACTIVE[i % POOL_ACTIVE.length] })) });
+// Active (30-day) users for an active agency — same rule the single-agency
+// view uses: activated users whose sample last-active is within 30 days.
+const poolActive = (i: number) => {
+  const users = POOL_USERS[i % POOL_USERS.length], activated = Math.max(1, users - (i % 4));
+  return Array.from({ length: activated }, (_, pi) => pi).filter(pi => !["5 weeks ago"].includes(["Today", "Yesterday", "3 days ago", "1 week ago", "2 weeks ago", "5 weeks ago"][pi % 6])).length;
+};
+const buildSegment = (kind: SegKind, count: number) => ({ kind, count, title: SEG_INFO[kind].title, note: SEG_INFO[kind].note, rows: AGENCY_POOL.map((a, i) => ({ ...a, meta: SEG_INFO[kind].meta(i), users: POOL_USERS[i % POOL_USERS.length], activeUsers: kind === "nologin" || kind === "dormant" ? 0 : kind === "single" ? 1 : poolActive(i) })) });
 const downloadCsv = (filename: string, rows: (string | number)[][]) => {
   const csv = rows.map(r => r.map(x => `"${String(x).replace(/"/g, '""')}"`).join(",")).join("\n");
   try {
@@ -255,6 +279,20 @@ export default function Reports({ isDark = false, onNavigate }: ReportsProps) {
   const [userDrill, setUserDrill] = useState<UserSegKind | null>(null);
   const [cohort, setCohort] = useState<Cohort>("all");
   const [cohortOpen, setCohortOpen] = useState(false);
+  // Single-agency view: agency name + optional status forced by the list it
+  // was opened from (e.g. opened from "Lapsed agencies" → shows as Lapsed).
+  const [agencySel, setAgencySel] = useState<{ name: string; status?: AgencyStatus } | null>(null);
+  const [agencyQuery, setAgencyQuery] = useState("");
+  // Users table in the agency view: search, status filter, show all.
+  const [userQuery, setUserQuery] = useState("");
+  const [userFilter, setUserFilter] = useState<"all" | PersonStatus>("all");
+  const [showAllUsers, setShowAllUsers] = useState(false);
+  // Jump to the top when switching between all agencies and one agency.
+  useEffect(() => { document.querySelector("main")?.scrollTo({ top: 0 }); }, [agencySel]);
+  // Switch agency (or back to all with null) and reset the users table.
+  const openAgency = (sel: { name: string; status?: AgencyStatus } | null) => {
+    setAgencySel(sel); setUserQuery(""); setUserFilter("all"); setShowAllUsers(false);
+  };
   const [rangeId, setRangeId] = useState<RangeId>("30d");
   const [periodOpen, setPeriodOpen] = useState(false);
   const [customMode, setCustomMode] = useState(false);
@@ -345,6 +383,29 @@ export default function Reports({ isDark = false, onNavigate }: ReportsProps) {
     const colored = items.map((it, i) => ({ ...it, color: PALETTE[i % PALETTE.length] }));
     return <Composition items={colored} size={donutSize} legendCols={legendCols} colors={{ heading: c.heading, text: c.text, faint: c.faint, track: c.track }} />;
   };
+  // Hover for clickable boxes/rows: razz outline with a soft glow, matching
+  // the side nav's active item. Inset so it isn't clipped by the panel edge.
+  // Corners are square, except where the hovered cell sits on a rounded
+  // corner of the panel underneath — there it follows that curve.
+  const hoverOn = (el: HTMLElement) => {
+    el.style.boxShadow = `inset 0 0 0 1.5px ${isDark ? "rgba(200,120,230,0.9)" : "#A614C3"}, inset 0 0 12px rgba(166,20,195,${isDark ? 0.35 : 0.18})`;
+    const panelEl = el.parentElement?.closest<HTMLElement>(".rounded-xl");
+    if (!panelEl) return;
+    const r = el.getBoundingClientRect(), p = panelEl.getBoundingClientRect();
+    const rad = Math.max(0, parseFloat(getComputedStyle(panelEl).borderTopLeftRadius) - 1);
+    const near = (x: number, y: number) => Math.abs(x - y) < 3;
+    const top = near(r.top, p.top + 1) || near(r.top, p.top), bottom = near(r.bottom, p.bottom - 1) || near(r.bottom, p.bottom);
+    const left = near(r.left, p.left + 1) || near(r.left, p.left), right = near(r.right, p.right - 1) || near(r.right, p.right);
+    el.style.borderTopLeftRadius = top && left ? `${rad}px` : "";
+    el.style.borderTopRightRadius = top && right ? `${rad}px` : "";
+    el.style.borderBottomLeftRadius = bottom && left ? `${rad}px` : "";
+    el.style.borderBottomRightRadius = bottom && right ? `${rad}px` : "";
+  };
+  const hoverOff = (el: HTMLElement) => {
+    el.style.boxShadow = "none";
+    el.style.borderTopLeftRadius = el.style.borderTopRightRadius = el.style.borderBottomLeftRadius = el.style.borderBottomRightRadius = "";
+  };
+
   // Bold date/period text inside section subtitles.
   const b = (text: React.ReactNode) => <strong className="font-semibold" style={{ color: c.heading }}>{text}</strong>;
 
@@ -367,8 +428,8 @@ export default function Reports({ isDark = false, onNavigate }: ReportsProps) {
               title={m.info}
               className={`px-6 py-5 transition-colors${clickable ? " cursor-pointer" : ""}`}
               style={{ borderTop: idx >= 4 ? `1px solid ${c.line}` : undefined, borderLeft: idx % 4 ? `1px solid ${c.line}` : undefined }}
-              onMouseEnter={e => { if (clickable) e.currentTarget.style.background = isDark ? "rgba(255,255,255,0.05)" : "#F5F6F8"; }}
-              onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}>
+              onMouseEnter={e => { if (clickable) hoverOn(e.currentTarget); }}
+              onMouseLeave={e => hoverOff(e.currentTarget)}>
               {/* Clickable boxes show it on hover (tint) — no extra link text. */}
               <div className="text-[13px] font-semibold" style={{ color: c.text }}>{m.label}</div>
               <div className="flex items-center justify-between gap-3 mt-2">
@@ -392,8 +453,8 @@ export default function Reports({ isDark = false, onNavigate }: ReportsProps) {
           onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); o.open(); } }}
           className="flex items-start gap-3.5 px-6 py-5 cursor-pointer transition-colors"
           style={{ borderLeft: i ? `1px solid ${c.line}` : undefined }}
-          onMouseEnter={e => { e.currentTarget.style.background = isDark ? "rgba(255,255,255,0.05)" : "#F5F6F8"; }}
-          onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}>
+          onMouseEnter={e => hoverOn(e.currentTarget)}
+          onMouseLeave={e => hoverOff(e.currentTarget)}>
           <div className="flex items-center justify-center rounded-lg flex-shrink-0" style={{ width: 36, height: 36, background: isDark ? "rgba(166,20,195,0.16)" : "rgba(166,20,195,0.08)" }}>
             <o.icon className="w-4 h-4" style={{ color: "#A614C3" }} />
           </div>
@@ -426,6 +487,206 @@ export default function Reports({ isDark = false, onNavigate }: ReportsProps) {
     </div>
   );
 
+  // ── Single-agency view ──────────────────────────────────────────────────
+  const agencyView = () => {
+    if (!agencySel) return null;
+    const i = Math.max(0, AGENCY_POOL.findIndex(a => a.name === agencySel.name));
+    const a = AGENCY_POOL[i];
+    const status: AgencyStatus = agencySel.status ?? AGENCY_STATUS[i];
+    const pro = PRO_MEMBERS.find(m => m.agency === a.name);
+    const users = POOL_USERS[i];
+    const never = status === "Never logged in", lapsed = status === "Lapsed";
+    const activated = never ? 0 : Math.max(1, users - (i % 4));
+    const pending = users - activated;
+    // Activity scales the portal-wide sample by this agency's size; never-
+    // logged-in and lapsed agencies have none in the period by definition.
+    const k = never || lapsed ? 0 : users / 1200;
+    const sc = (n: number) => Math.round(n * k);
+    const stats = [
+      { label: "Quotes started", value: sc(d.started[0]).toLocaleString(), cur: sc(d.started[0]), prev: sc(d.started[1]) },
+      { label: "Submitted", value: sc(d.submitted[0]).toLocaleString(), cur: sc(d.submitted[0]), prev: sc(d.submitted[1]) },
+      { label: "Bound", value: sc(d.bound[0]).toLocaleString(), cur: sc(d.bound[0]), prev: sc(d.bound[1]) },
+      { label: "Written premium", value: `$${Math.round(d.premium[0] * k * 1000).toLocaleString()}K`, cur: Math.round(d.premium[0] * k * 1000), prev: Math.round(d.premium[1] * k * 1000) },
+    ];
+    const logins = d.series.map(p => ({ l: p.l, c: never ? 0 : lapsed ? 0 : Math.max(1, Math.round(p.c * users * 0.9)) }));
+    const loginMax = Math.max(1, ...logins.map(l => l.c));
+    const named = USER_POOL.filter(u => u.agency === a.name).map(u => ({ name: u.name, title: u.title, email: u.email }));
+    const domain = a.email.split("@")[1];
+    const people = [...named, ...FILLER_PEOPLE.map(f => ({ ...f, email: `${f.name.split(" ")[0].toLowerCase()}@${domain}` }))]
+      .slice(0, users)
+      .map((u, pi) => {
+        const st: PersonStatus = never || pi >= activated ? "pending" : lapsed || PERSON_LAST[pi % PERSON_LAST.length].includes("5 weeks") ? "inactive" : "active";
+        const last = st === "pending" ? "Invite pending" : lapsed ? "7+ weeks ago" : PERSON_LAST[pi % PERSON_LAST.length];
+        return { ...u, st, last };
+      });
+    // Box counts come from the same people list as the table/filters.
+    const act30 = people.filter(p => p.st === "active").length;
+    const act7 = people.filter(p => p.st === "active" && ["Today", "Yesterday", "3 days ago"].includes(p.last)).length;
+    const counts = { all: people.length, active: people.filter(p => p.st === "active").length, inactive: people.filter(p => p.st === "inactive").length, pending: people.filter(p => p.st === "pending").length };
+    const q = userQuery.trim().toLowerCase();
+    const matched = people.filter(p => (userFilter === "all" || p.st === userFilter) && (!q || `${p.name} ${p.email} ${p.title}`.toLowerCase().includes(q)));
+    const filtering = !!q || userFilter !== "all";
+    const shown = showAllUsers || filtering ? matched : matched.slice(0, 6);
+    const statusColor = status === "Active"
+      ? { fg: isDark ? "#6EE7B7" : "#047857", bg: isDark ? "rgba(16,185,129,0.16)" : "#D1FAE5" }
+      : status === "Lapsed"
+        ? { fg: isDark ? "#FCD34D" : "#92400E", bg: isDark ? "rgba(245,158,11,0.16)" : "#FEF3C7" }
+        : { fg: isDark ? "#C4C8D0" : "#374151", bg: isDark ? "rgba(255,255,255,0.08)" : "#F3F4F6" };
+    const box: React.CSSProperties = { background: c.box, border: `1px solid ${c.line}` };
+    return (
+      <>
+        <button type="button" onClick={() => openAgency(null)} className="flex items-center gap-1 text-[12.5px] font-semibold mb-4 cursor-pointer" style={{ fontFamily: FONT, color: "#A614C3", background: "transparent", border: "none", padding: 0 }}>
+          ← All agencies
+        </button>
+
+        {/* Agency header */}
+        <div className="rounded-xl px-6 py-5 mb-6 flex flex-wrap items-start justify-between gap-4" style={box}>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <h2 className="text-[20px] font-bold" style={{ color: c.heading }}>{a.name}</h2>
+              <span className="text-[11.5px] font-semibold px-2.5 py-0.5 rounded-full" style={{ color: statusColor.fg, background: statusColor.bg }}>{status}</span>
+              {pro && <span className="text-[10.5px] font-bold px-2 py-0.5 rounded-full" style={{ color: "#A614C3", background: isDark ? "rgba(166,20,195,0.18)" : "rgba(166,20,195,0.08)", letterSpacing: "0.04em" }}>PROSUITE</span>}
+            </div>
+            <div className="text-[12.5px] mt-1" style={{ color: c.muted }}>{a.contact} · {a.email} · {a.phone}</div>
+          </div>
+          <div className="flex gap-8 text-[12px]" style={{ color: c.muted }}>
+            <div>Member since<div className="text-[14px] font-semibold mt-0.5" style={{ color: c.heading }}>{AGENCY_SINCE[i]}</div></div>
+            <div>Last login<div className="text-[14px] font-semibold mt-0.5" style={{ color: c.heading }}>{never ? "Never" : lapsed ? (AGENCY_LAST_LOGIN[i].includes("week") ? AGENCY_LAST_LOGIN[i] : "6 weeks ago") : AGENCY_LAST_LOGIN[i]}</div></div>
+          </div>
+        </div>
+
+        {/* Users */}
+        <div className="rounded-xl overflow-hidden mb-6" style={box}>
+          <div className="px-6 py-4 flex flex-wrap items-baseline justify-between gap-2" style={{ borderBottom: `1px solid ${c.line}` }}>
+            <h3 className="text-[16px] font-bold" style={{ color: c.heading }}>Users</h3>
+            <span className="text-[12px]" style={{ color: c.muted }}>Sample data</span>
+          </div>
+          <div className="grid grid-cols-2 lg:grid-cols-4">
+            {[
+              { label: "Users", value: users },
+              { label: "Activated", value: activated, sub: `${pct(activated, users)}% of users` },
+              { label: "Active · 30 days", value: act30, sub: `Active · 7 days: ${act7}` },
+              { label: "Pending invites", value: pending },
+            ].map((m, idx) => (
+              <div key={m.label} className="px-6 py-5" style={{ borderLeft: idx % 4 ? `1px solid ${c.line}` : undefined }}>
+                <div className="text-[13px] font-semibold" style={{ color: c.text }}>{m.label}</div>
+                <div className="text-[30px] font-extrabold leading-none tracking-tight mt-2" style={{ color: c.heading }}>{m.value}</div>
+                {m.sub && <div className="text-[11.5px] mt-2" style={{ color: c.muted }}>{m.sub}</div>}
+              </div>
+            ))}
+          </div>
+          {/* Search + status filter */}
+          <div className="px-6 py-3 flex flex-wrap items-center justify-between gap-3" style={{ borderTop: `1px solid ${c.line}` }}>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {([["all", "All"], ["active", "Active"], ["inactive", "Not active"], ["pending", "Invite pending"]] as ["all" | PersonStatus, string][]).map(([k, label]) => {
+                const on = userFilter === k;
+                return (
+                  <button key={k} type="button" onClick={() => setUserFilter(k)}
+                    className="px-2.5 py-1 rounded-full text-[12px] font-semibold cursor-pointer"
+                    style={{ fontFamily: FONT, color: on ? "#FFFFFF" : c.text, background: on ? RAZZ : "transparent", border: on ? "1px solid transparent" : `1px solid ${c.line}` }}>
+                    {label} <span style={{ opacity: on ? 0.85 : 0.7 }}>{counts[k]}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <input value={userQuery} onChange={e => setUserQuery(e.target.value)} placeholder="Search name, email or title…"
+              className="px-3 py-1.5 rounded-lg text-[12.5px] outline-none" style={{ fontFamily: FONT, color: c.text, background: c.panel, border: `1px solid ${c.line}`, width: 240 }} />
+          </div>
+          <table className="w-full text-left" style={{ borderTop: `1px solid ${c.line}` }}>
+            <thead>
+              <tr className="text-[11px] font-bold uppercase" style={{ letterSpacing: "0.08em", color: c.muted, background: isDark ? "#1E2240" : "#F7F8FA" }}>
+                <th className="px-6 py-2.5 font-bold">Name</th>
+                <th className="px-3 py-2.5 font-bold">Job title</th>
+                <th className="px-3 py-2.5 font-bold">Email</th>
+                <th className="px-6 py-2.5 font-bold">Last active</th>
+              </tr>
+            </thead>
+            <tbody>
+              {shown.map(u => (
+                <tr key={u.email} style={{ borderTop: `1px solid ${c.line}` }}>
+                  <td className="px-6 py-3 text-[13px] font-semibold" style={{ color: c.heading }}>{u.name}</td>
+                  <td className="px-3 py-3 text-[12.5px]" style={{ color: c.text }}>{u.title}</td>
+                  <td className="px-3 py-3 text-[12.5px]" style={{ color: c.text }}>{u.email}</td>
+                  <td className="px-6 py-3 text-[12.5px]" style={{ color: u.st === "pending" ? c.muted : c.text, fontStyle: u.st === "pending" ? "italic" : undefined }}>{u.last}</td>
+                </tr>
+              ))}
+              {shown.length === 0 && (
+                <tr style={{ borderTop: `1px solid ${c.line}` }}><td colSpan={4} className="px-6 py-6 text-center text-[12.5px]" style={{ color: c.muted }}>No users match.</td></tr>
+              )}
+            </tbody>
+          </table>
+          <div className="px-6 py-3 flex items-center justify-between gap-3 text-[12px]" style={{ color: c.muted, borderTop: `1px solid ${c.line}` }}>
+            <span>Showing {shown.length} of {filtering ? `${matched.length} matching` : users} users</span>
+            <div className="flex items-center gap-3">
+              {!filtering && matched.length > 6 && (
+                <button type="button" onClick={() => setShowAllUsers(v => !v)} className="font-semibold cursor-pointer" style={{ fontFamily: FONT, color: "#A614C3", background: "transparent", border: "none", padding: 0 }}>
+                  {showAllUsers ? "Show fewer" : `Show all ${users} users`}
+                </button>
+              )}
+              <button type="button" onClick={() => downloadCsv(`norbielink-${a.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-users.csv`, [["Name", "Job title", "Email", "Last active"], ...matched.map(u => [u.name, u.title, u.email, u.last])])}
+                className="flex items-center gap-1 font-semibold cursor-pointer" style={{ fontFamily: FONT, color: c.text, background: "transparent", border: "none", padding: 0 }}>
+                <Download className="w-3.5 h-3.5" style={{ color: c.faint }} /> Export
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Activity */}
+        <div className="flex items-center justify-between gap-4 flex-wrap mb-4">
+          <div className="flex items-center gap-2">
+            <h3 className="text-[13px] font-bold uppercase" style={{ letterSpacing: "0.1em", color: c.heading }}>Activity</h3>
+            <SampleTag />
+          </div>
+          <span className="text-[12px]" style={{ color: c.muted }}>{b(periodLabel)}{compare && <> · vs {b(actPrevLabel)}</>}</span>
+        </div>
+        {statRow(stats)}
+        <div className="p-5 mt-6 mb-6" style={panel}>
+          <div className="text-[13px] font-semibold mb-5" style={{ color: c.heading }}>Logins <span style={{ color: c.faint }}>· {periodLabel}</span></div>
+          {never || lapsed ? (
+            <div className="text-[12.5px] py-6 text-center" style={{ color: c.muted }}>{never ? "No one at this agency has logged in yet." : "No logins in this period."}</div>
+          ) : (
+            <div className="flex items-end gap-3" style={{ minHeight: 120 }}>
+              {logins.map(m => (
+                <div key={m.l} className="flex-1 flex flex-col items-center gap-2">
+                  <span className="text-[11px] font-semibold" style={{ color: c.heading }}>{m.c}</span>
+                  <div className="w-full rounded-t" style={{ height: 4 + (m.c / loginMax) * 96, background: RAZZ }} />
+                  <span className="text-[10.5px]" style={{ color: c.faint }}>{m.l}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* ProSuite */}
+        <div className="rounded-xl px-6 py-5 mb-10" style={box}>
+          <div className="flex items-baseline justify-between gap-3 mb-3">
+            <h3 className="text-[16px] font-bold" style={{ color: c.heading }}>ProSuite</h3>
+            {pro && <span className="text-[12px]" style={{ color: c.muted }}>Member since {b(pro.since)}</span>}
+          </div>
+          {pro ? (
+            <div className="flex flex-col">
+              {pro.tools.map((t, ti) => {
+                const tool = PRO_TOOLS.find(x => x.name === t);
+                const n = Math.max(1, Math.round(users * [0.7, 0.55, 0.4, 0.3, 0.25][ti % 5]));
+                return (
+                  <div key={t} className="flex items-center justify-between gap-3 py-2.5" style={{ borderTop: ti ? `1px solid ${c.line}` : undefined }}>
+                    <div>
+                      <div className="text-[13px] font-semibold" style={{ color: c.heading }}>{t}</div>
+                      {tool && <div className="text-[11.5px]" style={{ color: c.muted }}>{tool.does}</div>}
+                    </div>
+                    <span className="text-[12.5px]" style={{ color: c.text }}>{b(n)} of {users} users</span>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="text-[12.5px]" style={{ color: c.muted }}>Not a ProSuite member.</div>
+          )}
+        </div>
+      </>
+    );
+  };
+
   return (
     <div style={{ fontFamily: FONT, color: c.text }}>
       {/* Report header */}
@@ -434,17 +695,32 @@ export default function Reports({ isDark = false, onNavigate }: ReportsProps) {
         <div className="flex items-center gap-3">
           <div className="relative">
             <button type="button" onClick={() => setCohortOpen(o => !o)} className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12.5px] font-semibold cursor-pointer" style={{ fontFamily: FONT, border: `1px solid ${c.line}`, color: c.text }}>
-              {ds.short}<ChevronDown className="w-3.5 h-3.5" style={{ color: c.faint }} />
+              <span className="truncate" style={{ maxWidth: 200 }}>{agencySel ? agencySel.name : ds.short}</span><ChevronDown className="w-3.5 h-3.5 flex-shrink-0" style={{ color: c.faint }} />
             </button>
             {cohortOpen && (
               <>
                 <div className="fixed inset-0 z-10" onClick={() => setCohortOpen(false)} />
-                <div className="absolute right-0 top-full mt-1 rounded-lg overflow-hidden z-20" style={{ background: c.panel, border: `1px solid ${c.line}`, boxShadow: "0 8px 24px rgba(0,0,0,0.12)", minWidth: 176 }}>
+                <div className="absolute right-0 top-full mt-1 rounded-lg overflow-hidden z-20" style={{ background: c.panel, border: `1px solid ${c.line}`, boxShadow: "0 8px 24px rgba(0,0,0,0.12)", width: 260 }}>
                   {COHORTS.map(k => (
-                    <button key={k} type="button" onClick={() => { setCohort(k); setCohortOpen(false); }} className="w-full text-left px-3.5 py-2 text-[12.5px] flex items-center justify-between" style={{ fontFamily: FONT, color: c.text, background: k === cohort ? c.track : "transparent", cursor: "pointer" }}>
-                      {DATASET[k].label}{k === cohort && <Check className="w-3.5 h-3.5" style={{ color: "#A614C3" }} strokeWidth={2.5} />}
+                    <button key={k} type="button" onClick={() => { setCohort(k); openAgency(null); setCohortOpen(false); }} className="w-full text-left px-3.5 py-2 text-[12.5px] flex items-center justify-between" style={{ fontFamily: FONT, color: c.text, background: !agencySel && k === cohort ? c.track : "transparent", cursor: "pointer" }}>
+                      {DATASET[k].label}{!agencySel && k === cohort && <Check className="w-3.5 h-3.5" style={{ color: "#A614C3" }} strokeWidth={2.5} />}
                     </button>
                   ))}
+                  {/* Single agency — search the agency list */}
+                  <div className="px-3 pt-2.5 pb-1.5" style={{ borderTop: `1px solid ${c.line}` }}>
+                    <div className="text-[10.5px] font-bold uppercase mb-1.5" style={{ letterSpacing: "0.08em", color: c.muted }}>Single agency</div>
+                    <input autoFocus value={agencyQuery} onChange={e => setAgencyQuery(e.target.value)} placeholder="Search agencies…"
+                      className="w-full px-2.5 py-1.5 rounded-md text-[12.5px] outline-none"
+                      style={{ fontFamily: FONT, color: c.text, background: c.panel, border: `1px solid ${c.line}` }} />
+                  </div>
+                  <div className="overflow-y-auto pb-1" style={{ maxHeight: 220 }}>
+                    {AGENCY_POOL.filter(a => a.name.toLowerCase().includes(agencyQuery.trim().toLowerCase())).map(a => (
+                      <button key={a.name} type="button" onClick={() => { openAgency({ name: a.name }); setCohortOpen(false); setAgencyQuery(""); }}
+                        className="w-full text-left px-3.5 py-1.5 text-[12.5px] flex items-center justify-between" style={{ fontFamily: FONT, color: c.text, background: agencySel?.name === a.name ? c.track : "transparent", cursor: "pointer" }}>
+                        <span className="truncate">{a.name}</span>{agencySel?.name === a.name && <Check className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#A614C3" }} strokeWidth={2.5} />}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </>
             )}
@@ -483,6 +759,7 @@ export default function Reports({ isDark = false, onNavigate }: ReportsProps) {
         </div>
       </div>
 
+      {agencySel ? agencyView() : (<>
       {/* Overview — agencies (the account) then users (the people in them) */}
       {metricGrid("Agency Adoption Overview", <>{ds.label} · snapshot {b(asOfLabel)} · change vs {b(adoptPrevLabel)}{cohort !== "all" && " · wave figures are sample data"}</>, overview)}
 
@@ -656,7 +933,10 @@ export default function Reports({ isDark = false, onNavigate }: ReportsProps) {
               </thead>
               <tbody>
                 {PRO_MEMBERS.map(m => (
-                  <tr key={m.agency} style={{ borderTop: `1px solid ${c.line}` }}>
+                  <tr key={m.agency} onClick={() => openAgency({ name: m.agency, status: "Active" })} className="cursor-pointer transition-colors"
+                    onMouseEnter={e => hoverOn(e.currentTarget)}
+                    onMouseLeave={e => hoverOff(e.currentTarget)}
+                    style={{ borderTop: `1px solid ${c.line}` }}>
                     <td className="px-5 py-3">
                       <div className="text-[13px] font-semibold" style={{ color: c.heading }}>{m.agency}</div>
                       <div className="text-[11.5px]" style={{ color: c.muted }}>{m.contact} · {m.state}</div>
@@ -679,6 +959,8 @@ export default function Reports({ isDark = false, onNavigate }: ReportsProps) {
         </div>
       </div>
 
+      </>)}
+
       {/* Source footer */}
       <div className="flex items-end justify-between gap-6 flex-wrap pb-2">
         <p className="text-[10.5px] leading-relaxed" style={{ color: c.faint, maxWidth: 820 }}>Source: NorbieLink login and activity data, snapshot as of {asOfLabel}, reporting period {periodLabel}, compared with the {adoptPrevLabel}. Cohort: {ds.label}. Activity, traffic and premium figures are sample data; custom ranges map to the nearest sample window.</p>
@@ -700,7 +982,13 @@ export default function Reports({ isDark = false, onNavigate }: ReportsProps) {
               </div>
               <div className="overflow-y-auto px-6 py-2" style={{ minHeight: 120 }}>
                 {seg.rows.map((r, i) => (
-                  <div key={r.name} className="flex items-start justify-between gap-3 py-3" style={{ borderBottom: i === seg.rows.length - 1 ? "none" : `1px solid ${c.line}` }}>
+                  <div key={r.name} role="button" tabIndex={0}
+                    onClick={() => { openAgency({ name: r.name, status: seg.kind === "nologin" ? "Never logged in" : seg.kind === "dormant" ? "Lapsed" : seg.kind === "all" ? undefined : "Active" }); setDrill(null); }}
+                    onKeyDown={(e) => { if (e.key === "Enter") { openAgency({ name: r.name }); setDrill(null); } }}
+                    className="flex items-start justify-between gap-3 py-3 px-2 -mx-2 cursor-pointer transition-colors"
+                    onMouseEnter={e => hoverOn(e.currentTarget)}
+                    onMouseLeave={e => hoverOff(e.currentTarget)}
+                    style={{ borderBottom: i === seg.rows.length - 1 ? "none" : `1px solid ${c.line}` }}>
                     <div className="min-w-0"><div className="text-[13px] font-medium truncate" style={{ color: c.text }}>{r.name}</div><div className="text-[11.5px] mt-0.5 truncate" style={{ color: c.muted }}>{r.contact} · {r.email} · {r.phone}</div></div>
                     <div className="flex-shrink-0 text-right pt-0.5">
                       <div className="text-[12px] font-semibold" style={{ color: c.text }}>{r.users} users · {r.activeUsers} active</div>
