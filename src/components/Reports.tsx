@@ -18,10 +18,10 @@ const PREV_AS_OF = "Oct 11";
 type Cohort = "all" | "w1" | "w2" | "w3";
 interface Snap { total: number; loggedin: number; active30: number; active7: number; }
 const DATASET: Record<Cohort, { label: string; short: string; cur: Snap; prev: Snap }> = {
-  all: { label: "All agencies",      short: "All agencies", cur: { total: 963, loggedin: 634, active30: 389, active7: 185 }, prev: { total: 915, loggedin: 571, active30: 352, active7: 168 } },
-  w1:  { label: "Wave 1 · earliest", short: "Wave 1",       cur: { total: 420, loggedin: 357, active30: 243, active7: 121 }, prev: { total: 420, loggedin: 345, active30: 232, active7: 115 } },
-  w2:  { label: "Wave 2",            short: "Wave 2",       cur: { total: 330, loggedin: 198, active30: 112, active7: 50 },  prev: { total: 300, loggedin: 165, active30: 95,  active7: 44 } },
-  w3:  { label: "Wave 3 · newest",   short: "Wave 3",       cur: { total: 213, loggedin: 79,  active30: 34,  active7: 14 },  prev: { total: 195, loggedin: 61,  active30: 25,  active7: 9 } },
+  all: { label: "All agencies",      short: "All agencies", cur: { total: 240, loggedin: 158, active30: 97, active7: 46 }, prev: { total: 228, loggedin: 142, active30: 88, active7: 42 } },
+  w1:  { label: "Wave 1 · earliest", short: "Wave 1",       cur: { total: 105, loggedin: 89, active30: 61, active7: 30 }, prev: { total: 105, loggedin: 86, active30: 58, active7: 28 } },
+  w2:  { label: "Wave 2",            short: "Wave 2",       cur: { total: 82, loggedin: 49, active30: 28, active7: 12 }, prev: { total: 75, loggedin: 41, active30: 24, active7: 11 } },
+  w3:  { label: "Wave 3 · newest",   short: "Wave 3",       cur: { total: 53, loggedin: 20, active30: 8, active7: 4 }, prev: { total: 48, loggedin: 15, active30: 6, active7: 3 } },
 };
 const COHORTS: Cohort[] = ["all", "w1", "w2", "w3"];
 
@@ -31,10 +31,10 @@ const COHORTS: Cohort[] = ["all", "w1", "w2", "w3"];
 // where only one user is active (usually the primary contact). Sample data.
 interface UserSnap { invited: number; activated: number; active30: number; active7: number; single: number; }
 const USERS: Record<Cohort, { cur: UserSnap; prev: UserSnap }> = {
-  all: { cur: { invited: 4812, activated: 3105, active30: 1642, active7: 806, single: 112 }, prev: { invited: 4420, activated: 2770, active30: 1470, active7: 731, single: 124 } },
-  w1:  { cur: { invited: 2290, activated: 1820, active30: 1098, active7: 561, single: 48 },  prev: { invited: 2240, activated: 1745, active30: 1040, active7: 530, single: 55 } },
-  w2:  { cur: { invited: 1650, activated: 915,  active30: 428,  active7: 196, single: 39 },  prev: { invited: 1480, activated: 760,  active30: 360,  active7: 170, single: 41 } },
-  w3:  { cur: { invited: 872,  activated: 370,  active30: 116,  active7: 49,  single: 25 },  prev: { invited: 700,  activated: 265,  active30: 70,   active7: 31,  single: 28 } },
+  all: { cur: { invited: 963, activated: 621, active30: 328, active7: 161, single: 28 }, prev: { invited: 880, activated: 554, active30: 294, active7: 146, single: 31 } },
+  w1:  { cur: { invited: 459, activated: 362, active30: 219, active7: 112, single: 12 }, prev: { invited: 445, activated: 348, active30: 208, active7: 106, single: 14 } },
+  w2:  { cur: { invited: 330, activated: 183, active30: 86, active7: 39, single: 9 }, prev: { invited: 296, activated: 152, active30: 72, active7: 34, single: 10 } },
+  w3:  { cur: { invited: 174, activated: 76, active30: 23, active7: 10, single: 7 }, prev: { invited: 139, activated: 54, active30: 14, active7: 6, single: 7 } },
 };
 
 const pct = (n: number, base: number) => Math.round((n / base) * 100);
@@ -48,11 +48,11 @@ const RANGES: { id: RangeId; label: string }[] = [
 type Pair = [number, number];
 interface RangeData { prevLabel: string; active: Pair; onboarded: Pair; started: Pair; submitted: Pair; bound: Pair; premium: Pair; series: { l: string; c: number }[]; }
 const RANGE_DATA: Record<RangeId, RangeData> = {
-  "7d":  { prevLabel: "prior 7 days", active: [185, 171], onboarded: [19, 22], started: [1120, 1030], submitted: [740, 690], bound: [250, 236], premium: [3.1, 2.9], series: [{ l: "Mon", c: 3 }, { l: "Tue", c: 2 }, { l: "Wed", c: 4 }, { l: "Thu", c: 4 }, { l: "Fri", c: 3 }, { l: "Sat", c: 1 }, { l: "Sun", c: 2 }] },
-  "30d": { prevLabel: "prior 30 days", active: [389, 341], onboarded: [63, 88], started: [4820, 4510], submitted: [3140, 2980], bound: [1090, 1015], premium: [13.4, 12.6], series: [{ l: "Wk 1", c: 15 }, { l: "Wk 2", c: 17 }, { l: "Wk 3", c: 18 }, { l: "Wk 4", c: 13 }] },
-  "90d": { prevLabel: "prior 90 days", active: [521, 486], onboarded: [225, 198], started: [14200, 13050], submitted: [9250, 8600], bound: [3180, 2910], premium: [39.6, 36.4], series: [{ l: "Sep", c: 74 }, { l: "Oct", c: 88 }, { l: "Nov", c: 63 }] },
-  "12m": { prevLabel: "prior 12 months", active: [612, 560], onboarded: [709, 631], started: [57600, 50200], submitted: [37400, 33100], bound: [12900, 11250], premium: [161, 142], series: [{ l: "Dec", c: 44 }, { l: "Jan", c: 49 }, { l: "Feb", c: 55 }, { l: "Mar", c: 58 }, { l: "Apr", c: 61 }, { l: "May", c: 66 }, { l: "Jun", c: 38 }, { l: "Jul", c: 52 }, { l: "Aug", c: 61 }, { l: "Sep", c: 74 }, { l: "Oct", c: 88 }, { l: "Nov", c: 63 }] },
-  "ytd": { prevLabel: "same period last year", active: [604, 560], onboarded: [665, 590], started: [52800, 47900], submitted: [34300, 31200], bound: [11850, 10700], premium: [148, 131], series: [{ l: "Jan", c: 49 }, { l: "Feb", c: 55 }, { l: "Mar", c: 58 }, { l: "Apr", c: 61 }, { l: "May", c: 66 }, { l: "Jun", c: 38 }, { l: "Jul", c: 52 }, { l: "Aug", c: 61 }, { l: "Sep", c: 74 }, { l: "Oct", c: 88 }, { l: "Nov", c: 63 }] },
+  "7d":  { prevLabel: "prior 7 days", active: [46, 42], onboarded: [5, 6], started: [1120, 1030], submitted: [740, 690], bound: [250, 236], premium: [3.1, 2.9], series: [{ l: "Mon", c: 3 }, { l: "Tue", c: 2 }, { l: "Wed", c: 4 }, { l: "Thu", c: 4 }, { l: "Fri", c: 3 }, { l: "Sat", c: 1 }, { l: "Sun", c: 2 }] },
+  "30d": { prevLabel: "prior 30 days", active: [97, 88], onboarded: [16, 22], started: [4820, 4510], submitted: [3140, 2980], bound: [1090, 1015], premium: [13.4, 12.6], series: [{ l: "Wk 1", c: 15 }, { l: "Wk 2", c: 17 }, { l: "Wk 3", c: 18 }, { l: "Wk 4", c: 13 }] },
+  "90d": { prevLabel: "prior 90 days", active: [130, 121], onboarded: [56, 50], started: [14200, 13050], submitted: [9250, 8600], bound: [3180, 2910], premium: [39.6, 36.4], series: [{ l: "Sep", c: 74 }, { l: "Oct", c: 88 }, { l: "Nov", c: 63 }] },
+  "12m": { prevLabel: "prior 12 months", active: [153, 140], onboarded: [177, 158], started: [57600, 50200], submitted: [37400, 33100], bound: [12900, 11250], premium: [161, 142], series: [{ l: "Dec", c: 44 }, { l: "Jan", c: 49 }, { l: "Feb", c: 55 }, { l: "Mar", c: 58 }, { l: "Apr", c: 61 }, { l: "May", c: 66 }, { l: "Jun", c: 38 }, { l: "Jul", c: 52 }, { l: "Aug", c: 61 }, { l: "Sep", c: 74 }, { l: "Oct", c: 88 }, { l: "Nov", c: 63 }] },
+  "ytd": { prevLabel: "same period last year", active: [151, 140], onboarded: [166, 148], started: [52800, 47900], submitted: [34300, 31200], bound: [11850, 10700], premium: [148, 131], series: [{ l: "Jan", c: 49 }, { l: "Feb", c: 55 }, { l: "Mar", c: 58 }, { l: "Apr", c: 61 }, { l: "May", c: 66 }, { l: "Jun", c: 38 }, { l: "Jul", c: 52 }, { l: "Aug", c: 61 }, { l: "Sep", c: 74 }, { l: "Oct", c: 88 }, { l: "Nov", c: 63 }] },
 };
 const TRAFFIC: Record<RangeId, { sessions: Pair; avgDur: Pair; pps: Pair; returning: Pair }> = {
   "7d": { sessions: [1980, 1840], avgDur: [372, 360], pps: [5.2, 5.0], returning: [63, 61] },
@@ -98,7 +98,7 @@ const USER_POOL = [
 const USER_SEG_INFO: Record<UserSegKind, { title: string; note: string; meta: (i: number) => string }> = {
   invited:   { title: "Users invited",           note: "Every user account created across the agencies.",    meta: (i) => (i % 3 === 2 ? "Invite pending" : "Activated") },
   activated: { title: "Activated users",         note: "Have logged in at least once.",                       meta: (i) => `First login ${["Feb 3", "Mar 18", "Apr 2", "Jun 11", "Aug 27"][i % 5]}` },
-  uactive30: { title: "Active users · 30 days",  note: "Portal activity in the last 30 days.",                meta: (i) => `Last active ${["today", "yesterday", "3 days ago", "1 week ago", "2 weeks ago"][i % 5]}` },
+  uactive30: { title: "Active users",  note: "Portal activity in the selected period.",                meta: (i) => `Last active ${["today", "yesterday", "3 days ago", "1 week ago", "2 weeks ago"][i % 5]}` },
   uactive7:  { title: "Active users · 7 days",   note: "Portal activity in the last 7 days.",                 meta: (i) => `Last active ${["today", "yesterday", "2 days ago", "4 days ago"][i % 4]}` },
   pending:   { title: "Pending invites",         note: "Invited but haven't logged in yet — resend from Admin › Users.", meta: (i) => `Invited ${["Nov 4", "Oct 22", "Oct 9", "Sep 30", "Sep 12"][i % 5]}` },
 };
@@ -106,14 +106,14 @@ const USER_SEG_INFO: Record<UserSegKind, { title: string; note: string; meta: (i
 // ── ProSuite (sample) ─────────────────────────────────────────────────────
 // Who's on ProSuite and which of its tools they actually use. Tool list
 // mirrors the ProSuite plan on the Pricing page.
-const PRO_STATS = { members: [142, 118], newMembers: [24, 17], renewals60: 19, avgTools: [3.4, 3.0] };
+const PRO_STATS = { members: [58, 48], newMembers: [9, 6], renewals60: 7, avgTools: [3.4, 3.0] };
 const PRO_TOOLS: { name: string; does: string; using: Pair; users: number; active30: number }[] = [
-  { name: "Outmarket",          does: "AI quote comparison across carriers", using: [118, 96],  users: 340, active30: 91 },
-  { name: "NowCerts",           does: "Self-service certificates, 24/7",     using: [104, 88],  users: 296, active30: 79 },
-  { name: "Commercial Leads",   does: "Real-time commercial leads",          using: [71, 52],   users: 158, active30: 48 },
-  { name: "Compliance Library", does: "Legal & compliance documents",        using: [63, 58],   users: 121, active30: 22 },
-  { name: "CE Tracking",        does: "CE discounts + compliance tracking",  using: [49, 41],   users: 187, active30: 17 },
-  { name: "Growth Support",     does: "1:1 agency growth & strategy",        using: [27, 25],   users: 41, active30: 9 },
+  { name: "Outmarket",          does: "AI quote comparison across carriers", using: [48, 39], users: 190, active30: 37 },
+  { name: "NowCerts",           does: "Self-service certificates, 24/7",     using: [42, 36], users: 165, active30: 32 },
+  { name: "Commercial Leads",   does: "Real-time commercial leads",          using: [29, 21], users: 88, active30: 19 },
+  { name: "Compliance Library", does: "Legal & compliance documents",        using: [25, 23], users: 67, active30: 9 },
+  { name: "CE Tracking",        does: "CE discounts + compliance tracking",  using: [20, 17], users: 104, active30: 7 },
+  { name: "Growth Support",     does: "1:1 agency growth & strategy",        using: [11, 10], users: 23, active30: 4 },
 ];
 const PRO_MEMBERS: { agency: string; contact: string; state: string; since: string; users: number; tools: string[]; lastActive: string }[] = [
   { agency: "Summit Risk Partners",    contact: "Dana Pruitt",  state: "CA", since: "Feb 2026", users: 14, tools: ["Outmarket", "NowCerts", "Commercial Leads", "CE Tracking"], lastActive: "Today" },
@@ -163,11 +163,11 @@ type SegKind = "all" | "loggedin" | "active" | "weekly" | "nologin" | "dormant" 
 const SEG_INFO: Record<SegKind, { title: string; note: string; meta: (i: number) => string }> = {
   all:      { title: "All tracked agencies",            note: "Every agency in the reporting universe.",               meta: () => "Tracked" },
   loggedin: { title: "Agencies that have logged in",    note: "Signed in at least once — adopted.",                    meta: (i) => `Last login ${["2 days", "5 days", "1 week", "3 weeks", "1 month"][i % 5]} ago` },
-  active:   { title: "Active agencies · last 30 days",  note: "Recorded portal activity in the last 30 days.",         meta: () => "Active this month" },
+  active:   { title: "Active agencies",  note: "Recorded portal activity in the selected period.",         meta: () => "Active this month" },
   weekly:   { title: "Active agencies · last 7 days",   note: "Recorded portal activity in the last 7 days.",          meta: () => "Active this week" },
   nologin:  { title: "Agencies with no recorded login", note: "Invited but never signed in — onboarding opportunity.", meta: (i) => `Invited ${["Oct 2", "Sep 18", "Aug 30", "Jul 12"][i % 4]} · never signed in` },
   single:   { title: "Single-user agencies",            note: "Active, but only one person logs in — usually the primary contact.", meta: (i) => `Only ${["the principal", "the primary contact", "one CSR", "one producer"][i % 4]} is active` },
-  dormant:  { title: "Lapsed agencies",                 note: "Logged in before, inactive 30+ days — re-engage.",      meta: (i) => `Last active ${["5", "7", "9", "12", "16"][i % 5]} weeks ago` },
+  dormant:  { title: "Lapsed agencies",                 note: "Logged in before, not active this period — re-engage.",      meta: (i) => `Last active ${["5", "7", "9", "12", "16"][i % 5]} weeks ago` },
 };
 // Users per sample agency; never-logged-in / lapsed agencies have no
 // recently active users by definition.
@@ -320,7 +320,7 @@ export default function Reports({ isDark = false, onNavigate }: ReportsProps) {
   const NO_LOGIN = TOTAL - LOGGED_IN, LAPSED = LOGGED_IN - ACTIVE_30;
   const pr = ds.prev;
   const pNO = pr.total - pr.loggedin;
-  const adoptNow = pct(LOGGED_IN, TOTAL), adoptPrev = pct(pr.loggedin, pr.total);
+  const adoptNow = pct(LOGGED_IN, TOTAL);
   const segCount: Record<Exclude<SegKind, "single">, number> = { all: TOTAL, loggedin: LOGGED_IN, active: ACTIVE_30, weekly: ACTIVE_7, nologin: NO_LOGIN, dormant: LAPSED };
 
   // Activity (range-scoped)
@@ -338,31 +338,24 @@ export default function Reports({ isDark = false, onNavigate }: ReportsProps) {
 
   // Overview grid: counts on top (click → drill-down list); each rate sits
   // directly under the count it's derived from (Never logged in under Tracked).
-  type Metric = { label: string; value: string; cur: number; prev: number; unit?: string; inverse?: boolean; info: string; kind?: SegKind; userKind?: UserSegKind };
+  type Metric = { label: string; value: string; rate?: string; cur: number; prev: number; unit?: string; inverse?: boolean; info: string; kind?: SegKind; userKind?: UserSegKind };
+  // One row: each count carries its rate in the same box. "Active" follows
+  // the selected report range, so no 30/7-day split.
   const overview: Metric[] = [
     { label: "Agencies tracked", value: TOTAL.toLocaleString(), cur: TOTAL, prev: pr.total, info: "Unique agencies in the reporting universe", kind: "all" },
-    { label: "Have logged in", value: LOGGED_IN.toLocaleString(), cur: LOGGED_IN, prev: pr.loggedin, info: "Agencies with at least one sign-in", kind: "loggedin" },
-    { label: "Active · 30 days", value: ACTIVE_30.toLocaleString(), cur: ACTIVE_30, prev: pr.active30, info: "Agencies with portal activity in the last 30 days", kind: "active" },
-    { label: "Active · 7 days", value: ACTIVE_7.toLocaleString(), cur: ACTIVE_7, prev: pr.active7, info: "Agencies with portal activity in the last 7 days", kind: "weekly" },
-    { label: "Never logged in", value: NO_LOGIN.toLocaleString(), cur: NO_LOGIN, prev: pNO, inverse: true, info: "Invited agencies with no recorded sign-in — onboarding opportunity", kind: "nologin" },
-    { label: "Adoption rate", value: `${adoptNow}%`, cur: adoptNow, prev: adoptPrev, unit: " pts", info: "Share of tracked agencies that have logged in" },
-    { label: "Monthly return rate", value: `${pct(ACTIVE_30, LOGGED_IN)}%`, cur: pct(ACTIVE_30, LOGGED_IN), prev: pct(pr.active30, pr.loggedin), unit: " pts", info: "Share of logged-in agencies active in the last 30 days" },
-    { label: "Weekly return rate", value: `${pct(ACTIVE_7, ACTIVE_30)}%`, cur: pct(ACTIVE_7, ACTIVE_30), prev: pct(pr.active7, pr.active30), unit: " pts", info: "Share of monthly-active agencies also active in the last 7 days" },
+    { label: "Have logged in", value: LOGGED_IN.toLocaleString(), rate: `${adoptNow}%`, cur: LOGGED_IN, prev: pr.loggedin, info: "Agencies with at least one sign-in · % of tracked agencies", kind: "loggedin" },
+    { label: "Active", value: ACTIVE_30.toLocaleString(), rate: `${pct(ACTIVE_30, LOGGED_IN)}%`, cur: ACTIVE_30, prev: pr.active30, info: "Agencies with portal activity in the selected period · % of agencies that have logged in", kind: "active" },
+    { label: "Never logged in", value: NO_LOGIN.toLocaleString(), rate: `${pct(NO_LOGIN, TOTAL)}%`, cur: NO_LOGIN, prev: pNO, inverse: true, info: "Invited agencies with no recorded sign-in · % of tracked agencies", kind: "nologin" },
   ];
   // Users (agents) inside those agencies — same 4×2 layout, each rate under
   // the count it comes from.
   const us = USERS[cohort].cur, up = USERS[cohort].prev;
   const PENDING = us.invited - us.activated, pPENDING = up.invited - up.activated;
-  const perAgency = (users: number, agencies: number) => Math.round((users / agencies) * 10) / 10;
   const userMetrics: Metric[] = [
     { label: "Users invited", value: us.invited.toLocaleString(), cur: us.invited, prev: up.invited, info: "All user accounts created across the agencies", userKind: "invited" },
-    { label: "Activated", value: us.activated.toLocaleString(), cur: us.activated, prev: up.activated, info: "Users who have logged in at least once", userKind: "activated" },
-    { label: "Active · 30 days", value: us.active30.toLocaleString(), cur: us.active30, prev: up.active30, info: "Users with portal activity in the last 30 days", userKind: "uactive30" },
-    { label: "Active · 7 days", value: us.active7.toLocaleString(), cur: us.active7, prev: up.active7, info: "Users with portal activity in the last 7 days", userKind: "uactive7" },
-    { label: "Pending invites", value: PENDING.toLocaleString(), cur: PENDING, prev: pPENDING, inverse: true, info: "Invited users who haven't logged in yet", userKind: "pending" },
-    { label: "Activation rate", value: `${pct(us.activated, us.invited)}%`, cur: pct(us.activated, us.invited), prev: pct(up.activated, up.invited), unit: " pts", info: "Share of invited users who have logged in" },
-    { label: "Active users per agency", value: perAgency(us.active30, ACTIVE_30).toFixed(1), cur: perAgency(us.active30, ACTIVE_30), prev: perAgency(up.active30, pr.active30), info: "Average active users (30 days) in each active agency" },
-    { label: "Single-user agencies", value: us.single.toLocaleString(), cur: us.single, prev: up.single, inverse: true, info: "Active agencies where only one person logs in, usually the primary contact", kind: "single" },
+    { label: "Activated", value: us.activated.toLocaleString(), rate: `${pct(us.activated, us.invited)}%`, cur: us.activated, prev: up.activated, info: "Users who have logged in at least once · % of invited", userKind: "activated" },
+    { label: "Active", value: us.active30.toLocaleString(), rate: `${pct(us.active30, us.activated)}%`, cur: us.active30, prev: up.active30, info: "Users with portal activity in the selected period · % of activated", userKind: "uactive30" },
+    { label: "Pending invites", value: PENDING.toLocaleString(), rate: `${pct(PENDING, us.invited)}%`, cur: PENDING, prev: pPENDING, inverse: true, info: "Invited users who haven't logged in yet · % of invited", userKind: "pending" },
   ];
   const winStats = [
     { label: "Active agencies", value: d.active[0].toLocaleString(), cur: d.active[0], prev: d.active[1] },
@@ -431,11 +424,12 @@ export default function Reports({ isDark = false, onNavigate }: ReportsProps) {
               onMouseEnter={e => { if (clickable) hoverOn(e.currentTarget); }}
               onMouseLeave={e => hoverOff(e.currentTarget)}>
               {/* Clickable boxes show it on hover (tint) — no extra link text. */}
-              <div className="text-[13px] font-semibold" style={{ color: c.text }}>{m.label}</div>
-              <div className="flex items-center justify-between gap-3 mt-2">
+              <div className="text-[13px] font-semibold whitespace-nowrap" style={{ color: c.text }}>{m.label}</div>
+              <div className="flex items-baseline gap-2 mt-2">
                 <span className="text-[30px] font-extrabold leading-none tracking-tight" style={{ color: c.heading }}>{m.value}</span>
-                <DeltaPill cur={m.cur} prev={m.prev} unit={m.unit} inverse={m.inverse} isDark={isDark} />
+                {m.rate && <span className="text-[16px] font-bold" style={{ color: c.muted }}>{m.rate}</span>}
               </div>
+              <div className="mt-2.5"><DeltaPill cur={m.cur} prev={m.prev} unit={m.unit} inverse={m.inverse} isDark={isDark} /></div>
             </div>
           );
         })}
@@ -521,7 +515,6 @@ export default function Reports({ isDark = false, onNavigate }: ReportsProps) {
       });
     // Box counts come from the same people list as the table/filters.
     const act30 = people.filter(p => p.st === "active").length;
-    const act7 = people.filter(p => p.st === "active" && ["Today", "Yesterday", "3 days ago"].includes(p.last)).length;
     const counts = { all: people.length, active: people.filter(p => p.st === "active").length, inactive: people.filter(p => p.st === "inactive").length, pending: people.filter(p => p.st === "pending").length };
     const q = userQuery.trim().toLowerCase();
     const matched = people.filter(p => (userFilter === "all" || p.st === userFilter) && (!q || `${p.name} ${p.email} ${p.title}`.toLowerCase().includes(q)));
@@ -565,7 +558,7 @@ export default function Reports({ isDark = false, onNavigate }: ReportsProps) {
             {[
               { label: "Users", value: users },
               { label: "Activated", value: activated, sub: `${pct(activated, users)}% of users` },
-              { label: "Active · 30 days", value: act30, sub: `Active · 7 days: ${act7}` },
+              { label: "Active", value: act30, sub: `${pct(act30, activated)}% of activated` },
               { label: "Pending invites", value: pending },
             ].map((m, idx) => (
               <div key={m.label} className="px-6 py-5" style={{ borderLeft: idx % 4 ? `1px solid ${c.line}` : undefined }}>
@@ -752,7 +745,7 @@ export default function Reports({ isDark = false, onNavigate }: ReportsProps) {
               </>
             )}
           </div>
-          <button type="button" onClick={() => downloadCsv(`norbielink-adoption-${cohort}.csv`, [["Metric", "Value", `vs ${adoptPrevLabel}`], ["Cohort", ds.label, ""], ["Period", periodLabel, ""], ["Agencies tracked", TOTAL, TOTAL - pr.total], ["Have logged in", LOGGED_IN, LOGGED_IN - pr.loggedin], ["Active last 30 days", ACTIVE_30, ACTIVE_30 - pr.active30], ["No recorded login", NO_LOGIN, NO_LOGIN - pNO]])}
+          <button type="button" onClick={() => downloadCsv(`norbielink-adoption-${cohort}.csv`, [["Metric", "Value", `vs ${adoptPrevLabel}`], ["Cohort", ds.label, ""], ["Period", periodLabel, ""], ["Agencies tracked", TOTAL, TOTAL - pr.total], ["Have logged in", LOGGED_IN, LOGGED_IN - pr.loggedin], ["Active", ACTIVE_30, ACTIVE_30 - pr.active30], ["No recorded login", NO_LOGIN, NO_LOGIN - pNO]])}
             className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12.5px] font-semibold cursor-pointer" style={{ fontFamily: FONT, border: `1px solid ${c.line}`, color: c.text }}>
             <Download className="w-3.5 h-3.5" style={{ color: c.faint }} /> Export
           </button>
@@ -768,7 +761,7 @@ export default function Reports({ isDark = false, onNavigate }: ReportsProps) {
         { key: "nologin", icon: UserPlus, title: "Ready to onboard", action: "Onboard", open: () => setDrill("nologin"),
           text: <><strong style={{ color: c.heading }}>{NO_LOGIN} agencies</strong> haven&apos;t logged in yet.</> },
         { key: "dormant", icon: RefreshCw, title: "Ready to re-engage", action: "Re-engage", open: () => setDrill("dormant"),
-          text: <><strong style={{ color: c.heading }}>{LAPSED} agencies</strong> have used NorbieLink before but not in the last 30 days.</> },
+          text: <><strong style={{ color: c.heading }}>{LAPSED} agencies</strong> have used NorbieLink before but not in this period.</> },
       ])}
 
       {metricGrid("User Activity", <>Agents inside these agencies · change vs {b(adoptPrevLabel)} · sample data</>, userMetrics, "mb-10")}
@@ -905,7 +898,7 @@ export default function Reports({ isDark = false, onNavigate }: ReportsProps) {
                   </div>
                   <div className="text-[12.5px] text-right whitespace-nowrap" style={{ color: c.text }}>
                     <span className="font-semibold" style={{ color: c.heading }}>{t.using[0]}</span> agencies · {share}%
-                    <div className="text-[11px]" style={{ color: c.muted }}>{t.users} users · {t.active30} agencies active 30d</div>
+                    <div className="text-[11px]" style={{ color: c.muted }}>{t.users} users · {t.active30} agencies active</div>
                   </div>
                   <div className="justify-self-end"><DeltaPill cur={t.using[0]} prev={t.using[1]} isDark={isDark} /></div>
                 </div>
@@ -1000,7 +993,7 @@ export default function Reports({ isDark = false, onNavigate }: ReportsProps) {
               <div className="flex items-center justify-between gap-3 px-6 py-4" style={{ borderTop: `1px solid ${c.line}` }}>
                 <span className="text-[11.5px]" style={{ color: c.faint }}>Showing {seg.rows.length} of {seg.count.toLocaleString()} · sample data</span>
                 <div className="flex items-center gap-2">
-                  <button type="button" onClick={() => downloadCsv(`norbielink-${seg.kind}-${cohort}.csv`, [["Agency", "Contact", "Email", "Phone", "Users", "Active users (30d)", "Status"], ...seg.rows.map(r => [r.name, r.contact, r.email, r.phone, r.users, r.activeUsers, r.meta])])} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12.5px] font-semibold cursor-pointer" style={{ fontFamily: FONT, border: `1px solid ${c.line}`, color: c.text }}><Download className="w-3.5 h-3.5" style={{ color: c.faint }} /> Export CSV</button>
+                  <button type="button" onClick={() => downloadCsv(`norbielink-${seg.kind}-${cohort}.csv`, [["Agency", "Contact", "Email", "Phone", "Users", "Active users", "Status"], ...seg.rows.map(r => [r.name, r.contact, r.email, r.phone, r.users, r.activeUsers, r.meta])])} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12.5px] font-semibold cursor-pointer" style={{ fontFamily: FONT, border: `1px solid ${c.line}`, color: c.text }}><Download className="w-3.5 h-3.5" style={{ color: c.faint }} /> Export CSV</button>
                   <button type="button" onClick={() => { setDrill(null); viewAgencies(); }} className="px-3.5 py-1.5 rounded-lg text-[12.5px] font-semibold text-white cursor-pointer" style={{ fontFamily: FONT, background: RAZZ, border: "none" }}>Open in Agencies</button>
                 </div>
               </div>
