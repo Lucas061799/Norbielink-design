@@ -27,9 +27,10 @@ interface NewAgencyTeamModalProps {
   onClose: () => void;
   onRemindLater: () => void;
   onAddUsers: () => void; // → Admin › Users
+  onJustMe: () => void;   // one-person agency → completes setup
 }
 
-export default function NewAgencyTeamModal({ isDark, open, onClose, onRemindLater, onAddUsers }: NewAgencyTeamModalProps) {
+export default function NewAgencyTeamModal({ isDark, open, onClose, onRemindLater, onAddUsers, onJustMe }: NewAgencyTeamModalProps) {
   const titleId = useId();
   const primaryBtnRef = useRef<HTMLButtonElement | null>(null);
 
@@ -98,7 +99,15 @@ export default function NewAgencyTeamModal({ isDark, open, onClose, onRemindLate
           </p>
         </div>
 
-        <div className="flex items-center justify-end gap-2 px-7 py-4 flex-shrink-0" style={{ borderTop: `1px solid ${border}` }}>
+        <div className="flex items-center gap-2 px-7 py-4 flex-shrink-0" style={{ borderTop: `1px solid ${border}` }}>
+          <button
+            type="button"
+            onClick={onJustMe}
+            className="mr-auto text-[12.5px] font-semibold underline underline-offset-2 cursor-pointer"
+            style={{ fontFamily: FONT, background: "transparent", border: "none", padding: 0, color: muted }}
+          >
+            It&apos;s just me
+          </button>
           <button
             type="button"
             onClick={onRemindLater}

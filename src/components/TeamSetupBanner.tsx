@@ -18,11 +18,12 @@ interface TeamSetupBannerProps {
   isDark: boolean;
   onOpen: () => void;   // Re-opens the Team Setup modal
   onDismiss: () => void; // Collapses the banner → bell-only
+  onJustMe?: () => void; // New agency only: one-person agency → completes setup
 }
 
 const FONT = "var(--font-montserrat), Montserrat, sans-serif";
 
-export default function TeamSetupBanner({ isDark, onOpen, onDismiss }: TeamSetupBannerProps) {
+export default function TeamSetupBanner({ isDark, onOpen, onDismiss, onJustMe }: TeamSetupBannerProps) {
   const bg          = isDark ? "#1E2240" : "#F9FAFB";
   const borderCol   = isDark ? "rgba(255,255,255,0.10)" : "#E5E7EB";
   const bodyColor   = isDark ? "#D1D5DB" : "#374151";
@@ -80,6 +81,17 @@ export default function TeamSetupBanner({ isDark, onOpen, onDismiss }: TeamSetup
           Set up your agency&apos;s users and their access levels.
         </div>
       </div>
+
+      {onJustMe && (
+        <button
+          type="button"
+          onClick={onJustMe}
+          className="flex-shrink-0 self-center text-[12px] font-semibold underline underline-offset-2 whitespace-nowrap cursor-pointer"
+          style={{ fontFamily: FONT, background: "transparent", border: "none", padding: 0, color: bodyColor }}
+        >
+          It&apos;s just me
+        </button>
+      )}
 
       <button
         type="button"

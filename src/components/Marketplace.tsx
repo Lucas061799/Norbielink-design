@@ -28,6 +28,7 @@ interface MarketplaceProps {
   teamSetupBannerVisible?: boolean;
   onOpenTeamSetup?: () => void;
   onDismissTeamSetupBanner?: () => void;
+  onTeamSetupJustMe?: () => void;
 }
 
 // Left-column tiles. `icon` is the base filename in /public/insurance-icons/;
@@ -162,7 +163,7 @@ const EMPTY_STATE_COPY: Record<"All" | PromoCategory, string> = {
   Learning:   "New training dropping soon",
 };
 
-export default function Marketplace({ isDark = false, teamSetupBannerVisible = false, onOpenTeamSetup, onDismissTeamSetupBanner }: MarketplaceProps) {
+export default function Marketplace({ isDark = false, teamSetupBannerVisible = false, onOpenTeamSetup, onDismissTeamSetupBanner, onTeamSetupJustMe }: MarketplaceProps) {
   const text     = isDark ? "#F9FAFB" : "#1F2937";
   const heading  = isDark ? "#F9FAFB" : "#2D3653";
   const muted    = isDark ? "#8B8FA8" : "#6B7280";
@@ -219,6 +220,7 @@ export default function Marketplace({ isDark = false, teamSetupBannerVisible = f
           isDark={isDark}
           onOpen={() => onOpenTeamSetup?.()}
           onDismiss={() => onDismissTeamSetupBanner?.()}
+          onJustMe={onTeamSetupJustMe}
         />
       )}
 

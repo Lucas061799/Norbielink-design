@@ -1890,6 +1890,8 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
     setSentSummary({ sent: sent.length, skipped });
     setImportPhase("sent");
     clearDraftStorage();
+    // Flow A: an import with at least one sent row completes team setup.
+    if (newAgency && teamSetupPending && sent.length > 0) onCompleteTeamSetup?.();
     // Top-right toast matching the rest of the app's notification pattern — confirms the send
     // happened independently of the modal's own success screen, so users get a familiar signal
     // even if they close the modal right after clicking Send.
@@ -8974,6 +8976,9 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                         return s;
                       });
                       showToast({ title: "User updated", description: `${auFirstName} ${auLastName} saved.` });
+                    } else if (newAgency && teamSetupPending) {
+                      // Flow A: the first invitation sent completes team setup.
+                      onCompleteTeamSetup?.();
                     }
                     closeModal();
                     closeAll();

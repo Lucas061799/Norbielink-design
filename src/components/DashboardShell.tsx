@@ -239,6 +239,7 @@ export default function DashboardShell({ children, pageTitle }: DashboardShellPr
             // Add New User / Import Users live.
             onOpenTeamSetup={goToAddUsers}
             onDismissTeamSetupBanner={() => setTeamSetupBannerDismissed(true)}
+            onTeamSetupJustMe={isNewAgency ? completeTeamSetup : undefined}
           />
         );
       case "Clients":
@@ -344,6 +345,7 @@ export default function DashboardShell({ children, pageTitle }: DashboardShellPr
           // Bell "Set up team" → Admin › Users (same as the Marketplace banner).
           onOpenTeamSetup={goToAddUsers}
           onDismissTeamSetupBell={() => setTeamSetupBellDismissed(true)}
+          onTeamSetupJustMe={isNewAgency ? completeTeamSetup : undefined}
           impersonation={impersonation}
           impersonationSpotlight={impersonationSpotlightActive}
           onDismissImpersonationSpotlight={() => setImpersonationSpotlightActive(false)}
@@ -366,6 +368,7 @@ export default function DashboardShell({ children, pageTitle }: DashboardShellPr
           onClose={dismissTeamSetupModal}
           onRemindLater={dismissTeamSetupModal}
           onAddUsers={goToAddUsers}
+          onJustMe={completeTeamSetup}
         />
       ) : (
         <TeamSetupModal

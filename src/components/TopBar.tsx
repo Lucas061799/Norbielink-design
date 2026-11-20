@@ -18,6 +18,8 @@ interface TopBarProps {
   teamSetupBellSpotlight?: boolean;
   onOpenTeamSetup?: () => void;
   onDismissTeamSetupBell?: () => void;
+  // New agency only: "It's just me" link on the bell entry → completes setup.
+  onTeamSetupJustMe?: () => void;
   // When set, the top bar surfaces a compact "Acting as <name>" chip beside
   // the bell so the internal user is reminded on every page that quotes they
   // start will post under this external user's account. Cleared via
@@ -73,7 +75,7 @@ const INITIAL_NOTIFS: Notification[] = [
 function NotifRow({
   isDark, textColor, mutedColor, dividerColor,
   isLast, sev, icon, title, body, timestamp, actionLabel,
-  isDismissed, onAction, onDismiss, onRestore,
+  isDismissed, onAction, onDismiss, onRestore, secondaryLabel, onSecondary,
 }: {
   isDark: boolean;
   textColor: string;
@@ -92,6 +94,8 @@ function NotifRow({
   onAction: () => void;
   onDismiss: () => void;
   onRestore?: () => void;
+  secondaryLabel?: string;
+  onSecondary?: () => void;
 }) {
   const [hovered, setHovered] = useState(false);
   return (
@@ -188,6 +192,17 @@ function NotifRow({
         <div className="flex items-center justify-between mt-2">
           <span style={{ fontFamily: FONT, fontSize: 11, color: mutedColor }}>{timestamp}</span>
           {actionLabel && (
+            <div className="flex items-center gap-3">
+            {secondaryLabel && onSecondary && (
+              <button
+                type="button"
+                onClick={onSecondary}
+                className="cursor-pointer underline underline-offset-2"
+                style={{ background: "transparent", border: "none", padding: 0, color: mutedColor, fontFamily: FONT, fontSize: 11, fontWeight: 600 }}
+              >
+                {secondaryLabel}
+              </button>
+            )}
             <button
               type="button"
               onClick={onAction}
@@ -206,6 +221,7 @@ function NotifRow({
             >
               {actionLabel}
             </button>
+            </div>
           )}
         </div>
       </div>
@@ -213,7 +229,7 @@ function NotifRow({
   );
 }
 
-export default function TopBar({ isDark = false, activePage, teamSetupBellVisible = true, teamSetupBellSpotlight = false, onOpenTeamSetup, onDismissTeamSetupBell, impersonation = null, onExitImpersonation, impersonationSpotlight = false, onDismissImpersonationSpotlight }: TopBarProps) {
+export default function TopBar({ isDark = false, activePage, teamSetupBellVisible = true, teamSetupBellSpotlight = false, onOpenTeamSetup, onDismissTeamSetupBell, onTeamSetupJustMe, impersonation = null, onExitImpersonation, impersonationSpotlight = false, onDismissImpersonationSpotlight }: TopBarProps) {
   const hideSearch = activePage === "Quotes" || activePage === "Policies";
   const [open, setOpen] = useState(false);
   // `notifs` stays stable — dismissing an item adds its id to `dismissedIds`
@@ -637,6 +653,8 @@ export default function TopBar({ isDark = false, activePage, teamSetupBellVisibl
                       }}
                       onDismiss={() => dismiss(n.id, n.type)}
                       onRestore={() => restore(n.id)}
+                      secondaryLabel={isTeamSetup && onTeamSetupJustMe ? "It's just me" : undefined}
+                      onSecondary={() => { onTeamSetupJustMe?.(); setOpen(false); }}
                     />
                   );
                 })
