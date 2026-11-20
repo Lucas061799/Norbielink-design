@@ -964,9 +964,11 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
   // backdrop, bell halo (shell-owned), raised shadow — is transient and
   // tied to `spotlightActive` only.
   const coachmarkVisible = teamSetupPending;
-  // "Set up your team" box is an accordion; starts open and remembers the
+  // "Managing your team" box is an accordion; starts open and remembers the
   // admin's choice in this browser.
   const TEAM_TIP_OPEN_KEY = "norbielink.teamTipOpen";
+  // Which "Common questions" item is open (one at a time).
+  const [openFaq, setOpenFaq] = useState<string | null>(null);
   const [teamTipOpen, setTeamTipOpen] = useState(() => {
     try { return typeof window === "undefined" || localStorage.getItem(TEAM_TIP_OPEN_KEY) !== "0"; } catch { return true; }
   });
@@ -8078,8 +8080,8 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                 <svg className="w-5 h-5 flex-shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <defs>
                     <linearGradient id="team-coach-razz" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="24" y2="0">
-                      <stop offset="0%" stopColor={isDark ? "#C9A6FF" : "#5C2ED4"} />
-                      <stop offset="100%" stopColor={isDark ? "#E68BF2" : "#A614C3"} />
+                      <stop offset="0%" stopColor="#A614C3" />
+                      <stop offset="100%" stopColor="#A614C3" />
                     </linearGradient>
                   </defs>
                   <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" stroke="url(#team-coach-razz)" />
@@ -8094,71 +8096,87 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                     <span className="text-[13px] font-semibold"
                       style={{
                         ...font,
-                        backgroundImage: isDark
-                          ? "linear-gradient(88.54deg, #C9A6FF 0.1%, #E68BF2 63.88%)"
-                          : "linear-gradient(88.54deg, #5C2ED4 0.1%, #A614C3 63.88%)",
-                        backgroundClip: "text",
-                        WebkitBackgroundClip: "text",
-                        WebkitTextFillColor: "transparent",
+                        color: "#A614C3",
                       }}>
-                      Set up your team
+                      Managing your team
                     </span>
                     {!teamTipOpen && (
-                      <span className="text-[12px] truncate" style={{ ...font, color: isDark ? "#D1D5DB" : "#374151" }}>
-                        · Access levels and tips for adding users
+                      <span className="text-[12px] truncate" style={{ ...font, color: isDark ? "#E5E7EB" : "#1F2937" }}>
+                        · Admin access and common questions
                       </span>
                     )}
                     <ChevronDown className="w-4 h-4 ml-auto flex-shrink-0 transition-transform"
-                      style={{ color: isDark ? "#D1D5DB" : "#374151", transform: teamTipOpen ? "rotate(180deg)" : undefined }} />
+                      style={{ color: isDark ? "#E5E7EB" : "#1F2937", transform: teamTipOpen ? "rotate(180deg)" : undefined }} />
                   </button>
                   {teamTipOpen && (<>
-                  <div className="text-[12px] mt-0.5" style={{ ...font, color: isDark ? "#D1D5DB" : "#374151" }}>
-                    Add the people at your agency and give each person an access level. Admins can change anyone&apos;s access level at any time.
-                  </div>
-                  <div className="text-[11px] font-semibold uppercase tracking-wide mt-3" style={{ ...font, color: isDark ? "#D1D5DB" : "#374151" }}>
-                    Access levels
-                  </div>
-                  {/* Access levels. "Account Manager" is the name for the
-                      see-everything-but-not-admin level — not built yet. */}
-                  <div className="grid grid-cols-2 grid-rows-2 gap-2.5 mt-1.5" style={{ maxWidth: 720 }}>
-                    {[
-                      { name: "Admin", perms: ["Add, edit, and delete users", "Make other users Admins", "See all agency quotes and policies", "View accounting statements and commissions"] },
-                      { name: "Account Manager", perms: ["See all agency quotes and policies"] },
-                      { name: "CSR and Producer", perms: ["See only their own quotes and policies"] },
-                    ].map(role => (
-                      // Admin fills the left column; the other two stack on the right.
-                      <div key={role.name} className={`rounded-lg px-3 py-2.5${role.name === "Admin" ? " row-span-2" : ""}`}
-                        style={{ background: isDark ? "rgba(255,255,255,0.04)" : "#FFFFFF", border: `1px solid ${c.border}` }}>
-                        <div className="text-[12px] font-semibold" style={{ ...font, color: c.text }}>{role.name}</div>
-                        <ul className="mt-1.5 flex flex-col gap-1">
-                          {role.perms.map(p => (
-                            <li key={p} className="flex items-start gap-1.5 text-[11.5px]" style={{ ...font, color: isDark ? "#D1D5DB" : "#374151", lineHeight: 1.4 }}>
-                              <Check className="w-3 h-3 flex-shrink-0 mt-[3px]" style={{ color: "#A614C3" }} />
-                              {p}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    ))}
-                  </div>
+                  {/* Two access levels, shown as pictures not paragraphs:
+                      Admin unlocks every tile; everyone else gets one. */}
                   {(() => {
-                    const b = (t: string) => <span style={{ fontWeight: 600, color: c.text }}>{t}</span>;
-                    const notes = [
-                      <>Turn on {b("Admin")} by clicking the <span className="inline-flex align-middle mx-0.5" aria-label="Admin icon"><GradientUserCog size={14} /></span> icon in any row.</>,
-                      <>To change someone to {b("Account Manager")}, {b("CSR")}, {b("Producer")}, etc., click the {b("⋮")} menu → {b("Edit User")} and pick from the {b("Job title")} dropdown.</>,
-                      <>New users get an {b("invitation email")} when you add them. If it doesn&apos;t arrive, ask them to check their junk or spam folder.</>,
-                      <>Use the {b("⋮")} menu to resend the invitation, reset a password, and more.</>,
-                    ];
-                    return (
-                      <ul className="mt-3 flex flex-col gap-1">
-                        {notes.map((n, i) => (
-                          <li key={i} className="flex items-start gap-2 text-[11.5px]" style={{ ...font, color: isDark ? "#D1D5DB" : "#374151", lineHeight: 1.45 }}>
-                            <span className="flex-shrink-0 rounded-full mt-[6px]" style={{ width: 4, height: 4, background: "#A614C3" }} />
-                            <span>{n}</span>
-                          </li>
-                        ))}
-                      </ul>
+                    const RZ = "#A614C3";
+                    const muted = isDark ? "#E5E7EB" : "#1F2937";
+                    const adminPerms = ["Add, edit & remove users", "Make other Admins", "View statements & commissions"];
+                    const card = () => (
+                      <div className="rounded-xl p-3.5"
+                        style={{ background: isDark ? "rgba(255,255,255,0.04)" : "#FFFFFF", border: `1px solid ${c.border}` }}>
+                        <div className="text-[13px] font-bold" style={{ ...font, color: c.text }}>Admin</div>
+                        <div className="text-[11px] leading-snug mt-0.5" style={{ ...font, color: muted }}>Have as many Admins as you need. Good picks: office manager, bookkeeper, principal.</div>
+                        <div className="grid grid-cols-1 gap-1.5 mt-2.5">
+                          {adminPerms.map(label => (
+                            <div key={label} className="rounded-lg px-2.5 py-2 flex items-center gap-2"
+                              style={{ background: isDark ? "rgba(255,255,255,0.06)" : "#F3F4F6" }}>
+                              <span className="text-[11px] font-semibold leading-tight flex-1" style={{ ...font, color: c.text }}>{label}</span>
+                              <Check className="w-3.5 h-3.5 flex-shrink-0" style={{ color: RZ }} strokeWidth={3} />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     );
+                    const kbd = (node: React.ReactNode) => (
+                      <span className="inline-flex items-center justify-center rounded-md align-middle mx-0.5"
+                        style={{ minWidth: 20, height: 20, padding: "0 4px", background: isDark ? "rgba(255,255,255,0.08)" : "#FFFFFF", border: `1px solid ${c.border}`, color: c.text }}>{node}</span>
+                    );
+                    // FAQ accordion — one question open at a time.
+                    const B = (t: React.ReactNode) => <b style={{ color: c.text }}>{t}</b>;
+                    const dots = kbd(<MoreVertical className="w-3 h-3" />);
+                    const faq: { q: string; a: React.ReactNode }[] = [
+                      { q: "What happens after I add a user?",
+                        a: <>They get an {B("invitation email")}, then {B("verify with a code")} and they&apos;re ready to start.</> },
+                      { q: "Can I bulk upload users?",
+                        a: <>Yes. Click {B("Import Users")} and follow the instructions. For best results, click {B("Download Excel Template")} there first and fill it in.</> },
+                      { q: "They didn't get the invitation email",
+                        a: <>Ask them to check their {B("junk or spam")} folder. Still nothing? Click {dots} in their row → {B("Resend Invitation")}.</> },
+                      { q: "How do I make someone an Admin?",
+                        a: <>Click {kbd(<GradientUserCog size={12} />)} in their row. Click it again to turn Admin off.</> },
+                      { q: "How do I change someone's job title?",
+                        a: <>Click {dots} → {B("Edit User")} and pick from the {B("Job title")} dropdown.</> },
+                      { q: "Someone forgot their password or is locked out",
+                        a: <>Click {dots} → {B("Reset Password")} to email them a reset link, or {B("Unlock User")} if they&apos;re locked out.</> },
+                      { q: "Someone left the agency",
+                        a: <>Click {dots} → {B("Reassign Accounts")} to hand off their clients, then {B("Deactivate User")}.</> },
+                    ];
+                    return (<>
+                      {/* Side by side to keep the panel short: Admin on the
+                          left, questions on the right (stacks on narrow screens). */}
+                      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] gap-3 mt-3 items-start" style={{ maxWidth: 980 }}>
+                      {card()}
+                      <div className="rounded-xl overflow-hidden" style={{ background: isDark ? "rgba(255,255,255,0.04)" : "#FFFFFF", border: `1px solid ${c.border}` }}>
+                        <div className="px-3.5 pt-2.5 pb-1.5 text-[11px] font-semibold uppercase tracking-wide" style={{ ...font, color: muted }}>Common questions</div>
+                        {faq.map(f => (
+                          <div key={f.q} style={{ borderTop: `1px solid ${c.border}` }}>
+                            <button type="button" aria-expanded={openFaq === f.q} onClick={() => setOpenFaq(openFaq === f.q ? null : f.q)}
+                              className="w-full flex items-center gap-2.5 px-3.5 py-[7px] cursor-pointer text-left"
+                              style={{ background: "transparent", border: "none" }}>
+                              <span className="text-[12px] font-semibold flex-1" style={{ ...font, color: c.text }}>{f.q}</span>
+                              <ChevronDown className="w-4 h-4 flex-shrink-0 transition-transform" style={{ color: muted, transform: openFaq === f.q ? "rotate(180deg)" : undefined }} />
+                            </button>
+                            {openFaq === f.q && (
+                              <div className="text-[11.5px] leading-relaxed pb-3 pr-4" style={{ ...font, color: muted, paddingLeft: 14 }}>{f.a}</div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                      </div>
+                    </>);
                   })()}
                   </>)}
                 </div>
@@ -8246,7 +8264,10 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                 <button className="px-5 text-[12px] font-semibold text-white flex-shrink-0"
                   style={{ background:btnGrad, fontFamily:FONT, borderRadius:"0 7px 7px 0" }}>Submit</button>
               </div>
-              <button className="flex items-center gap-1.5 text-[12px] font-semibold text-white transition-all flex-shrink-0"
+              <button
+                // While team setup is pending, a soft razz pulse points new
+                // admins at the one button they need.
+                className={`flex items-center gap-1.5 text-[12px] font-semibold text-white transition-all flex-shrink-0${teamSetupPending && viewMode === "client" ? " razz-pulse" : ""}`}
                 style={{ fontFamily:FONT, background:btnGrad, height:37, padding:"9px 16px", borderRadius:10, boxSizing:"border-box" as const }}
                 onMouseEnter={e=>(e.currentTarget.style.filter="brightness(1.1)")}
                 onMouseLeave={e=>(e.currentTarget.style.filter="none")}

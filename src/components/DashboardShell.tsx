@@ -81,7 +81,7 @@ export default function DashboardShell({ children, pageTitle }: DashboardShellPr
     if (new URLSearchParams(window.location.search).get("teamSetup") !== "reset") return;
     try {
       localStorage.removeItem(TEAM_SETUP_DONE_KEY);
-      localStorage.removeItem("norbielink.teamTipOpen"); // "Set up your team" box starts open again
+      localStorage.removeItem("norbielink.teamTipOpen"); // "Managing your team" box starts open again
     } catch { /* nothing stored */ }
   }, []);
   const [teamSetupModalDismissed, setTeamSetupModalDismissed] = useState(false);

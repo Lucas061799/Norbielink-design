@@ -59,3 +59,14 @@ body {
   scrollbar-width: thin;
   scrollbar-color: rgba(0, 0, 0, 0.25) transparent;
 }
+
+/* Soft razz pulse to draw the eye to a primary action (e.g. Add New User
+   while team setup is pending). */
+@keyframes razz-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(166, 20, 195, 0.45); }
+  50%      { box-shadow: 0 0 0 6px rgba(166, 20, 195, 0); }
+}
+.razz-pulse { animation: razz-pulse 2s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .razz-pulse { animation: none; box-shadow: 0 0 0 3px rgba(166, 20, 195, 0.35); }
+}
