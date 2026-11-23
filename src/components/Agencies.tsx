@@ -8161,18 +8161,19 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                           left, questions on the right (stacks on narrow screens). */}
                       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] gap-3 mt-3 items-start" style={{ maxWidth: 980 }}>
                       {card()}
-                      <div className="rounded-xl overflow-hidden" style={{ background: isDark ? "rgba(255,255,255,0.04)" : "#FFFFFF", border: `1px solid ${c.border}` }}>
-                        <div className="px-3.5 pt-2.5 pb-1.5 text-[11px] font-semibold uppercase tracking-wide" style={{ ...font, color: muted }}>Common questions</div>
-                        {faq.map(f => (
-                          <div key={f.q} style={{ borderTop: `1px solid ${c.border}` }}>
+                      {/* Plain list with divider lines — no card around it. */}
+                      <div className="px-4 py-3">
+                        <div className="pb-2 text-[11px] font-semibold uppercase tracking-wide" style={{ ...font, color: "#A614C3" }}>Common questions</div>
+                        {faq.map((f, i) => (
+                          <div key={f.q} style={{ borderTop: `1px solid ${c.border}`, borderBottom: i === faq.length - 1 ? `1px solid ${c.border}` : undefined }}>
                             <button type="button" aria-expanded={openFaq === f.q} onClick={() => setOpenFaq(openFaq === f.q ? null : f.q)}
-                              className="w-full flex items-center gap-2.5 px-3.5 py-[7px] cursor-pointer text-left"
+                              className="w-full flex items-center gap-2.5 px-1 py-2 cursor-pointer text-left"
                               style={{ background: "transparent", border: "none" }}>
                               <span className="text-[12px] font-semibold flex-1" style={{ ...font, color: c.text }}>{f.q}</span>
                               <ChevronDown className="w-4 h-4 flex-shrink-0 transition-transform" style={{ color: muted, transform: openFaq === f.q ? "rotate(180deg)" : undefined }} />
                             </button>
                             {openFaq === f.q && (
-                              <div className="text-[11.5px] leading-relaxed pb-3 pr-4" style={{ ...font, color: muted, paddingLeft: 14 }}>{f.a}</div>
+                              <div className="text-[11.5px] leading-relaxed pb-3 pl-1 pr-6" style={{ ...font, color: muted }}>{f.a}</div>
                             )}
                           </div>
                         ))}
