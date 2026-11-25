@@ -87,7 +87,8 @@ export default function NewAgencyTeamModal({ isDark, open, onClose, onRemindLate
             Set up your agency&apos;s users
           </h2>
           <p className="text-[13px] mt-1.5" style={{ fontFamily: FONT, color: muted, lineHeight: 1.55 }}>
-            You&apos;re the first user, and an Admin. Add the people at your agency who&apos;ll use NorbieLink.
+            You&apos;re the first user, and an Admin.{" "}
+            <span style={{ fontWeight: 700, color: text }}>Add the people at your agency who&apos;ll use NorbieLink, and choose who else should be an Admin.</span>
           </p>
 
           {/* What an Admin can do — same three rows as the Admin card on
