@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef } from "react";
-import { X, UserPlus, ArrowRight } from "lucide-react";
+import { X, UserPlus, ArrowRight, Check } from "lucide-react";
 
 // -----------------------------------------------------------------------------
 // First-run Team Setup notice — NEW agency variant.
@@ -87,10 +87,23 @@ export default function NewAgencyTeamModal({ isDark, open, onClose, onRemindLate
             Set up your agency&apos;s users
           </h2>
           <p className="text-[13px] mt-1.5" style={{ fontFamily: FONT, color: muted, lineHeight: 1.55 }}>
-            You&apos;re the only user so far, and you&apos;re an Admin because you&apos;re the primary contact.
-            Add the people at your agency who&apos;ll use NorbieLink and give each person an access level.
-            Admins can change anyone&apos;s access level at any time.
+            You&apos;re the first user, and an Admin. Add the people at your agency who&apos;ll use NorbieLink.
           </p>
+
+          {/* What an Admin can do — same three rows as the Admin card on
+              Admin › Users, so the two read as one explanation. */}
+          <div className="mt-4 rounded-xl p-3.5" style={{ border: `1px solid ${border}` }}>
+            <div className="text-[12.5px] font-semibold mb-2" style={{ fontFamily: FONT, color: text }}>As an Admin, you can:</div>
+            <div className="flex flex-col gap-1.5">
+              {["Add, edit & remove users", "Make other Admins", "View statements & commissions"].map(p => (
+                <div key={p} className="flex items-center justify-between gap-3 rounded-lg px-3 py-2"
+                  style={{ background: isDark ? "rgba(255,255,255,0.05)" : "#F3F4F6" }}>
+                  <span className="text-[12.5px] font-medium" style={{ fontFamily: FONT, color: text }}>{p}</span>
+                  <Check className="w-4 h-4 flex-shrink-0" style={{ color: "#A614C3" }} strokeWidth={2.5} />
+                </div>
+              ))}
+            </div>
+          </div>
 
 
           <p className="text-[12.5px] mt-4" style={{ fontFamily: FONT, color: muted, lineHeight: 1.5 }}>
