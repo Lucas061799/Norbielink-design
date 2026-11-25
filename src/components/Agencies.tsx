@@ -8126,8 +8126,8 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                     const card = () => (
                       <div className="rounded-xl p-3.5"
                         style={{ background: isDark ? "rgba(255,255,255,0.04)" : "#FFFFFF", border: `1px solid ${c.border}` }}>
-                        <div className="text-[13px] font-bold" style={{ ...font, color: c.text }}>Admin</div>
-                        <div className="text-[11px] leading-snug mt-0.5" style={{ ...font, color: muted }}>Have as many Admins as you need. Good picks: office manager, bookkeeper, principal.</div>
+                        <div className="text-[13px] font-bold" style={{ ...font, color: c.text }}>What&apos;s an Admin?</div>
+                        <div className="text-[11px] leading-snug mt-0.5" style={{ ...font, color: muted }}>Admins manage your team. Have as many as you need. Good picks: office manager, bookkeeper or principal.</div>
                         <div className="grid grid-cols-1 gap-1.5 mt-2.5">
                           {adminPerms.map(label => (
                             <div key={label} className="rounded-lg px-2.5 py-2 flex items-center gap-2"
