@@ -9,7 +9,7 @@ import {
   StickyNote, LayoutGrid, Trash2, Archive, Pin, List, Table2, FolderOpen, FileCheck,
   CheckSquare, Maximize2, Minimize2, Lock, Unlock, Copy, CopyPlus,
   MoreVertical, UserCircle, UserX, UserMinus, Download, Upload, UserCog, Pencil, Globe, Eye, Mail, Phone, Bell, Bookmark, FilePen, AlertCircle, Filter, Paperclip, Check, Send,
-  Landmark, MessageCircle, CalendarDays, PlayCircle, ListChecks,
+  Landmark, CalendarDays, PlayCircle, ListChecks,
 } from "lucide-react";
 import { AddressAutocomplete } from "./AddressAutocomplete";
 import { StyledSelect } from "./StyledSelect";
@@ -8174,20 +8174,19 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                         {/* Other ways to get help — for anyone who'd rather
                             talk to a person, watch, or follow a guide. */}
                         <div className="pb-2 text-[11px] font-semibold uppercase tracking-wide" style={{ ...font, color: "#A614C3" }}>We&apos;re here to help</div>
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className="grid grid-cols-3 gap-2">
                           {[
-                            { label: "Live chat", Icon: MessageCircle, toast: { title: "Live chat", description: "Opens a chat with the NorbieLink support team." } },
                             { label: "Schedule a call", Icon: CalendarDays, toast: { title: "Schedule a call", description: "Opens a calendar to book time with the support team." } },
                             { label: "Watch the video", Icon: PlayCircle, toast: { title: "Watch the video", description: "Opens the 2-minute team setup walkthrough." } },
-                            { label: "Step-by-step guide", Icon: ListChecks, toast: { title: "Step-by-step guide", description: "Opens the written guide with screenshots." } },
+                            { label: "View guide", Icon: ListChecks, toast: { title: "View guide", description: "Opens the written guide with screenshots." } },
                           ].map(({ label, Icon, toast }) => (
                             <button key={label} type="button" onClick={() => showToast(toast)}
-                              className="flex items-center gap-2 rounded-lg px-3 py-2 text-left cursor-pointer transition-colors"
+                              className="flex flex-col items-center justify-center gap-1.5 rounded-lg px-2 py-2.5 text-center cursor-pointer transition-colors"
                               style={{ background: "transparent", border: `1px solid ${c.border}` }}
                               onMouseEnter={e => (e.currentTarget.style.borderColor = RZ)}
                               onMouseLeave={e => (e.currentTarget.style.borderColor = c.border)}>
                               <Icon className="w-4 h-4 flex-shrink-0" style={{ color: RZ }} strokeWidth={2} />
-                              <span className="text-[12px] font-semibold" style={{ ...font, color: c.text }}>{label}</span>
+                              <span className="text-[11.5px] font-semibold leading-tight" style={{ ...font, color: c.text }}>{label}</span>
                             </button>
                           ))}
                         </div>
