@@ -9,7 +9,7 @@ import {
   StickyNote, LayoutGrid, Trash2, Archive, Pin, List, Table2, FolderOpen, FileCheck,
   CheckSquare, Maximize2, Minimize2, Lock, Unlock, Copy, CopyPlus,
   MoreVertical, UserCircle, UserX, UserMinus, Download, Upload, UserCog, Pencil, Globe, Eye, Mail, Phone, Bell, Bookmark, FilePen, AlertCircle, Filter, Paperclip, Check, Send,
-  Landmark,
+  Landmark, MessageCircle, CalendarDays, PlayCircle, ListChecks,
 } from "lucide-react";
 import { AddressAutocomplete } from "./AddressAutocomplete";
 import { StyledSelect } from "./StyledSelect";
@@ -8104,7 +8104,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                     </span>
                     {!teamTipOpen && (
                       <span className="text-[12px] truncate" style={{ ...font, color: isDark ? "#E5E7EB" : "#1F2937" }}>
-                        · Admin access and common questions
+                        · Admin access, common questions and help
                       </span>
                     )}
                     <ChevronDown className="w-4 h-4 ml-auto flex-shrink-0 transition-transform"
@@ -8160,7 +8160,33 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                       {/* Side by side to keep the panel short: Admin on the
                           left, questions on the right (stacks on narrow screens). */}
                       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] gap-3 mt-3 items-start" style={{ maxWidth: 980 }}>
+                      {/* Left: Admin card with More help under it, so both
+                          columns end at about the same height. */}
+                      <div className="flex flex-col gap-4 min-w-0">
                       {card()}
+                      <div className="px-1">
+                        {/* Other ways to get help — for anyone who'd rather
+                            talk to a person, watch, or follow a guide. */}
+                        <div className="pb-2 text-[11px] font-semibold uppercase tracking-wide" style={{ ...font, color: "#A614C3" }}>We&apos;re here to help</div>
+                        <div className="grid grid-cols-2 gap-2">
+                          {[
+                            { label: "Live chat", Icon: MessageCircle, toast: { title: "Live chat", description: "Opens a chat with the NorbieLink support team." } },
+                            { label: "Schedule a call", Icon: CalendarDays, toast: { title: "Schedule a call", description: "Opens a calendar to book time with the support team." } },
+                            { label: "Watch the video", Icon: PlayCircle, toast: { title: "Watch the video", description: "Opens the 2-minute team setup walkthrough." } },
+                            { label: "Step-by-step guide", Icon: ListChecks, toast: { title: "Step-by-step guide", description: "Opens the written guide with screenshots." } },
+                          ].map(({ label, Icon, toast }) => (
+                            <button key={label} type="button" onClick={() => showToast(toast)}
+                              className="flex items-center gap-2 rounded-lg px-3 py-2 text-left cursor-pointer transition-colors"
+                              style={{ background: "transparent", border: `1px solid ${c.border}` }}
+                              onMouseEnter={e => (e.currentTarget.style.borderColor = RZ)}
+                              onMouseLeave={e => (e.currentTarget.style.borderColor = c.border)}>
+                              <Icon className="w-4 h-4 flex-shrink-0" style={{ color: RZ }} strokeWidth={2} />
+                              <span className="text-[12px] font-semibold" style={{ ...font, color: c.text }}>{label}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      </div>
                       {/* Plain list with divider lines — no card around it. */}
                       <div className="px-4 py-3">
                         <div className="pb-2 text-[11px] font-semibold uppercase tracking-wide" style={{ ...font, color: "#A614C3" }}>Common questions</div>
