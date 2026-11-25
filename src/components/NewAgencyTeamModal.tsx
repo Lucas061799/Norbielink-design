@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef } from "react";
-import { X, UserPlus, ArrowRight, Check } from "lucide-react";
+import { X, UserPlus, ArrowRight } from "lucide-react";
 
 // -----------------------------------------------------------------------------
 // First-run Team Setup notice — NEW agency variant.
@@ -87,25 +87,27 @@ export default function NewAgencyTeamModal({ isDark, open, onClose, onRemindLate
             Set up your agency&apos;s users
           </h2>
           <p className="text-[13px] mt-1.5" style={{ fontFamily: FONT, color: muted, lineHeight: 1.55 }}>
-            You&apos;re the first user, and an Admin.{" "}
-            <span style={{ fontWeight: 700, color: text }}>Add the people at your agency who&apos;ll use NorbieLink, and choose who else should be an Admin.</span>
+            You&apos;re the first user, and an Admin. Here&apos;s what to do next:
           </p>
 
-          {/* What an Admin can do — same three rows as the Admin card on
-              Admin › Users, so the two read as one explanation. */}
-          <div className="mt-4 rounded-xl p-3.5" style={{ border: `1px solid ${border}` }}>
-            <div className="text-[12.5px] font-semibold mb-2" style={{ fontFamily: FONT, color: text }}>As an Admin, you can:</div>
-            <div className="flex flex-col gap-1.5">
-              {["Add, edit & remove users", "Make other Admins", "View statements & commissions"].map(p => (
-                <div key={p} className="flex items-center justify-between gap-3 rounded-lg px-3 py-2"
-                  style={{ background: isDark ? "rgba(255,255,255,0.05)" : "#F3F4F6" }}>
-                  <span className="text-[12.5px] font-medium" style={{ fontFamily: FONT, color: text }}>{p}</span>
-                  <Check className="w-4 h-4 flex-shrink-0" style={{ color: "#A614C3" }} strokeWidth={2.5} />
+          {/* The two things to do in Admin › Users: add people, then pick
+              Admins. What Admins can do sits under step 2 so they choose well. */}
+          <div className="mt-4 rounded-xl p-3.5 flex flex-col gap-2" style={{ border: `1px solid ${border}` }}>
+            {[
+              { t: "Add your users", d: "One at a time, or import a list." },
+              { t: "Choose your Admins", d: "Admins can add, edit & remove users, make other Admins, and view statements & commissions." },
+            ].map((s, i) => (
+              <div key={s.t} className="flex items-start gap-3 rounded-lg px-3 py-2.5"
+                style={{ background: isDark ? "rgba(255,255,255,0.05)" : "#F3F4F6" }}>
+                <span className="flex items-center justify-center rounded-full text-[11px] font-bold text-white flex-shrink-0"
+                  style={{ width: 20, height: 20, background: "#A614C3", fontFamily: FONT, marginTop: 1 }}>{i + 1}</span>
+                <div className="min-w-0">
+                  <div className="text-[12.5px] font-semibold" style={{ fontFamily: FONT, color: text }}>{s.t}</div>
+                  <div className="text-[12px] mt-0.5" style={{ fontFamily: FONT, color: muted, lineHeight: 1.5 }}>{s.d}</div>
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
           </div>
-
 
           <p className="text-[12.5px] mt-4" style={{ fontFamily: FONT, color: muted, lineHeight: 1.5 }}>
             You can do this anytime in{" "}
