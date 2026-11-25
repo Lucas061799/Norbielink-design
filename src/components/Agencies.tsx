@@ -8063,10 +8063,10 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                 banner matching the Legacy BTIS banner family. */}
             {coachmarkVisible && (
               <div
-                className="rounded-xl p-4 mb-4 flex items-start gap-3"
+                className="rounded-xl mb-4 overflow-hidden"
                 onClick={e => e.stopPropagation()}
                 style={{
-                  background: isDark ? "#1E2240" : "#F9FAFB",
+                  background: isDark ? "#161A33" : "#FFFFFF",
                   border: `1px solid ${c.border}`,
                   // Lift above the dim backdrop only while spotlight is on.
                   position: spotlightActive ? "relative" : undefined,
@@ -8079,7 +8079,11 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                   transition: "box-shadow 220ms ease-out",
                 }}
               >
-                <svg className="w-5 h-5 flex-shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                {/* Grey header bar; the body below stays white so the
+                    cards and help buttons stand out. */}
+                <div className="flex items-center gap-3 px-4 py-3"
+                  style={{ background: isDark ? "#1E2240" : "#F3F4F6", borderBottom: teamTipOpen ? `1px solid ${c.border}` : "none" }}>
+                <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" fill="none" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <defs>
                     <linearGradient id="team-coach-razz" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="24" y2="0">
                       <stop offset="0%" stopColor="#A614C3" />
@@ -8110,7 +8114,9 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                     <ChevronDown className="w-4 h-4 ml-auto flex-shrink-0 transition-transform"
                       style={{ color: isDark ? "#E5E7EB" : "#1F2937", transform: teamTipOpen ? "rotate(180deg)" : undefined }} />
                   </button>
-                  {teamTipOpen && (<>
+                </div>
+                </div>
+                  {teamTipOpen && (<div className="px-4 pb-4">
                   {/* Two access levels, shown as pictures not paragraphs:
                       Admin unlocks every tile; everyone else gets one. */}
                   {(() => {
@@ -8207,8 +8213,7 @@ function AgencyDetailView({ agency, isDark, onBack, c, btnGrad, stars, onToggleS
                       </div>
                     </>);
                   })()}
-                  </>)}
-                </div>
+                  </div>)}
               </div>
             )}
             {/* Legacy BTIS auto-detect banner — shown when there are new
