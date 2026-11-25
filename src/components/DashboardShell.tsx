@@ -335,6 +335,7 @@ export default function DashboardShell({ children, pageTitle }: DashboardShellPr
           else setActivePage(item);
         }}
         activeDemoItem={isNewAgency ? "Onboarding · New agency admin" : "Onboarding · Legacy agency admin"}
+        hideLegacyView={isNewAgency}
       />
       <div className="flex-1 flex flex-col overflow-hidden">
         <TopBar

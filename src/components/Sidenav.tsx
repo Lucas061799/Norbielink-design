@@ -98,9 +98,12 @@ interface SidenavProps {
   // Demo: which onboarding view is loaded, so its submenu entry stays
   // highlighted even though the current page is something else.
   activeDemoItem?: string;
+  // New agencies never had the legacy portal, so they don't get the
+  // Legacy View toggle (we don't want them starting on a sunset system).
+  hideLegacyView?: boolean;
 }
 
-export default function Sidenav({ isDark = false, onToggleDark, activeItem = "Marketplace", onActiveChange, activeDemoItem }: SidenavProps) {
+export default function Sidenav({ isDark = false, onToggleDark, activeItem = "Marketplace", onActiveChange, activeDemoItem, hideLegacyView = false }: SidenavProps) {
   const [legacyView, setLegacyView] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const accountRef = useRef<HTMLDivElement | null>(null);
@@ -478,7 +481,8 @@ export default function Sidenav({ isDark = false, onToggleDark, activeItem = "Ma
           <span style={{ fontSize: "13px", fontWeight: 400, color: isDark ? "#F9FAFB" : "#6B7280" }}>Dark Mode</span>
         </button>
 
-        {/* Legacy View — no border, no icon in knob */}
+        {/* Legacy View — no border, no icon in knob. Hidden for new agencies. */}
+        {!hideLegacyView && (
         <button
           onClick={() => setLegacyView(!legacyView)}
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all"
@@ -491,6 +495,7 @@ export default function Sidenav({ isDark = false, onToggleDark, activeItem = "Ma
           </div>
           <span style={{ fontSize: "13px", fontWeight: 400, color: isDark ? "#F9FAFB" : "#6B7280" }}>Legacy View</span>
         </button>
+        )}
 
       </div>
       </div>
